@@ -8,5 +8,5 @@ pub fn compile_file(file: SourceFile) -> String {
         println!("{:?}", token);
     }
 
-    return String::new();
+    String::new()
 }

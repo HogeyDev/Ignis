@@ -73,7 +73,7 @@ impl Tokenizer {
             tokens.push(token);
         }
 
-        return tokens;
+        tokens
     }
     fn next(&mut self) {
         self.index += 1;
@@ -97,7 +97,7 @@ impl Tokenizer {
             token.value.push(self.current_character);
             self.next();
         }
-        return token;
+        token
     }
     fn parse_string(&mut self) -> Token {
         let mut token = Token {
@@ -110,7 +110,7 @@ impl Tokenizer {
             self.next();
         }
         self.next();
-        return token;
+        token
     }
     fn parse_number(&mut self) -> Token {
         let mut token = Token {
@@ -118,19 +118,19 @@ impl Tokenizer {
             variation: TokenType::String,
         };
         self.next();
-        while self.current_character.is_digit(10) {
+        while self.current_character.is_ascii_digit() {
             token.value.push(self.current_character);
             self.next();
         }
         self.next();
-        return token;
+        token
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
         self.next();
-        return Token {
+        Token {
             value: "".to_string(),
             variation: token_type,
-        };
+        }
     }
     fn peek(&self, offset: usize) -> char {
         return self.source.as_bytes()[self.index + offset] as char;
@@ -143,11 +143,11 @@ impl Tokenizer {
         if self.current_character == '\"' {
             return self.parse_string();
         }
-        if self.current_character.is_digit(10) {
+        if self.current_character.is_ascii_digit() {
             return self.parse_number();
         }
 
-        return self.skip_and_return(match self.current_character {
+        self.skip_and_return(match self.current_character {
             '(' => TokenType::LeftParenthesis,
             ')' => TokenType::RightParenthesis,
             '{' => TokenType::LeftBrace,
@@ -193,6 +193,6 @@ impl Tokenizer {
             '*' => TokenType::Star,
             '/' => TokenType::Slash,
             _ => TokenType::EndOfFile,
-        });
+        })
     }
 }
