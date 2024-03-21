@@ -1,6 +1,6 @@
 use crate::io::SourceFile;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Identifier,
     Function,
@@ -10,18 +10,21 @@ pub enum TokenType {
     For,
     While,
     Return,
+    Import,
 
     LeftParenthesis,
     RightParenthesis,
     LeftBrace,
     RightBrace,
 
+    Period,
     Colon,
     SemiColon,
     Comma,
 
     Equals,
 
+    NotEqualsTo,
     EqualsTo,
     LessThan,
     LessThanEqualsTo,
@@ -29,10 +32,13 @@ pub enum TokenType {
     MoreThanEqualsTo,
     Increment,
     Decrement,
+    Bang,
     Plus,
     Minus,
     Star,
     Slash,
+    DoublePipe,
+    DoubleAmpersand,
 
     String,
     Integer,
@@ -40,9 +46,9 @@ pub enum TokenType {
     EndOfFile,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
-    pub variation: TokenType,
+    pub token_type: TokenType,
     pub value: String,
 }
 
@@ -67,7 +73,7 @@ impl Tokenizer {
 
         loop {
             let token = self.get_next_token();
-            if token.variation == TokenType::EndOfFile {
+            if token.token_type == TokenType::EndOfFile {
                 break;
             }
             tokens.push(token);
@@ -90,19 +96,30 @@ impl Tokenizer {
     }
     fn parse_identifier(&mut self) -> Token {
         let mut token = Token {
-            value: "".to_string(),
-            variation: TokenType::Identifier,
+            value: String::new(),
+            token_type: TokenType::Identifier,
         };
         while self.current_character.is_alphanumeric() {
             token.value.push(self.current_character);
             self.next();
         }
+        token.token_type = match token.value.as_str() {
+            "fn" => TokenType::Function,
+            "if" => TokenType::If,
+            "let" => TokenType::Let,
+            "asm" => TokenType::Asm, // TODO: this is gonna need some extra parsing, though
+            "for" => TokenType::For,
+            "while" => TokenType::While,
+            "return" => TokenType::For,
+            "import" => TokenType::Import,
+            _ => TokenType::Identifier,
+        };
         token
     }
     fn parse_string(&mut self) -> Token {
         let mut token = Token {
-            value: "".to_string(),
-            variation: TokenType::String,
+            value: String::new(),
+            token_type: TokenType::String,
         };
         self.next();
         while self.current_character != '\"' {
@@ -114,8 +131,8 @@ impl Tokenizer {
     }
     fn parse_number(&mut self) -> Token {
         let mut token = Token {
-            value: "".to_string(),
-            variation: TokenType::String,
+            value: String::new(),
+            token_type: TokenType::String,
         };
         self.next();
         while self.current_character.is_ascii_digit() {
@@ -126,11 +143,27 @@ impl Tokenizer {
         token
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
+        let token: Token = if token_type == TokenType::Increment
+            || token_type == TokenType::Decrement
+            || token_type == TokenType::EqualsTo
+            || token_type == TokenType::LessThanEqualsTo
+            || token_type == TokenType::MoreThanEqualsTo
+        {
+            let mut name = String::from(self.current_character);
+            self.next();
+            name.push(self.current_character);
+            Token {
+                value: name,
+                token_type,
+            }
+        } else {
+            Token {
+                value: String::from(self.current_character),
+                token_type,
+            }
+        };
         self.next();
-        Token {
-            value: "".to_string(),
-            variation: token_type,
-        }
+        token
     }
     fn peek(&self, offset: usize) -> char {
         return self.source.as_bytes()[self.index + offset] as char;
@@ -152,6 +185,7 @@ impl Tokenizer {
             ')' => TokenType::RightParenthesis,
             '{' => TokenType::LeftBrace,
             '}' => TokenType::RightBrace,
+            '.' => TokenType::Period,
             ':' => TokenType::Colon,
             ';' => TokenType::SemiColon,
             ',' => TokenType::Comma,
@@ -188,6 +222,13 @@ impl Tokenizer {
                     TokenType::Decrement
                 } else {
                     TokenType::Minus
+                }
+            }
+            '!' => {
+                if self.peek(1) == '=' {
+                    TokenType::NotEqualsTo
+                } else {
+                    TokenType::Bang
                 }
             }
             '*' => TokenType::Star,

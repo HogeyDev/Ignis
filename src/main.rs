@@ -4,6 +4,7 @@ use io::{read_file, write_file, SourceFile};
 pub mod compile;
 pub mod io;
 pub mod lexer;
+pub mod parser;
 
 fn main() {
     let input_file_path = "example/hello_world.is".to_string();
