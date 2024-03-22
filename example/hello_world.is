@@ -9,7 +9,7 @@ fn fibonacci: int = (n: int) {
     let curr: int = 1;
     let temp: int = 0;
 
-    for (let i: int = 2; i <= n; i++) {
+    for (let i: int = 2; i <= n; ++i) {
         temp = curr;
         curr = prev + curr;
         prev = temp;
@@ -21,7 +21,7 @@ fn fibonacci: int = (n: int) {
 fn main: int = () {
     let n: int = 10;
     printf("Fibonacci sequence up to the %dth term:", n);
-    for (let i: int = 0; i <= n; i++) {
+    for (let i: int = 0; i <= n; ++i) {
         let result: int = fibonacci(i);
         printf("fib(%d) = %d", i, result);
     }

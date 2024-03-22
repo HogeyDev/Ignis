@@ -179,6 +179,7 @@ impl Parser {
                 let name = self.current_token.value.clone();
                 self.eat(TokenType::Identifier);
 
+                self.eat(TokenType::Colon);
                 let mut return_type = String::new();
                 while self.current_token.token_type != TokenType::Equals {
                     return_type.push_str(self.current_token.value.as_str());
@@ -276,13 +277,10 @@ impl Parser {
                 self.eat(TokenType::LeftParenthesis);
                 let initializer = self.scope();
                 let condition = self.expression();
-                println!("COND");
                 self.eat(TokenType::SemiColon);
                 let updater = self.expression();
-                println!("UPDA");
                 self.eat(TokenType::RightParenthesis);
                 let body = self.scope();
-                println!("BODY");
 
                 stmt = Some(Box::new(AST::For {
                     initializer,
@@ -290,6 +288,39 @@ impl Parser {
                     updater,
                     body,
                 }));
+            } else if self.current_token.token_type == TokenType::Identifier {
+                if self.peek(1).token_type == TokenType::LeftParenthesis {
+                    // function call
+                    let name = self.current_token.value.clone();
+                    self.eat(TokenType::Identifier);
+                    self.eat(TokenType::LeftParenthesis);
+
+                    let mut arguments = Vec::new();
+                    while self.current_token.token_type != TokenType::RightParenthesis
+                        && self.current_token.token_type != TokenType::EndOfFile
+                    {
+                        arguments.push(Box::new(AST::Argument(self.expression())));
+                        if self.current_token.token_type == TokenType::Comma {
+                            // there is still more to parse
+                            self.eat(TokenType::Comma);
+                        }
+                    }
+                    self.eat(TokenType::RightParenthesis);
+
+                    self.eat(TokenType::SemiColon);
+
+                    stmt = Some(Box::new(AST::FunctionCall { name, arguments }));
+                } else {
+                    // variable assignment
+                    let name = self.current_token.value.clone();
+                    self.eat(TokenType::Identifier);
+                    self.eat(TokenType::Equals);
+
+                    let value = self.expression();
+                    self.eat(TokenType::SemiColon);
+
+                    stmt = Some(Box::new(AST::VariableAssignment { name, value }));
+                }
             }
             if let Some(s) = stmt {
                 match *scope {
@@ -301,7 +332,7 @@ impl Parser {
             } else {
                 println!("{:#?}", scope);
 
-                let radius = 2;
+                let radius = 4;
                 eprintln!(
                     "Cannot find matching parse method for tokens in order (radius = {radius}):"
                 );
@@ -439,10 +470,14 @@ impl Parser {
     fn unary(&mut self) -> Box<AST> {
         if self.current_token.token_type == TokenType::Bang
             || self.current_token.token_type == TokenType::Minus
+            || self.current_token.token_type == TokenType::Increment
+            || self.current_token.token_type == TokenType::Decrement
         {
             let op = match self.current_token.token_type {
                 TokenType::Minus => Operation::Neg,
                 TokenType::Bang => Operation::Inv,
+                TokenType::Increment => Operation::Inc,
+                TokenType::Decrement => Operation::Dec,
                 _ => {
                     eprintln!(
                         "{:?} is not a valid operation, or it has not been implemented yet",
@@ -451,6 +486,7 @@ impl Parser {
                     process::exit(1);
                 }
             };
+            self.advance();
             return Box::new(AST::UnaryExpr {
                 op,
                 child: self.primary(),

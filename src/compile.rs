@@ -20,7 +20,7 @@ pub fn compile_file(file: SourceFile) -> String {
         value: String::from("}"),
     });
 
-    // for token in token_list {
+    // for token in token_list.iter() {
     //     println!("{:?}", token);
     // }
 
