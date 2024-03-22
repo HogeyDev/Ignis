@@ -1,8 +1,24 @@
-use crate::{io::SourceFile, lexer::Tokenizer, parser::Parser};
+use crate::{
+    io::SourceFile,
+    lexer::{Token, TokenType, Tokenizer},
+    parser::Parser,
+};
 
 pub fn compile_file(file: SourceFile) -> String {
     let mut tokenizer = Tokenizer::new(file);
-    let token_list = tokenizer.tokenize();
+    let mut token_list = tokenizer.tokenize();
+
+    token_list.insert(
+        0,
+        Token {
+            token_type: TokenType::LeftBrace,
+            value: String::from("{"),
+        },
+    );
+    token_list.push(Token {
+        token_type: TokenType::RightBrace,
+        value: String::from("}"),
+    });
 
     // for token in token_list {
     //     println!("{:?}", token);

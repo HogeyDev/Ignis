@@ -8,12 +8,23 @@ pub enum Operation {
     Sub, // -
     Mul, // *
     Div, // /
+    Mod, // %
+
+    Inc, // ++
+    Dec, // --
 
     Inv, // !
     Neg, // -
 
     Or,  // ||
     And, // &&
+
+    Eq,  // ==
+    Neq, // !=
+    LT,  // <
+    GT,  // >
+    LTE, // <=
+    GTE, // >=
 }
 
 #[derive(Debug)]
@@ -42,6 +53,7 @@ pub enum AST {
     },
     FunctionCall {
         name: String,
+        arguments: Vec<Box<AST>>,
     },
     VariableDeclaration {
         variable_type: String,
@@ -66,6 +78,7 @@ pub enum AST {
         initializer: Box<AST>,
         condition: Box<AST>,
         updater: Box<AST>,
+        body: Box<AST>,
     },
     Return(Box<AST>),
     Asm(String),
@@ -115,6 +128,7 @@ impl Parser {
                 "Expected token of type: {:?}, but instead got token of type: {:?}",
                 token_type, self.current_token.token_type
             );
+            self.print_token_debug_stack(5);
             process::exit(1);
         }
         self.advance();
@@ -216,6 +230,66 @@ impl Parser {
                 let condition = self.expression();
                 let body = self.scope();
                 stmt = Some(Box::new(AST::If { condition, body }));
+            } else if self.current_token.token_type == TokenType::Return {
+                self.eat(TokenType::Return);
+                let value = self.expression();
+                self.eat(TokenType::SemiColon);
+                stmt = Some(Box::new(AST::Return(value)));
+            } else if self.current_token.token_type == TokenType::Let {
+                self.eat(TokenType::Let);
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+                self.eat(TokenType::Colon);
+                let mut variable_type = String::new();
+                while self.current_token.token_type != TokenType::Equals
+                    && self.current_token.token_type != TokenType::SemiColon
+                {
+                    variable_type.push_str(self.current_token.value.as_str());
+                    self.advance();
+                }
+                let set_value = self.current_token.token_type == TokenType::Equals;
+                if set_value {
+                    self.eat(TokenType::Equals);
+                    match *scope {
+                        AST::Block(ref mut statements) => {
+                            statements.push(Box::new(AST::VariableDeclaration {
+                                variable_type,
+                                name: name.clone(),
+                            }));
+                        }
+                        _ => unreachable!(),
+                    };
+
+                    stmt = Some(Box::new(AST::VariableAssignment {
+                        name,
+                        value: self.expression(),
+                    }));
+                } else {
+                    stmt = Some(Box::new(AST::VariableDeclaration {
+                        variable_type,
+                        name: name.clone(),
+                    }));
+                }
+                self.eat(TokenType::SemiColon);
+            } else if self.current_token.token_type == TokenType::For {
+                self.eat(TokenType::For);
+                self.eat(TokenType::LeftParenthesis);
+                let initializer = self.scope();
+                let condition = self.expression();
+                println!("COND");
+                self.eat(TokenType::SemiColon);
+                let updater = self.expression();
+                println!("UPDA");
+                self.eat(TokenType::RightParenthesis);
+                let body = self.scope();
+                println!("BODY");
+
+                stmt = Some(Box::new(AST::For {
+                    initializer,
+                    condition,
+                    updater,
+                    body,
+                }));
             }
             if let Some(s) = stmt {
                 match *scope {
@@ -234,11 +308,16 @@ impl Parser {
                 self.print_token_debug_stack(radius);
                 process::exit(1);
             }
+            if !brace_delim {
+                break;
+            }
+        }
+        if brace_delim {
+            self.eat(TokenType::RightBrace);
         }
         scope
     }
     fn expression(&mut self) -> Box<AST> {
-        // TODO: Implement expression parsing
         let mut lhs = self.comparison();
 
         while self.current_token.token_type == TokenType::DoublePipe
@@ -277,10 +356,150 @@ impl Parser {
             || self.current_token.token_type == TokenType::MoreThanEqualsTo
         {
             let op = match self.current_token.token_type {
-                TokenType::
-            }
+                TokenType::EqualsTo => Operation::Eq,
+                TokenType::NotEqualsTo => Operation::Neq,
+                TokenType::LessThan => Operation::LT,
+                TokenType::MoreThan => Operation::GT,
+                TokenType::LessThanEqualsTo => Operation::LTE,
+                TokenType::MoreThanEqualsTo => Operation::GTE,
+                _ => {
+                    eprintln!(
+                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        self.current_token.token_type
+                    );
+                    process::exit(1);
+                }
+            };
+            self.advance();
+            lhs = Box::new(AST::BinaryExpression {
+                op,
+                lhs,
+                rhs: self.term(),
+            });
         }
 
         lhs
+    }
+    fn term(&mut self) -> Box<AST> {
+        let mut lhs = self.factor();
+
+        while self.current_token.token_type == TokenType::Plus
+            || self.current_token.token_type == TokenType::Minus
+        {
+            let op = match self.current_token.token_type {
+                TokenType::Plus => Operation::Add,
+                TokenType::Minus => Operation::Sub,
+                _ => {
+                    eprintln!(
+                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        self.current_token.token_type
+                    );
+                    process::exit(1);
+                }
+            };
+            self.advance();
+            lhs = Box::new(AST::BinaryExpression {
+                op,
+                lhs,
+                rhs: self.factor(),
+            });
+        }
+
+        lhs
+    }
+    fn factor(&mut self) -> Box<AST> {
+        let mut lhs = self.unary();
+
+        while self.current_token.token_type == TokenType::Star
+            || self.current_token.token_type == TokenType::Slash
+            || self.current_token.token_type == TokenType::Percent
+        {
+            let op = match self.current_token.token_type {
+                TokenType::Star => Operation::Mul,
+                TokenType::Slash => Operation::Div,
+                TokenType::Percent => Operation::Mod,
+                _ => {
+                    eprintln!(
+                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        self.current_token.token_type
+                    );
+                    process::exit(1);
+                }
+            };
+            self.advance();
+            lhs = Box::new(AST::BinaryExpression {
+                op,
+                lhs,
+                rhs: self.unary(),
+            })
+        }
+
+        lhs
+    }
+    fn unary(&mut self) -> Box<AST> {
+        if self.current_token.token_type == TokenType::Bang
+            || self.current_token.token_type == TokenType::Minus
+        {
+            let op = match self.current_token.token_type {
+                TokenType::Minus => Operation::Neg,
+                TokenType::Bang => Operation::Inv,
+                _ => {
+                    eprintln!(
+                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        self.current_token.token_type
+                    );
+                    process::exit(1);
+                }
+            };
+            return Box::new(AST::UnaryExpr {
+                op,
+                child: self.primary(),
+            });
+        }
+        self.primary()
+    }
+    fn primary(&mut self) -> Box<AST> {
+        match self.current_token.token_type {
+            TokenType::Integer => {
+                let value = match i32::from_str_radix(self.current_token.value.as_str(), 10) {
+                    Ok(num) => num,
+                    Err(_) => 0,
+                };
+                self.eat(TokenType::Integer);
+                Box::new(AST::Integer(value))
+            }
+            TokenType::String => {
+                let value = self.current_token.value.clone();
+                self.eat(TokenType::String);
+                Box::new(AST::String(value))
+            }
+            TokenType::Identifier => {
+                if self.peek(1).token_type == TokenType::LeftParenthesis {
+                    let name = self.current_token.value.clone();
+                    self.eat(TokenType::Identifier);
+                    self.eat(TokenType::LeftParenthesis);
+                    let mut arguments = Vec::new();
+                    while self.current_token.token_type != TokenType::RightParenthesis {
+                        let value = self.expression();
+                        arguments.push(Box::new(AST::Argument(value)));
+                        if self.current_token.token_type != TokenType::RightParenthesis {
+                            self.eat(TokenType::Comma);
+                        }
+                    }
+                    self.eat(TokenType::RightParenthesis);
+                    return Box::new(AST::FunctionCall { name, arguments });
+                }
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+                Box::new(AST::VariableCall { name })
+            }
+            TokenType::LeftParenthesis => {
+                self.eat(TokenType::LeftParenthesis);
+                let group = self.expression();
+                self.eat(TokenType::RightParenthesis);
+                group
+            }
+            _ => self.expression(),
+        }
     }
 }

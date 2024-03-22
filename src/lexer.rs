@@ -37,6 +37,7 @@ pub enum TokenType {
     Minus,
     Star,
     Slash,
+    Percent,
     DoublePipe,
     DoubleAmpersand,
 
@@ -110,7 +111,7 @@ impl Tokenizer {
             "asm" => TokenType::Asm, // TODO: this is gonna need some extra parsing, though
             "for" => TokenType::For,
             "while" => TokenType::While,
-            "return" => TokenType::For,
+            "return" => TokenType::Return,
             "import" => TokenType::Import,
             _ => TokenType::Identifier,
         };
@@ -132,14 +133,12 @@ impl Tokenizer {
     fn parse_number(&mut self) -> Token {
         let mut token = Token {
             value: String::new(),
-            token_type: TokenType::String,
+            token_type: TokenType::Integer,
         };
-        self.next();
         while self.current_character.is_ascii_digit() {
             token.value.push(self.current_character);
             self.next();
         }
-        self.next();
         token
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
@@ -233,6 +232,7 @@ impl Tokenizer {
             }
             '*' => TokenType::Star,
             '/' => TokenType::Slash,
+            '%' => TokenType::Percent,
             _ => TokenType::EndOfFile,
         })
     }
