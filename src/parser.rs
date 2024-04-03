@@ -2,7 +2,7 @@ use std::{process, usize};
 
 use crate::lexer::{Token, TokenType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operation {
     Add, // +
     Sub, // -
@@ -27,7 +27,7 @@ pub enum Operation {
     GTE, // >=
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AST {
     Integer(i32), // TODO: maybe implement 64 bits???
     String(String),
@@ -330,7 +330,7 @@ impl Parser {
                     _ => unreachable!(),
                 }
             } else {
-                println!("{:#?}", scope);
+                // println!("{:#?}", scope);
 
                 let radius = 4;
                 eprintln!(

@@ -1,4 +1,4 @@
-import stdio;
+import example.stdio;
 
 fn fibonacci: int = (n: int) {
     if (n <= 1) {

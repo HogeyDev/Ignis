@@ -1,10 +1,11 @@
 use crate::{
+    config::Configuration,
     io::SourceFile,
     lexer::{Token, TokenType, Tokenizer},
-    parser::Parser,
+    parser::{Parser, AST},
 };
 
-pub fn compile_file(file: SourceFile) -> String {
+pub fn parse_file(_program_config: Configuration, file: SourceFile) -> Box<AST> {
     let mut tokenizer = Tokenizer::new(file);
     let mut token_list = tokenizer.tokenize();
 
@@ -25,8 +26,5 @@ pub fn compile_file(file: SourceFile) -> String {
     // }
 
     let mut parser = Parser::new(token_list);
-    let ast = parser.parse();
-    println!("{:#?}", ast);
-
-    String::new()
+    parser.parse()
 }

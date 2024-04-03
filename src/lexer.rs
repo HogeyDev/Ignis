@@ -62,15 +62,22 @@ pub struct Tokenizer {
 
 impl Tokenizer {
     pub fn new(source_file: SourceFile) -> Tokenizer {
-        return Tokenizer {
+        let mut t = Tokenizer {
             index: 0,
             source_file: source_file.clone(),
             source: source_file.clone().contents,
-            current_character: source_file.contents.as_bytes()[0] as char,
+            current_character: '\0',
         };
+        if t.source.len() > 0 {
+            t.current_character = source_file.contents.as_bytes()[0] as char;
+        }
+        t
     }
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
+        if self.source.len() == 0 {
+            return tokens;
+        }
 
         loop {
             let token = self.get_next_token();
