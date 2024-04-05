@@ -30,6 +30,17 @@ impl ScopeContext {
     }
     pub fn push(&mut self, source: String) -> String {
         self.stack_size += 1;
-        format!("")
+        format!("push {}\n", source)
+    }
+    pub fn pop(&mut self, destination: String) -> String {
+        self.stack_size -= 1;
+        format!("pop {}\n", destination)
+    }
+    pub fn sub_scope(&self) -> ScopeContext {
+        ScopeContext {
+            stack_size: 0,
+            variables: self.variables.clone(),
+            functions: self.functions.clone(),
+        }
     }
 }

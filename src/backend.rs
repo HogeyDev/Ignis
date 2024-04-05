@@ -49,16 +49,21 @@ pub fn compile_to_asm(
 
             asm.push_str(format!("global {}\n{}:\n", name, name).as_str());
 
-            for parameter in prototype {
-                asm.push_str(compile_to_asm(program_config.clone(), parameter, scope).as_str());
+            let body_scope = &mut scope.sub_scope();
+
+            body_scope.stack_size += 1; // return address pushed after arguments on call
+
+            for param in prototype {
+                asm.push_str(compile_to_asm(program_config.clone(), param, body_scope).as_str());
             }
 
             asm
         }
         AST::Parameter { param_type, name } => {
-            let offset = scope.add_variable(name, param_type);
-            scope.push(String::from("rax"));
-            String::from("")
+            let asm = String::new();
+            scope.add_variable(name, param_type);
+            // asm.push_str(scope.push(format!("QWORD [rsp+{}]", offset)).as_str());
+            asm
         }
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);
