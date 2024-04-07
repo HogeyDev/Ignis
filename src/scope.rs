@@ -7,6 +7,12 @@ pub struct ScopeContext {
     pub functions: Vec<(String, String, Vec<String>)>, // [NAME, TYPE, [ARG0, ARG1, ... ARGN]]
 }
 
+impl Default for ScopeContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScopeContext {
     pub fn new() -> ScopeContext {
         ScopeContext {
@@ -26,7 +32,18 @@ impl ScopeContext {
         self.variables
             .push((name.clone(), variable_type.clone(), self.stack_size));
         self.stack_size += 1;
-        return self.stack_size - 1;
+        self.stack_size - 1
+    }
+    pub fn get_variable(&self, name: String) -> (String, usize) {
+        match self.variables.iter().filter(|x| x.0 == name).nth(0) {
+            Some(value) => {
+                return (value.clone().1, value.2);
+            }
+            None => {
+                eprintln!("Could not find variable named `{}`", name);
+                process::exit(1);
+            }
+        }
     }
     pub fn push(&mut self, source: String) -> String {
         self.stack_size += 1;

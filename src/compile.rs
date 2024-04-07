@@ -21,10 +21,6 @@ pub fn parse_file(_program_config: Configuration, file: SourceFile) -> Box<AST> 
         value: String::from("}"),
     });
 
-    // for token in token_list.iter() {
-    //     println!("{:?}", token);
-    // }
-
     let mut parser = Parser::new(token_list);
     parser.parse()
 }

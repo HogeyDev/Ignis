@@ -159,7 +159,6 @@ impl Parser {
         }
         while self.current_token.token_type != TokenType::EndOfFile
             && self.current_token.token_type != TokenType::RightBrace
-            && self.current_token.token_type != TokenType::EndOfFile
         {
             let mut stmt: Option<Box<AST>> = None;
             if self.current_token.token_type == TokenType::Import {
@@ -497,10 +496,12 @@ impl Parser {
     fn primary(&mut self) -> Box<AST> {
         match self.current_token.token_type {
             TokenType::Integer => {
-                let value = match i32::from_str_radix(self.current_token.value.as_str(), 10) {
-                    Ok(num) => num,
-                    Err(_) => 0,
-                };
+                let value = self
+                    .current_token
+                    .value
+                    .as_str()
+                    .parse::<i32>()
+                    .unwrap_or(0);
                 self.eat(TokenType::Integer);
                 Box::new(AST::Integer(value))
             }

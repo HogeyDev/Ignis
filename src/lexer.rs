@@ -68,14 +68,14 @@ impl Tokenizer {
             source: source_file.clone().contents,
             current_character: '\0',
         };
-        if t.source.len() > 0 {
+        if !t.source.is_empty() {
             t.current_character = source_file.contents.as_bytes()[0] as char;
         }
         t
     }
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
-        if self.source.len() == 0 {
+        if self.source.is_empty() {
             return tokens;
         }
 

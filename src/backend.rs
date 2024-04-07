@@ -1,7 +1,11 @@
 use std::process;
 
 use crate::{
-    compile::parse_file, config::Configuration, io::read_file, parser::AST, scope::ScopeContext,
+    compile::parse_file,
+    config::Configuration,
+    io::read_file,
+    parser::{Operation, AST},
+    scope::ScopeContext,
 };
 
 pub fn compile_to_asm(
@@ -12,8 +16,12 @@ pub fn compile_to_asm(
     match *root {
         AST::Block(statements) => {
             let mut asm = String::new();
+
+            let block_scope = &mut scope.sub_scope();
             for statement in statements {
-                asm.push_str(compile_to_asm(program_config.clone(), statement, scope).as_str());
+                asm.push_str(
+                    compile_to_asm(program_config.clone(), statement, block_scope).as_str(),
+                );
             }
             asm
         }
@@ -42,7 +50,7 @@ pub fn compile_to_asm(
         AST::FunctionDeclaration {
             name,
             prototype,
-            // body,
+            body,
             ..
         } => {
             let mut asm = String::new();
@@ -57,14 +65,49 @@ pub fn compile_to_asm(
                 asm.push_str(compile_to_asm(program_config.clone(), param, body_scope).as_str());
             }
 
+            asm.push_str(&compile_to_asm(program_config.clone(), body, body_scope).as_str());
+
             asm
         }
         AST::Parameter { param_type, name } => {
-            let asm = String::new();
             scope.add_variable(name, param_type);
-            // asm.push_str(scope.push(format!("QWORD [rsp+{}]", offset)).as_str());
+            String::new()
+        }
+        AST::If { condition, body } => {
+            let mut asm = String::new();
+
+            asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
+            asm.push_str(compile_to_asm(program_config, body, scope).as_str());
+
             asm
         }
+        AST::BinaryExpression { op, lhs, rhs } => {
+            let mut asm = String::new();
+
+            asm.push_str(compile_to_asm(program_config.clone(), lhs, scope).as_str());
+            asm.push_str(compile_to_asm(program_config, rhs, scope).as_str());
+            asm.push_str(scope.pop(String::from("rbx")).as_str());
+            asm.push_str(scope.pop(String::from("rax")).as_str());
+
+            asm.push_str(match op {
+                Operation::LTE => "a",
+                _ => {
+                    eprintln!("Unimplemented operation: {:?}", op);
+                    process::exit(1);
+                }
+            });
+
+            asm
+        }
+        AST::VariableCall { name } => {
+            let mut asm = String::new();
+
+            let offset = scope.get_variable(name).0;
+            asm.push_str(scope.push(format!("QWORD [rsp+{}]", offset)).as_str());
+
+            asm
+        }
+        AST::Integer(value) => scope.push(format!("{}", value)),
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);
             process::exit(1);
