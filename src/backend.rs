@@ -108,6 +108,25 @@ pub fn compile_to_asm(
             asm
         }
         AST::Integer(value) => scope.push(format!("{}", value)),
+        AST::Return(value) => {
+            let mut asm = String::new();
+
+            asm.push_str(compile_to_asm(program_config, value, scope).as_str());
+            asm.push_str(scope.pop(String::from("rax")).as_str());
+            asm.push_str("\tret");
+
+            asm
+        }
+        AST::VariableDeclaration {
+            variable_type,
+            name,
+        } => {
+            let mut asm = String::new();
+
+            
+
+            asm
+        }
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);
             process::exit(1);
