@@ -18,11 +18,16 @@ fn main() {
     let input_file_path = String::from("example/hello_world.is");
     let input_file = read_file(input_file_path);
     let program_config = get_config();
-    let compiled = compile_to_asm(
+
+    let mut scope = &mut ScopeContext::new();
+    let section_text = compile_to_asm(
         program_config.clone(),
         parse_file(program_config, input_file),
-        ScopeContext::new().borrow_mut(),
+        scope,
     );
+    let section_data = scope.compile_strings();
+
+    let compiled = format!("{}\n{}", section_text, section_data);
 
     let output_file = SourceFile {
         path: String::from("example/hello_world.asm"),

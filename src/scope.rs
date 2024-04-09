@@ -5,6 +5,7 @@ pub struct ScopeContext {
     pub stack_size: usize,
     pub variables: Vec<(String, String, usize)>, // [NAME, TYPE, LOCATION]
     pub functions: Vec<(String, String, Vec<String>)>, // [NAME, TYPE, [ARG0, ARG1, ... ARGN]]
+    pub strings: Vec<(String, usize)>,           // [VALUE, ID]
 }
 
 impl Default for ScopeContext {
@@ -19,6 +20,7 @@ impl ScopeContext {
             stack_size: 0,
             variables: Vec::new(),
             functions: Vec::new(),
+            strings: Vec::new(),
         }
     }
     pub fn variable_exists(&self, name: String) -> bool {
@@ -58,6 +60,30 @@ impl ScopeContext {
             stack_size: 0,
             variables: self.variables.clone(),
             functions: self.functions.clone(),
+            strings: self.strings.clone(),
         }
+    }
+    pub fn absorb_strings(&mut self, scope: ScopeContext) {
+        for str in scope.strings {
+            if self.strings.iter().any(|x| x.1 == str.1) {
+                continue;
+            }
+            self.strings.push(str);
+        }
+        self.strings.sort_by(|a, b| a.1.cmp(&b.1));
+    }
+    pub fn add_string(&mut self, value: String) -> usize {
+        let id = self.strings.len();
+        self.strings.push((value, id));
+        id
+    }
+    pub fn compile_strings(&self) -> String {
+        let mut strings = String::new();
+
+        for str in self.strings.clone() {
+            strings.push_str(format!(".STR{} db \"{}\", 0\n", str.1, str.0).as_str());
+        }
+
+        strings
     }
 }

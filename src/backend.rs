@@ -23,6 +23,7 @@ pub fn compile_to_asm(
                     compile_to_asm(program_config.clone(), statement, block_scope).as_str(),
                 );
             }
+            scope.absorb_strings(block_scope.to_owned());
             asm
         }
         AST::Import { module } => {
@@ -61,11 +62,13 @@ pub fn compile_to_asm(
 
             body_scope.stack_size += 1; // return address pushed after arguments on call
 
-            for param in prototype {
+            for param in prototype.iter().rev().cloned() {
                 asm.push_str(compile_to_asm(program_config.clone(), param, body_scope).as_str());
             }
 
             asm.push_str(&compile_to_asm(program_config.clone(), body, body_scope).as_str());
+
+            scope.absorb_strings(body_scope.to_owned());
 
             asm
         }
@@ -90,7 +93,7 @@ pub fn compile_to_asm(
             asm.push_str(scope.pop(String::from("rax")).as_str());
 
             asm.push_str(match op {
-                Operation::LTE => "a",
+                Operation::LTE => "",
                 _ => {
                     eprintln!("Unimplemented operation: {:?}", op);
                     process::exit(1);
@@ -102,8 +105,8 @@ pub fn compile_to_asm(
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
-            let offset = scope.get_variable(name).0;
-            asm.push_str(scope.push(format!("QWORD [rsp+{}]", offset)).as_str());
+            let offset = scope.get_variable(name).1;
+            asm.push_str(scope.push(format!("QWORD [rsp+{}]\n", 8 * offset)).as_str());
 
             asm
         }
@@ -113,7 +116,7 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config, value, scope).as_str());
             asm.push_str(scope.pop(String::from("rax")).as_str());
-            asm.push_str("\tret");
+            asm.push_str("\tret\n");
 
             asm
         }
@@ -123,9 +126,36 @@ pub fn compile_to_asm(
         } => {
             let mut asm = String::new();
 
-            
+            scope.add_variable(name, variable_type);
+            asm.push_str("\tpush 0\n");
 
             asm
+        }
+        AST::VariableAssignment { name, value } => {
+            let mut asm = String::new();
+
+            asm.push_str(compile_to_asm(program_config, value, scope).as_str());
+            scope.pop(String::from("rax"));
+
+            let offset = scope.get_variable(name).1;
+            asm.push_str(format!("\tmov QWORD [rsp+{}], rax\n", 8 * offset).as_str());
+
+            asm
+        }
+        AST::Argument(value) => compile_to_asm(program_config, value, scope).to_string(),
+        AST::For {
+            initializer,
+            condition,
+            updater,
+            body,
+        } => {
+            let mut asm = String::new();
+
+            asm
+        }
+        AST::String(value) => {
+            let id = scope.add_string(value);
+            format!("\tpush .STR{}\n", id)
         }
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);
