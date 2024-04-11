@@ -102,6 +102,12 @@ impl Tokenizer {
             self.next();
         }
     }
+    fn skip_comment(&mut self) {
+        while self.current_character != '\n' {
+            self.next();
+        }
+        self.next();
+    }
     fn parse_identifier(&mut self) -> Token {
         let mut token = Token {
             value: String::new(),
@@ -184,6 +190,10 @@ impl Tokenizer {
         }
         if self.current_character.is_ascii_digit() {
             return self.parse_number();
+        }
+        if self.current_character == '/' && self.peek(1) == '/' {
+            self.skip_comment();
+            return self.get_next_token();
         }
 
         self.skip_and_return(match self.current_character {

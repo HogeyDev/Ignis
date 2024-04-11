@@ -36,7 +36,7 @@ impl ScopeContext {
         self.stack_size += 1;
         self.stack_size - 1
     }
-    pub fn get_variable(&self, name: String) -> (String, usize) {
+    pub fn get_variable_data(&self, name: String) -> (String, usize) {
         match self.variables.iter().filter(|x| x.0 == name).nth(0) {
             Some(value) => {
                 return (value.clone().1, value.2);
@@ -46,6 +46,9 @@ impl ScopeContext {
                 process::exit(1);
             }
         }
+    }
+    pub fn get_variable_offset(&self, name: String) -> usize {
+        self.stack_size - self.get_variable_data(name).1
     }
     pub fn push(&mut self, source: String) -> String {
         self.stack_size += 1;
@@ -57,7 +60,7 @@ impl ScopeContext {
     }
     pub fn sub_scope(&self) -> ScopeContext {
         ScopeContext {
-            stack_size: 0,
+            stack_size: self.stack_size,
             variables: self.variables.clone(),
             functions: self.functions.clone(),
             strings: self.strings.clone(),
@@ -81,7 +84,7 @@ impl ScopeContext {
         let mut strings = String::new();
 
         for str in self.strings.clone() {
-            strings.push_str(format!(".STR{} db \"{}\", 0\n", str.1, str.0).as_str());
+            strings.push_str(format!("\tSTR{} db \"{}\", 0\n", str.1, str.0).as_str());
         }
 
         strings

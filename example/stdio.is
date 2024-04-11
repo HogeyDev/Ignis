@@ -1,0 +1,21 @@
+// asm "extern printf";
+
+fn putchar: void = (c: char) {
+	asm "mov rax, 1
+mov rdi, 1
+mov rsi, QWORD [rsp+16]
+mov rdx, 1
+syscalj";
+}
+
+fn print: void = (fmt: string) {
+	let len: int = strlen(fmt);
+	for (let i: int = 0; i < len; i = i + 1) {
+		putchar(fmt[i]);
+	}
+}
+
+fn println: void = (fmt: string) {
+	print(fmt);
+	putchar(10);
+}

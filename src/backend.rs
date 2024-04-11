@@ -45,7 +45,7 @@ pub fn compile_to_asm(
             for arg in arguments.iter().rev().cloned() {
                 asm.push_str(compile_to_asm(program_config.clone(), arg, scope).as_str());
             }
-            asm.push_str(format!("\tcall {}", name).as_str());
+            asm.push_str(format!("\tcall {}\n", name).as_str());
             asm
         }
         AST::FunctionDeclaration {
@@ -58,17 +58,25 @@ pub fn compile_to_asm(
 
             asm.push_str(format!("global {}\n{}:\n", name, name).as_str());
 
-            let body_scope = &mut scope.sub_scope();
+            let mut body_scope = scope.sub_scope();
 
-            body_scope.stack_size += 1; // return address pushed after arguments on call
+            asm.push_str(body_scope.push("rbp".to_string()).as_str());
+            asm.push_str("\tmov rbp, rsp\n");
 
             for param in prototype.iter().rev().cloned() {
-                asm.push_str(compile_to_asm(program_config.clone(), param, body_scope).as_str());
+                asm.push_str(
+                    compile_to_asm(program_config.clone(), param, &mut body_scope).as_str(),
+                );
             }
+            body_scope.stack_size += 1; // return address pushed after arguments on call
 
-            asm.push_str(&compile_to_asm(program_config.clone(), body, body_scope).as_str());
+            asm.push_str(compile_to_asm(program_config.clone(), body, &mut body_scope).as_str());
 
-            scope.absorb_strings(body_scope.to_owned());
+            asm.push_str("\tmov rsp, rbp\n");
+            asm.push_str(body_scope.pop("rbp".to_string()).as_str());
+            asm.push_str("\tret\n");
+
+            scope.absorb_strings(body_scope);
 
             asm
         }
@@ -105,8 +113,8 @@ pub fn compile_to_asm(
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
-            let offset = scope.get_variable(name).1;
-            asm.push_str(scope.push(format!("QWORD [rsp+{}]\n", 8 * offset)).as_str());
+            let offset = scope.get_variable_offset(name);
+            asm.push_str(scope.push(format!("QWORD [rsp+{}]", 8 * offset)).as_str());
 
             asm
         }
@@ -137,7 +145,7 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, value, scope).as_str());
             scope.pop(String::from("rax"));
 
-            let offset = scope.get_variable(name).1;
+            let offset = scope.get_variable_data(name).1;
             asm.push_str(format!("\tmov QWORD [rsp+{}], rax\n", 8 * offset).as_str());
 
             asm
@@ -153,9 +161,14 @@ pub fn compile_to_asm(
 
             asm
         }
+        AST::Asm(assembly) => {
+            let mut asm = assembly.clone();
+            asm.push('\n');
+            asm
+        }
         AST::String(value) => {
             let id = scope.add_string(value);
-            format!("\tpush .STR{}\n", id)
+            format!("\tpush STR{}\n", id)
         }
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);

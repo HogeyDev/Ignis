@@ -20,6 +20,10 @@ pub fn parse_file(_program_config: Configuration, file: SourceFile) -> Box<AST> 
         token_type: TokenType::RightBrace,
         value: String::from("}"),
     });
+    // token_list.push(Token {
+    //     token_type: TokenType::RightBrace,
+    //     value: String::from("}"),
+    // });
 
     let mut parser = Parser::new(token_list);
     parser.parse()

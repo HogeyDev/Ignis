@@ -124,6 +124,10 @@ impl Parser {
     }
     fn eat(&mut self, token_type: TokenType) {
         if self.current_token.token_type != token_type {
+            println!(
+                "{:?} @ {} = {:?}",
+                self.current_token, self.index, self.token_list[self.index]
+            );
             eprintln!(
                 "Expected token of type: {:?}, but instead got token of type: {:?}",
                 token_type, self.current_token.token_type
@@ -148,6 +152,7 @@ impl Parser {
         }
     }
     pub fn parse(&mut self) -> Box<AST> {
+        // println!("{:#?}", self.token_list);
         self.scope()
     }
     fn scope(&mut self) -> Box<AST> {
@@ -225,6 +230,12 @@ impl Parser {
                     prototype,
                     body,
                 }));
+            } else if self.current_token.token_type == TokenType::Asm {
+                self.eat(TokenType::Asm);
+                let assembly = self.current_token.value.clone();
+                self.eat(TokenType::String);
+                self.eat(TokenType::SemiColon);
+                stmt = Some(Box::new(AST::Asm(assembly)));
             } else if self.current_token.token_type == TokenType::If {
                 self.eat(TokenType::If);
                 let condition = self.expression();

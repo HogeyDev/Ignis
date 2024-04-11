@@ -19,20 +19,23 @@ fn main() {
     let input_file = read_file(input_file_path);
     let program_config = get_config();
 
-    let mut scope = &mut ScopeContext::new();
+    let mut scope = ScopeContext::new();
     let section_text = compile_to_asm(
         program_config.clone(),
         parse_file(program_config, input_file),
-        scope,
+        &mut scope,
     );
     let section_data = scope.compile_strings();
 
-    let compiled = format!("{}\n{}", section_text, section_data);
+    let compiled = format!(
+        "section .text\n{}\nglobal _start\n_start:\n\tpush rbp\n\tmov rbp, rsp\n\tcall main\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\nsection .data\n{}",
+        section_text, section_data
+    );
 
     let output_file = SourceFile {
         path: String::from("example/hello_world.asm"),
         contents: compiled.clone(),
     };
     write_file(output_file);
-    println!("{}", compiled)
+    // println!("{}", compiled)
 }
