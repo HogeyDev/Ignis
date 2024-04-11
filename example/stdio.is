@@ -3,19 +3,31 @@
 fn putchar: void = (c: char) {
 	asm "mov rax, 1
 mov rdi, 1
-mov rsi, QWORD [rsp+16]
+mov rsi, [rsp+16]
 mov rdx, 1
-syscalj";
+syscall";
 }
 
-fn print: void = (fmt: string) {
-	let len: int = strlen(fmt);
-	for (let i: int = 0; i < len; i = i + 1) {
-		putchar(fmt[i]);
+fn strlen: int = (str: string) {
+	asm "mov rsi, qword [rsp+16]
+mov rax, -1
+.looper:
+inc rax
+cmp byte [rsi+rax], 0x00
+jne .looper";
+}
+
+fn print: void = (str: string) {
+	// let len: int = strlen(str);
+	let i: int = 0;
+	while (str[i]) {
+	 	putchar(str[i]);
+	 	putchar(10);
+	 	i = i + 1;
 	}
 }
 
-fn println: void = (fmt: string) {
-	print(fmt);
+fn println: void = (str: string) {
+	print(str);
 	putchar(10);
 }

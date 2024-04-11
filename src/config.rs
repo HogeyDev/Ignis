@@ -4,6 +4,15 @@ pub struct Configuration {
     pub root_path: String,
 }
 
+impl Configuration {
+    pub fn new() -> Configuration {
+        Configuration {
+            main_file: String::new(),
+            root_path: String::new(),
+        }
+    }
+}
+
 pub fn get_config() -> Configuration {
     let root_path = std::env::current_dir()
         .expect("Could not get current working directory")

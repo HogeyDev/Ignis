@@ -25,6 +25,8 @@ pub enum Operation {
     GT,  // >
     LTE, // <=
     GTE, // >=
+
+    ArrAcc, // []
 }
 
 #[derive(Debug, Clone)]
@@ -165,6 +167,7 @@ impl Parser {
         while self.current_token.token_type != TokenType::EndOfFile
             && self.current_token.token_type != TokenType::RightBrace
         {
+            // println!("whiling");
             let mut stmt: Option<Box<AST>> = None;
             if self.current_token.token_type == TokenType::Import {
                 self.eat(TokenType::Import);
@@ -283,12 +286,13 @@ impl Parser {
                 }
                 self.eat(TokenType::SemiColon);
             } else if self.current_token.token_type == TokenType::For {
+                // TODO: implement updater
                 self.eat(TokenType::For);
                 self.eat(TokenType::LeftParenthesis);
                 let initializer = self.scope();
                 let condition = self.expression();
                 self.eat(TokenType::SemiColon);
-                let updater = self.expression();
+                let updater = self.parse();
                 self.eat(TokenType::RightParenthesis);
                 let body = self.scope();
 
@@ -298,6 +302,14 @@ impl Parser {
                     updater,
                     body,
                 }));
+            } else if self.current_token.token_type == TokenType::While {
+                self.eat(TokenType::While);
+                self.eat(TokenType::LeftParenthesis);
+                let condition = self.expression();
+                self.eat(TokenType::RightParenthesis);
+                let body = self.scope();
+
+                stmt = Some(Box::new(AST::While { condition, body }));
             } else if self.current_token.token_type == TokenType::Identifier {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
                     // function call
@@ -359,11 +371,13 @@ impl Parser {
         scope
     }
     fn expression(&mut self) -> Box<AST> {
+        // println!("{:?}", self.current_token);
         let mut lhs = self.comparison();
 
         while self.current_token.token_type == TokenType::DoublePipe
             || self.current_token.token_type == TokenType::DoubleAmpersand
         {
+            // println!("expression");
             let op = match self.current_token.token_type {
                 TokenType::DoublePipe => Operation::Or,
                 TokenType::DoubleAmpersand => Operation::And,
@@ -387,6 +401,7 @@ impl Parser {
         lhs
     }
     fn comparison(&mut self) -> Box<AST> {
+        // println!("{:?}", self.current_token.token_type);
         let mut lhs = self.term();
 
         while self.current_token.token_type == TokenType::EqualsTo
@@ -396,6 +411,7 @@ impl Parser {
             || self.current_token.token_type == TokenType::LessThanEqualsTo
             || self.current_token.token_type == TokenType::MoreThanEqualsTo
         {
+            // println!("comparison");
             let op = match self.current_token.token_type {
                 TokenType::EqualsTo => Operation::Eq,
                 TokenType::NotEqualsTo => Operation::Neq,
@@ -427,6 +443,7 @@ impl Parser {
         while self.current_token.token_type == TokenType::Plus
             || self.current_token.token_type == TokenType::Minus
         {
+            // println!("term");
             let op = match self.current_token.token_type {
                 TokenType::Plus => Operation::Add,
                 TokenType::Minus => Operation::Sub,
@@ -455,6 +472,7 @@ impl Parser {
             || self.current_token.token_type == TokenType::Slash
             || self.current_token.token_type == TokenType::Percent
         {
+            // println!("factor");
             let op = match self.current_token.token_type {
                 TokenType::Star => Operation::Mul,
                 TokenType::Slash => Operation::Div,
@@ -483,6 +501,7 @@ impl Parser {
             || self.current_token.token_type == TokenType::Increment
             || self.current_token.token_type == TokenType::Decrement
         {
+            // println!("unary");
             let op = match self.current_token.token_type {
                 TokenType::Minus => Operation::Neg,
                 TokenType::Bang => Operation::Inv,
@@ -499,14 +518,42 @@ impl Parser {
             self.advance();
             return Box::new(AST::UnaryExpr {
                 op,
-                child: self.primary(),
+                child: self.accessor(),
             });
         }
-        self.primary()
+        self.accessor()
+    }
+    fn accessor(&mut self) -> Box<AST> {
+        // should be used for '->', '[]', '.' type operators
+        let mut lhs = self.primary();
+
+        while self.current_token.token_type == TokenType::LeftBracket {
+            let rhs;
+            let op = match self.current_token.token_type {
+                TokenType::LeftBracket => {
+                    self.eat(TokenType::LeftBracket);
+                    rhs = self.expression();
+                    self.eat(TokenType::RightBracket);
+                    Operation::ArrAcc
+                }
+                _ => {
+                    eprintln!(
+                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        self.current_token.token_type
+                    );
+                    process::exit(1);
+                }
+            };
+            lhs = Box::new(AST::BinaryExpression { op, lhs, rhs });
+        }
+
+        lhs
     }
     fn primary(&mut self) -> Box<AST> {
+        // println!("primary");
         match self.current_token.token_type {
             TokenType::Integer => {
+                // println!("integer");
                 let value = self
                     .current_token
                     .value
@@ -517,12 +564,14 @@ impl Parser {
                 Box::new(AST::Integer(value))
             }
             TokenType::String => {
+                // println!("string");
                 let value = self.current_token.value.clone();
                 self.eat(TokenType::String);
                 Box::new(AST::String(value))
             }
             TokenType::Identifier => {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
+                    // println!("function call");
                     let name = self.current_token.value.clone();
                     self.eat(TokenType::Identifier);
                     self.eat(TokenType::LeftParenthesis);
@@ -537,17 +586,22 @@ impl Parser {
                     self.eat(TokenType::RightParenthesis);
                     return Box::new(AST::FunctionCall { name, arguments });
                 }
+                // println!("variable call");
                 let name = self.current_token.value.clone();
                 self.eat(TokenType::Identifier);
                 Box::new(AST::VariableCall { name })
             }
             TokenType::LeftParenthesis => {
+                // println!("grouping");
                 self.eat(TokenType::LeftParenthesis);
                 let group = self.expression();
                 self.eat(TokenType::RightParenthesis);
                 group
             }
-            _ => self.expression(),
+            _ => {
+                // println!("something else ({:?})", self.peek(1));
+                self.expression()
+            }
         }
     }
 }

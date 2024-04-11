@@ -9,7 +9,8 @@ run:
 
 compile_asm:
 	nasm -f elf64 example/hello_world.asm -o example/hello_world.o -g
-	ld -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 example/hello_world.o -o example/hello_world -lc
+	@# ld -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 example/hello_world.o -o example/hello_world -lc # link with libc
+	ld -m elf_x86_64 example/hello_world.o -o example/hello_world
 	rm example/hello_world.o
 
 run_asm:

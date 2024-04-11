@@ -1,10 +1,10 @@
-use std::borrow::BorrowMut;
-
 use backend::compile_to_asm;
 use compile::parse_file;
 use config::get_config;
 use io::{read_file, write_file, SourceFile};
 use scope::ScopeContext;
+
+use crate::config::Configuration;
 
 pub mod backend;
 pub mod compile;
@@ -38,4 +38,11 @@ fn main() {
     };
     write_file(output_file);
     // println!("{}", compiled)
+    println!(
+        "AST:\n{:#?}",
+        parse_file(
+            Configuration::new(),
+            read_file("example/stdio.is".to_string())
+        )
+    );
 }

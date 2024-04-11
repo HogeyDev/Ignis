@@ -1,3 +1,5 @@
+use std::process;
+
 use crate::io::SourceFile;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -16,6 +18,8 @@ pub enum TokenType {
     RightParenthesis,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
 
     Period,
     Colon,
@@ -201,6 +205,8 @@ impl Tokenizer {
             ')' => TokenType::RightParenthesis,
             '{' => TokenType::LeftBrace,
             '}' => TokenType::RightBrace,
+            '[' => TokenType::LeftBracket,
+            ']' => TokenType::RightBracket,
             '.' => TokenType::Period,
             ':' => TokenType::Colon,
             ';' => TokenType::SemiColon,
@@ -250,7 +256,14 @@ impl Tokenizer {
             '*' => TokenType::Star,
             '/' => TokenType::Slash,
             '%' => TokenType::Percent,
-            _ => TokenType::EndOfFile,
+            _ => {
+                if self.index >= self.source.len() {
+                    TokenType::EndOfFile
+                } else {
+                    eprintln!("Unexpected character: {}", self.current_character);
+                    process::exit(1);
+                }
+            }
         })
     }
 }
