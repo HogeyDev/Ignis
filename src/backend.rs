@@ -1,4 +1,4 @@
-use std::{fmt::format, process};
+use std::process;
 
 use crate::{
     compile::parse_file,

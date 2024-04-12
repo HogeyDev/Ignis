@@ -4,8 +4,6 @@ use config::get_config;
 use io::{read_file, write_file, SourceFile};
 use scope::ScopeContext;
 
-use crate::config::Configuration;
-
 pub mod backend;
 pub mod compile;
 pub mod config;
