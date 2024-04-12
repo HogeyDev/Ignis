@@ -13,6 +13,7 @@ pub mod io;
 pub mod lexer;
 pub mod parser;
 pub mod scope;
+pub mod util;
 
 fn main() {
     let input_file_path = String::from("example/hello_world.is");
@@ -38,11 +39,11 @@ fn main() {
     };
     write_file(output_file);
     // println!("{}", compiled)
-    println!(
-        "AST:\n{:#?}",
-        parse_file(
-            Configuration::new(),
-            read_file("example/stdio.is".to_string())
-        )
-    );
+    // println!(
+    //     "AST:\n{:#?}",
+    //     parse_file(
+    //         Configuration::new(),
+    //         read_file("example/stdio.is".to_string())
+    //     )
+    // );
 }

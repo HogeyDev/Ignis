@@ -1,10 +1,12 @@
 use std::process;
 
+use crate::util::get_asm_size_prefix;
+
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
-    pub stack_size: usize,
+    pub stack_size: i64, // in bytes
     pub label_counter: usize,
-    pub variables: Vec<(String, String, usize)>, // [NAME, TYPE, LOCATION]
+    pub variables: Vec<(String, String, i64)>, // [NAME, TYPE, LOCATION]
     pub functions: Vec<(String, String, Vec<(String, String)>)>, // [NAME, TYPE, [[ARG0, TYPE], [ARG1, TYPE], ... [ARGN, TYPE]]]
     pub strings: Vec<(String, usize)>,                           // [VALUE, ID]
 }
@@ -25,19 +27,35 @@ impl ScopeContext {
             strings: Vec::new(),
         }
     }
+    pub fn add_parameter(&mut self, name: String, param_type: String, width: i64) -> i64 {
+        let first_offset = self
+            .variables
+            .first()
+            .unwrap_or(&("TEMP".to_string(), "TEMP".to_string(), 0))
+            .2;
+        let new_offset = first_offset - width;
+        self.variables.insert(0, (name, param_type, new_offset));
+        new_offset
+    }
     pub fn variable_exists(&self, name: String) -> bool {
         self.variables.iter().any(|i| i.0 == name)
     }
-    pub fn add_variable(&mut self, name: String, variable_type: String) {
+    pub fn add_variable(
+        &mut self,
+        name: String,
+        variable_type: String,
+        width: i64,
+    ) -> (i64, String) {
         if self.variable_exists(name.clone()) {
             eprintln!("Variable '{}' already exists", name);
             process::exit(1);
         }
+        self.stack_size += width;
         self.variables
             .push((name.clone(), variable_type.clone(), self.stack_size));
-        // self.stack_size += 1;
+        self.get_variable_offset(name)
     }
-    pub fn get_variable_data(&self, name: String) -> (String, usize) {
+    pub fn get_variable_data(&self, name: String) -> (String, i64) {
         match self.variables.iter().filter(|x| x.0 == name).next() {
             Some(value) => {
                 return (value.clone().1, value.2);
@@ -48,8 +66,15 @@ impl ScopeContext {
             }
         }
     }
-    pub fn get_variable_offset(&self, name: String) -> usize {
-        self.stack_size - self.get_variable_data(name).1
+    pub fn get_variable_offset(&self, name: String) -> (i64, String) {
+        let numerical = self.get_variable_data(name).1;
+        let mut stringified = format!("{}", -numerical);
+        if stringified.chars().nth(0).unwrap_or('0') != '-' {
+            // positive number
+            stringified.insert(0, '+');
+        }
+
+        (numerical, stringified)
     }
     pub fn add_function(
         &mut self,
@@ -79,13 +104,13 @@ impl ScopeContext {
             self.functions.push(func);
         }
     }
-    pub fn push(&mut self, source: String) -> String {
-        self.stack_size += 1;
+    pub fn push(&mut self, source: String, width: i64) -> String {
+        self.stack_size += width;
         format!("\tpush {}\n", source)
     }
-    pub fn pop(&mut self, destination: String) -> String {
-        self.stack_size -= 1;
-        format!("\tpop {}\n", destination)
+    pub fn pop(&mut self, destination: String, width: i64) -> String {
+        self.stack_size -= width;
+        format!("\tpop {} {}\n", get_asm_size_prefix(width), destination)
     }
     pub fn absorb_strings(&mut self, scope: ScopeContext) {
         for str in scope.strings {
@@ -126,9 +151,13 @@ impl ScopeContext {
             strings: self.strings.clone(),
         }
     }
+    pub fn absorb_stack(&mut self, scope: ScopeContext) {
+        self.stack_size = std::cmp::max(self.stack_size, scope.stack_size);
+    }
     pub fn absorb_sub_scope_globals(&mut self, sub_scope: ScopeContext) {
         self.absorb_strings(sub_scope.clone());
         self.absorb_functions(sub_scope.clone());
-        self.absorb_labels(sub_scope);
+        self.absorb_labels(sub_scope.clone());
+        self.absorb_stack(sub_scope);
     }
 }

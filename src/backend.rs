@@ -1,4 +1,4 @@
-use std::process;
+use std::{fmt::format, process};
 
 use crate::{
     compile::parse_file,
@@ -6,6 +6,7 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
+    util::get_asm_size_prefix,
 };
 
 pub fn compile_to_asm(
@@ -19,17 +20,11 @@ pub fn compile_to_asm(
 
             let mut block_scope = scope.sub_scope();
 
-            asm.push_str(block_scope.push("rbp".to_string()).as_str());
-            asm.push_str("\tmov rbp, rsp\n");
-
             for statement in statements {
                 asm.push_str(
                     compile_to_asm(program_config.clone(), statement, &mut block_scope).as_str(),
                 );
             }
-
-            asm.push_str("\tmov rsp, rbp\n");
-            asm.push_str(block_scope.pop("rbp".to_string()).as_str());
 
             scope.absorb_sub_scope_globals(block_scope.to_owned());
             asm
@@ -55,7 +50,7 @@ pub fn compile_to_asm(
             asm.push_str(format!("\tcall {}\n\tadd rsp, {}\n", name, 8 * arguments.len()).as_str());
             if function_data.0 != "void" {
                 // has a notable return value
-                asm.push_str(scope.push("rax".to_string()).as_str());
+                asm.push_str(scope.push("rax".to_string(), 8).as_str());
             }
             asm
         }
@@ -71,6 +66,8 @@ pub fn compile_to_asm(
 
             let mut body_scope = scope.sub_scope();
 
+            body_scope.add_parameter("".to_string(), "usize *".to_string(), 8);
+
             let mut params = Vec::new();
             for param in prototype.iter().rev().cloned() {
                 asm.push_str(
@@ -85,19 +82,21 @@ pub fn compile_to_asm(
                     }
                 }
             }
-            body_scope.stack_size += 1; // return address pushed after arguments on call
+            // body_scope.stack_size += 8; // return address pushed after arguments on call
 
-            scope.add_function(name, return_type, params);
+            asm.push_str("\tpush rbp\n\tmov rbp, rsp\n");
+
+            scope.add_function(name, return_type, params.clone());
 
             asm.push_str(compile_to_asm(program_config.clone(), body, &mut body_scope).as_str());
-            asm.push_str("\tret\n");
+            asm.push_str("\tmov rsp, rbp\n\tpop rbp\n\tret\n");
 
             scope.absorb_sub_scope_globals(body_scope);
 
             asm
         }
         AST::Parameter { param_type, name } => {
-            scope.add_variable(name, param_type);
+            scope.add_parameter(name, param_type, 8);
             String::new()
         }
         AST::If { condition, body } => {
@@ -113,8 +112,8 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config.clone(), lhs, scope).as_str());
             asm.push_str(compile_to_asm(program_config, rhs, scope).as_str());
-            asm.push_str(scope.pop(String::from("rbx")).as_str()); // rhs
-            asm.push_str(scope.pop(String::from("rax")).as_str()); // lhs
+            asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
+            asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
 
             asm.push_str(match op {
                 Operation::Add => "\tadd rax, rbx\n",
@@ -141,25 +140,25 @@ pub fn compile_to_asm(
                 }
             });
 
-            asm.push_str(scope.push("rax".to_string()).as_str());
+            asm.push_str(scope.push("rax".to_string(), 8).as_str());
 
             asm
         }
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
-            let offset = scope.get_variable_offset(name.clone());
-            asm.push_str(format!("\tmov rax, qword [rsp+{}]\n", 8 * offset).as_str());
-            asm.push_str(scope.push(format!("rax ; recalled `{}`", name)).as_str());
+            let offset = scope.get_variable_offset(name.clone()).1;
+            asm.push_str(format!("\tmov rax, qword [rbp{}]\n", offset).as_str());
+            asm.push_str(scope.push(format!("rax ; recalled `{}`", name), 8).as_str());
 
             asm
         }
-        AST::Integer(value) => scope.push(format!("{} ; integer literal", value)),
+        AST::Integer(value) => scope.push(format!("{} ; integer literal", value), 8),
         AST::Return(value) => {
             let mut asm = String::new();
 
             asm.push_str(compile_to_asm(program_config, value, scope).as_str());
-            asm.push_str(scope.pop(String::from("rax")).as_str());
+            asm.push_str(scope.pop(String::from("rax"), 8).as_str());
             asm.push_str("\tret\n");
 
             asm
@@ -170,8 +169,17 @@ pub fn compile_to_asm(
         } => {
             let mut asm = String::new();
 
-            asm.push_str(scope.push(format!("0 ; created `{}`", name)).as_str());
-            scope.add_variable(name.clone(), variable_type);
+            let width = 8; // TODO: Hardcoded to 8 byte width
+            let offset = scope.add_variable(name.clone(), variable_type, width).1;
+            asm.push_str(
+                format!(
+                    "\tsub rsp, {}\n\tmov {} [rbp{}], 0\n",
+                    width,
+                    get_asm_size_prefix(width),
+                    offset
+                )
+                .as_str(),
+            );
 
             asm
         }
@@ -179,16 +187,11 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             asm.push_str(compile_to_asm(program_config, value, scope).as_str());
-            asm.push_str(scope.pop(String::from("rax")).as_str());
 
-            let offset = scope.get_variable_offset(name.clone());
+            let offset = scope.get_variable_offset(name.clone()).1;
+            asm.push_str(scope.pop("rax".to_string(), 8).as_str());
             asm.push_str(
-                format!(
-                    "\tmov qword [rsp+{}], rax ; assigned `{}`\n",
-                    8 * offset,
-                    name
-                )
-                .as_str(),
+                format!("\tmov qword [rbp{}], rax ; assigned `{}`\n", offset, name).as_str(),
             );
 
             asm
@@ -212,7 +215,7 @@ pub fn compile_to_asm(
 
             asm.push_str(format!("lbl{}:\n", head_label_id).as_str());
             asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
-            asm.push_str(scope.pop("rax".to_string()).as_str());
+            asm.push_str(scope.pop("rax".to_string(), 8).as_str());
             asm.push_str(format!("\tcmp rax, 0\n\tje lbl{}\n", tail_label_id).as_str());
 
             asm.push_str(compile_to_asm(program_config, body, scope).as_str());

@@ -1,20 +1,20 @@
 // asm "extern printf";
 
 fn putchar: void = (c: char) {
-	asm "mov rax, 1
-mov rdi, 1
-mov rsi, [rsp+16]
-mov rdx, 1
-syscall";
+	asm "	mov rax, 1
+	mov rdi, 1
+	movzx rsi, byte [rbp+16]
+	mov rdx, 1
+	syscall";
 }
 
 fn strlen: int = (str: string) {
-	asm "mov rsi, qword [rsp+16]
-mov rax, -1
-.looper:
-inc rax
-cmp byte [rsi+rax], 0x00
-jne .looper";
+	asm "	mov rsi, qword [rsp+16]
+	mov rax, -1
+	.looper:
+	inc rax
+	cmp byte [rsi+rax], 0x00
+	jne .looper";
 }
 
 fn print: void = (str: string) {
@@ -22,7 +22,6 @@ fn print: void = (str: string) {
 	let i: int = 0;
 	while (str[i]) {
 	 	putchar(str[i]);
-	 	putchar(10);
 	 	i = i + 1;
 	}
 }
