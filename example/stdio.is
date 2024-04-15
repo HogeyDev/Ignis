@@ -11,7 +11,7 @@ fn putchar: void = (c: char) {
 fn strlen: int = (str: string) {
 	asm "	mov rsi, qword [rsp+16]
 	mov rax, -1
-	.looper:
+.looper:
 	inc rax
 	cmp byte [rsi+rax], 0x00
 	jne .looper";

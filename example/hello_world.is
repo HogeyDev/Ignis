@@ -1,5 +1,6 @@
-import example.stdio;
+// import example.stdio;
+import example.stdlib;
 
 fn main: int = () {
-  println("Hello, World!");
+  exit(1);
 }

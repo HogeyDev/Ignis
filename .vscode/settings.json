@@ -1,3 +1,4 @@
 {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.detectIndentation": false
 }
