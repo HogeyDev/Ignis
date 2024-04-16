@@ -1,6 +1,7 @@
-// import example.stdio;
+import example.stdio;
 import example.stdlib;
 
 fn main: int = () {
-  exit(1);
+  println("Hello, World!");
+  exit(0x45);
 }

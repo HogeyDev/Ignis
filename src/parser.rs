@@ -31,7 +31,7 @@ pub enum Operation {
 
 #[derive(Debug, Clone)]
 pub enum AST {
-    Integer(i32), // TODO: maybe implement 64 bits???
+    Integer(i64), // TODO: maybe implement 64 bits???
     String(String),
     UnaryExpr {
         op: Operation,
@@ -558,7 +558,7 @@ impl Parser {
                     .current_token
                     .value
                     .as_str()
-                    .parse::<i32>()
+                    .parse::<i64>()
                     .unwrap_or(0);
                 self.eat(TokenType::Integer);
                 Box::new(AST::Integer(value))

@@ -148,13 +148,25 @@ impl Tokenizer {
         token
     }
     fn parse_number(&mut self) -> Token {
+        let is_hexadecimal = self.current_character == '0' && self.peek(1) == 'x';
         let mut token = Token {
             value: String::new(),
             token_type: TokenType::Integer,
         };
-        while self.current_character.is_ascii_digit() {
+        if is_hexadecimal {
+            self.next();
+            self.next();
+        }
+        while self.current_character.is_ascii_digit()
+            || (is_hexadecimal && self.current_character.is_ascii_hexdigit())
+        {
             token.value.push(self.current_character);
             self.next();
+        }
+        if is_hexadecimal {
+            token.value = i64::from_str_radix(token.value.as_str(), 16)
+                .unwrap_or(0)
+                .to_string();
         }
         token
     }

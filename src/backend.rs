@@ -6,6 +6,7 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
+    types::calculate_expression_type,
     util::get_asm_size_prefix,
 };
 
@@ -47,7 +48,9 @@ pub fn compile_to_asm(
             for arg in arguments.iter().rev().cloned() {
                 asm.push_str(compile_to_asm(program_config.clone(), arg, scope).as_str());
             }
-            asm.push_str(format!("\tcall {}\n\tadd rsp, {}\n", name, 8 * arguments.len()).as_str());
+            asm.push_str(
+                format!("\tcall _{}\n\tadd rsp, {}\n", name, 8 * arguments.len()).as_str(),
+            );
             if function_data.0 != "void" {
                 // has a notable return value
                 asm.push_str(scope.push("rax".to_string(), 8).as_str());
@@ -62,7 +65,7 @@ pub fn compile_to_asm(
         } => {
             let mut asm = String::new();
 
-            asm.push_str(format!("global {}\n{}:\n", name, name).as_str());
+            asm.push_str(format!("global _{}\n_{}:\n", name, name).as_str());
 
             let mut body_scope = scope.sub_scope();
 
@@ -110,35 +113,58 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
-            asm.push_str(compile_to_asm(program_config.clone(), lhs, scope).as_str());
-            asm.push_str(compile_to_asm(program_config, rhs, scope).as_str());
+            asm.push_str(compile_to_asm(program_config.clone(), lhs.clone(), scope).as_str());
+            asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+            let lhs_typing = calculate_expression_type(lhs, scope).unwrap();
+            let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
 
-            asm.push_str(match op {
-                Operation::Add => "\tadd rax, rbx\n",
-                // Operation::Sub => "",
-                // Operation::Mul => "",
-                // Operation::Div => "",
-                // Operation::Mod => "",
-                // Operation::Inc => "",
-                // Operation::Dec => "",
-                // Operation::Inv => "",
-                // Operation::Neg => "",
-                // Operation::Or => "",
-                // Operation::And => "",
-                // Operation::Eq => "",
-                // Operation::Neq => "",
-                Operation::LT => "\tcmp rax, rbx\n\tsetl al\n\tmovzx rax, al\n",
-                // Operation::GT => "",
-                // Operation::LTE => "",
-                // Operation::GTE => "",
-                Operation::ArrAcc => "\tmov rax, [rax + rbx]\n",
-                _ => {
-                    eprintln!("Unimplemented binary operation: {:?}", op);
-                    process::exit(1);
+            asm.push_str(
+                match op {
+                    Operation::Add => "\tadd rax, rbx\n".to_string(),
+                    // Operation::Sub => "",
+                    // Operation::Mul => "",
+                    // Operation::Div => "",
+                    // Operation::Mod => "",
+                    // Operation::Inc => "",
+                    // Operation::Dec => "",
+                    // Operation::Inv => "",
+                    // Operation::Neg => "",
+                    // Operation::Or => "",
+                    // Operation::And => "",
+                    // Operation::Eq => "",
+                    // Operation::Neq => "",
+                    Operation::LT => "\tcmp rax, rbx\n\tsetl al\n\tmovzx rax, al\n".to_string(),
+                    // Operation::GT => "",
+                    // Operation::LTE => "",
+                    // Operation::GTE => "",
+                    Operation::ArrAcc => {
+                        if lhs_typing.1 == 4 {
+                            format!(
+                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n",
+                                lhs_typing.1
+                            )
+                        } else if lhs_typing.1 == 8 {
+                            format!(
+                                "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
+                                lhs_typing.1,
+                            )
+                        } else {
+                            format!(
+                                "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
+                                lhs_typing.1,
+                                get_asm_size_prefix(lhs_typing.1.try_into().unwrap_or(0))
+                            )
+                        }
+                    }
+                    _ => {
+                        eprintln!("Unimplemented binary operation: {:?}", op);
+                        process::exit(1);
+                    }
                 }
-            });
+                .as_str(),
+            );
 
             asm.push_str(scope.push("rax".to_string(), 8).as_str());
 
@@ -153,7 +179,12 @@ pub fn compile_to_asm(
 
             asm
         }
-        AST::Integer(value) => scope.push(format!("{} ; integer literal", value), 8),
+        AST::Integer(value) => {
+            let mut asm = String::new();
+            asm.push_str(format!("\tmov rdx, {}\n", value).as_str());
+            asm.push_str(scope.push("rdx".to_string(), 8).as_str());
+            asm
+        }
         AST::Return(value) => {
             let mut asm = String::new();
 
@@ -230,8 +261,11 @@ pub fn compile_to_asm(
             asm
         }
         AST::String(value) => {
+            let mut asm = String::new();
             let id = scope.add_string(value);
-            format!("\tpush STR{}\n", id)
+            asm.push_str(format!("\tmov rax, STR{}\n", id).as_str());
+            asm.push_str(scope.push("rax".to_string(), 8).as_str());
+            asm
         }
         _ => {
             eprintln!("Could not find a way to compile {:?} to assembly", root);
