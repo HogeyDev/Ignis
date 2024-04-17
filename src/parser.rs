@@ -2,7 +2,7 @@ use std::{process, usize};
 
 use crate::lexer::{Token, TokenType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
     Add, // +
     Sub, // -

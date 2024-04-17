@@ -24,6 +24,7 @@ use crate::{
 //     }
 // }
 
+#[derive(PartialEq)]
 pub enum Type {
     Primative(&'static str),
     Array(Box<Type>),
@@ -32,11 +33,11 @@ pub enum Type {
     BinaryOperation(Operation, Box<Type>, Box<Type>),
 }
 
-impl Type {
-    pub fn to_string(&self) -> String {
-        "totally a real type".to_string()
-    }
-}
+// impl Type {
+//     pub fn to_string(&self) -> String {
+//         "totally a real type".to_string()
+//     }
+// }
 
 pub fn is_primative_type(potential: String) -> bool {
     vec!["int", "char"].contains(&potential.as_str())
@@ -71,15 +72,20 @@ pub fn ast_to_type_tree(ast: Box<AST>) -> Result<Box<Type>, &'static str> {
     }
 }
 
-pub fn collapse_type_tree(tree: Box<Type>) -> Result<Type, &'static str> {
+pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
     match *tree {
-        Type::Primative(type_name) => Ok(Type::Primative(type_name)),
+        Type::Primative(type_name) => Ok(Box::new(Type::Primative(type_name))),
         Type::UnaryOperation(op, child) => collapse_type_tree(child),
         Type::BinaryOperation(op, lhs, rhs) => {
             let collapsed_lhs = collapse_type_tree(lhs)?;
             let collapsed_rhs = collapse_type_tree(rhs)?;
 
-            if collapsed_lhs.to_string() != collapsed_rhs.to_string() {}
+            if collapsed_lhs != collapsed_rhs {
+                return Err("Types do not match");
+            }
+            Ok(collapsed_lhs)
         }
+        Type::Pointer(sub_type) => Ok(Box::new(Type::Pointer(collapse_type_tree(sub_type)?))),
+        Type::Array(sub_type) => Ok(Box::new(Type::Pointer(collapse_type_tree(sub_type)?))),
     }
 }
