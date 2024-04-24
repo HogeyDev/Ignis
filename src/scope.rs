@@ -47,7 +47,7 @@ impl ScopeContext {
         width: i64,
     ) -> (i64, String) {
         if self.variable_exists(name.clone()) {
-            eprintln!("Variable '{}' already exists", name);
+            eprintln!("[BlockScope] Variable '{}' already exists", name);
             process::exit(1);
         }
         self.stack_size += width;
@@ -61,7 +61,7 @@ impl ScopeContext {
                 return (value.clone().1, value.2);
             }
             None => {
-                eprintln!("Could not find variable named `{}`", name);
+                eprintln!("[BlockScope] Could not find variable named `{}`", name);
                 process::exit(1);
             }
         }
@@ -91,7 +91,7 @@ impl ScopeContext {
                 value.2.iter().map(|x| x.1.clone()).collect(),
             ),
             None => {
-                eprintln!("Could not find function named `{}`", name);
+                eprintln!("[BlockScope] Could not find function named `{}`", name);
                 process::exit(1);
             }
         }

@@ -1,3 +1,5 @@
+use std::process;
+
 use crate::{
     parser::{Operation, AST},
     scope::ScopeContext,
@@ -16,32 +18,6 @@ impl Type {
     pub fn to_string(&self) -> String {
         todo!("Implement Type::to_string()");
     }
-}
-
-pub fn string_to_type(type_str: String) -> Result<Box<Type>, &'static str> {
-    enum StrTokType {
-        AtSign,
-        Identifier(String),
-    }
-    let token_list = Vec::new();
-    let i = 0;
-    let current_char = type_str.bytes().nth(0).unwrap().try_into().unwrap();
-    let get_char =
-        |index: usize| -> char { type_str.bytes().nth(0).unwrap_or(0).try_into().unwrap() };
-    let peek = |offset: i64| -> char { get_char(i.try_into().unwrap() + offset) };
-    let advance = || {
-        current_char = get_char(i + 1);
-    };
-    while i < type_str.len() {
-        if current_char.is_alphabetic() {
-        } else {
-            token_list.push(match current_char {
-                '@' => StrTokType::AtSign,
-            });
-            advance();
-        }
-    }
-    Type::Star
 }
 
 pub fn calculate_expression_type(
@@ -100,10 +76,11 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         }
         AST::VariableCall { name } => {
             let type_str = scope.get_variable_data(name).0;
-            Type::from_string(type_str)
+            let variable_type_tree = string_to_type_tree(type_str).unwrap();
+            Ok(variable_type_tree)
         }
         _ => {
-            eprintln!("{:?}", ast);
+            eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able")
         }
     }
@@ -124,5 +101,94 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
         }
         Type::Pointer(sub_type) => Ok(Box::new(Type::Pointer(collapse_type_tree(sub_type)?))),
         Type::Array(sub_type) => Ok(Box::new(Type::Array(collapse_type_tree(sub_type)?))),
+    }
+}
+
+pub fn string_to_type_tree(type_str: String) -> Result<Box<Type>, &'static str> {
+    let type_tokens = TypeLexer::new(type_str).parse();
+    TypeParser::new(type_tokens).parse()
+}
+
+#[derive(Debug, Clone)]
+enum StrTokType {
+    AtSign,
+    Identifier(String),
+}
+
+struct TypeLexer {
+    type_string: String,
+    index: usize,
+    current_char: char,
+}
+
+impl TypeLexer {
+    pub fn new(type_string: String) -> TypeLexer {
+        TypeLexer {
+            type_string: type_string.clone(),
+            index: 0,
+            current_char: type_string.bytes().nth(0).unwrap_or(0).into(),
+        }
+    }
+    fn get_char(&self, index: usize) -> char {
+        self.type_string
+            .bytes()
+            .nth(index)
+            .unwrap_or(0)
+            .try_into()
+            .unwrap()
+    }
+    fn peek(&self, offset: i64) -> char {
+        self.get_char((self.index as i64 + offset).try_into().unwrap())
+    }
+    fn advance(&mut self) {
+        self.current_char = self.peek(1);
+        self.index += 1;
+    }
+    pub fn parse(&mut self) -> Vec<StrTokType> {
+        let mut token_list = Vec::new();
+        while self.index < self.type_string.len() {
+            if self.current_char.is_alphabetic() {
+                let mut full_id = String::new();
+                while self.current_char.is_alphanumeric() {
+                    full_id.push(self.current_char);
+                    self.advance();
+                }
+                token_list.push(StrTokType::Identifier(full_id));
+            } else {
+                token_list.push(match self.current_char {
+                    '@' => StrTokType::AtSign,
+                    _ => {
+                        eprintln!(
+                            "[TypeParser] Character `{}` is not parseable in a type",
+                            self.current_char
+                        );
+                        process::exit(1);
+                    }
+                });
+                self.advance();
+            }
+        }
+
+        println!("{:#?}", token_list);
+        unimplemented!("Type was tokenized, but parsing is still being implemented!");
+    }
+}
+
+struct TypeParser {
+    pub tokens: Vec<StrTokType>,
+    pub index: usize,
+    pub current_token: StrTokType,
+}
+
+impl TypeParser {
+    pub fn new(tokens: Vec<StrTokType>) -> TypeParser {
+        TypeParser {
+            tokens: tokens.clone(),
+            index: 0,
+            current_token: tokens[0].clone(),
+        }
+    }
+    pub fn parse(&self) -> Result<Box<Type>, &'static str> {
+        Ok(Box::new(Type::Primative("int")))
     }
 }

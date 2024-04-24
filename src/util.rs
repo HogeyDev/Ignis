@@ -7,7 +7,7 @@ pub fn get_asm_size_prefix(width: i64) -> String {
         4 => "dword",
         8 => "qword",
         _ => {
-            eprintln!("Binary width is not valid: `{width}`");
+            eprintln!("[ASM] Binary width is not valid: `{width}`");
             process::exit(1);
         }
     }

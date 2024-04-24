@@ -48,6 +48,8 @@ pub enum TokenType {
     String,
     Integer,
 
+    At,
+
     EndOfFile,
 }
 
@@ -268,11 +270,12 @@ impl Tokenizer {
             '*' => TokenType::Star,
             '/' => TokenType::Slash,
             '%' => TokenType::Percent,
+            '@' => TokenType::At,
             _ => {
                 if self.index >= self.source.len() {
                     TokenType::EndOfFile
                 } else {
-                    eprintln!("Unexpected character: {}", self.current_character);
+                    eprintln!("[Lexer] Unexpected character: {}", self.current_character);
                     process::exit(1);
                 }
             }

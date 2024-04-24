@@ -159,7 +159,7 @@ pub fn compile_to_asm(
                         }
                     }
                     _ => {
-                        eprintln!("Unimplemented binary operation: {:?}", op);
+                        eprintln!("[ASM] Unimplemented binary operation: {:?}", op);
                         process::exit(1);
                     }
                 }
@@ -268,7 +268,10 @@ pub fn compile_to_asm(
             asm
         }
         _ => {
-            eprintln!("Could not find a way to compile {:?} to assembly", root);
+            eprintln!(
+                "[ASM] Could not find a way to compile {:?} to assembly",
+                root
+            );
             process::exit(1);
         }
     }

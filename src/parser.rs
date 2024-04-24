@@ -131,7 +131,7 @@ impl Parser {
                 self.current_token, self.index, self.token_list[self.index]
             );
             eprintln!(
-                "Expected token of type: {:?}, but instead got token of type: {:?}",
+                "[Parser] Expected token of type: {:?}, but instead got token of type: {:?}",
                 token_type, self.current_token.token_type
             );
             self.print_token_debug_stack(5);
@@ -356,7 +356,7 @@ impl Parser {
 
                 let radius = 4;
                 eprintln!(
-                    "Cannot find matching parse method for tokens in order (radius = {radius}):"
+                    "[Parser] Cannot find matching parse method for tokens in order (radius = {radius}):"
                 );
                 self.print_token_debug_stack(radius);
                 process::exit(1);
@@ -384,7 +384,7 @@ impl Parser {
                 TokenType::Plus => Operation::Add,
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
@@ -421,7 +421,7 @@ impl Parser {
                 TokenType::MoreThanEqualsTo => Operation::GTE,
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
@@ -449,7 +449,7 @@ impl Parser {
                 TokenType::Minus => Operation::Sub,
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
@@ -479,7 +479,7 @@ impl Parser {
                 TokenType::Percent => Operation::Mod,
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
@@ -509,7 +509,7 @@ impl Parser {
                 TokenType::Decrement => Operation::Dec,
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
@@ -538,7 +538,7 @@ impl Parser {
                 }
                 _ => {
                     eprintln!(
-                        "{:?} is not a valid operation, or it has not been implemented yet",
+                        "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
                     process::exit(1);
