@@ -119,7 +119,7 @@ impl Tokenizer {
             value: String::new(),
             token_type: TokenType::Identifier,
         };
-        while self.current_character.is_alphanumeric() {
+        while self.current_character.is_alphanumeric() || self.current_character == '_' {
             token.value.push(self.current_character);
             self.next();
         }
@@ -127,7 +127,7 @@ impl Tokenizer {
             "fn" => TokenType::Function,
             "if" => TokenType::If,
             "let" => TokenType::Let,
-            "asm" => TokenType::Asm, // TODO: this is gonna need some extra parsing, though
+            "asm" => TokenType::Asm,
             "for" => TokenType::For,
             "while" => TokenType::While,
             "return" => TokenType::Return,

@@ -90,6 +90,86 @@ _println:
 	mov rsp, rbp
 	pop rbp
 	ret
+global _printnum
+_printnum:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 8
+	mov qword [rbp-8], 0
+	mov rax, qword [rbp+16]
+	push rax ; recalled `num`
+	pop qword rax
+	mov qword [rbp-8], rax ; assigned `a`
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	mov rdx, 0
+	push rdx
+	pop qword rbx
+	pop qword rax
+	cmp rax, rbx
+	setl al
+	movzx rax, al
+	push rax
+	pop qword rax
+	cmp rax, 0
+	je lbl2
+	mov rdx, 45
+	push rdx
+	call _putchar
+	add rsp, 8
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	pop qword rax
+	neg rax
+	pop qword rax
+	mov qword [rbp-8], rax ; assigned `a`
+lbl2:
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	mov rdx, 9
+	push rdx
+	pop qword rbx
+	pop qword rax
+	cmp rax, rbx
+	setg al
+	movzx rax, al
+	push rax
+	pop qword rax
+	cmp rax, 0
+	je lbl3
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	mov rdx, 10
+	push rdx
+	pop qword rbx
+	pop qword rax
+	mov rdx, 0
+	div rbx
+	push rax
+	call _printnum
+	add rsp, 8
+lbl3:
+	mov rdx, 48
+	push rdx
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	mov rdx, 10
+	push rdx
+	pop qword rbx
+	pop qword rax
+	mov rdx, 0
+	div rbx
+	mov rax, rdx
+	push rax
+	pop qword rbx
+	pop qword rax
+	add rax, rbx
+	push rax
+	call _putchar
+	add rsp, 8
+	mov rsp, rbp
+	pop rbp
+	ret
 global _exit
 _exit:
 	push rbp
@@ -104,11 +184,17 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
-	mov rax, STR0
-	push rax
-	call _println
-	add rsp, 8
 	mov rdx, 42
+	push rdx
+	pop qword rax
+	neg rax
+	call _printnum
+	add rsp, 8
+	mov rdx, 10
+	push rdx
+	call _putchar
+	add rsp, 8
+	mov rdx, 0
 	push rdx
 	call _exit
 	add rsp, 8
@@ -125,4 +211,3 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
-	STR0 db "Hello, World!", 0

@@ -2,6 +2,7 @@ import example.stdio;
 import example.stdlib;
 
 fn main: int = () {
-  println("Hello, World!");
-  exit(0x2a);
+  printnum(-42);
+  putchar(0xa);
+  exit(0);
 }

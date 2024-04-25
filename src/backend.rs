@@ -6,7 +6,9 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::{calculate_expression_type, get_type_size, Type},
+    types::{
+        calculate_expression_type, collapse_type_tree, get_type_size, string_to_type_tree, Type,
+    },
     util::get_asm_size_prefix,
 };
 
@@ -89,7 +91,7 @@ pub fn compile_to_asm(
 
             asm.push_str("\tpush rbp\n\tmov rbp, rsp\n");
 
-            scope.add_function(name, return_type, params.clone());
+            body_scope.add_function(name, return_type, params.clone());
 
             asm.push_str(compile_to_asm(program_config.clone(), body, &mut body_scope).as_str());
             asm.push_str("\tmov rsp, rbp\n\tpop rbp\n\tret\n");
@@ -99,14 +101,26 @@ pub fn compile_to_asm(
             asm
         }
         AST::Parameter { param_type, name } => {
-            scope.add_parameter(name, param_type, 8);
+            // println!(
+            //     "PRM: {name} | {}",
+            scope.add_parameter(name.clone(), param_type, 8);
+            // );
             String::new()
         }
         AST::If { condition, body } => {
             let mut asm = String::new();
 
+            let end_label_id = scope.add_label();
+
             asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
+            asm.push_str(scope.pop("rax".to_string(), 8).as_str());
+            asm.push_str(format!("\tcmp rax, 0\n\tje lbl{}\n", end_label_id).as_str());
+
             asm.push_str(compile_to_asm(program_config, body, scope).as_str());
+            asm.push_str(format!("lbl{}:\n", end_label_id).as_str());
+
+            // asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
+            // asm.push_str(compile_to_asm(program_config, body, scope).as_str());
 
             asm
         }
@@ -117,26 +131,30 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let lhs_typing = calculate_expression_type(lhs.clone(), scope).unwrap();
+            let lhs_typing = calculate_expression_type(lhs, scope).unwrap();
             // let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
+
+            // if lhs_typing != rhs_typing {
+            //     eprintln!(
+            //         "[ASM] Cannot do binary operation `{:?}` on mismatching types:\n\t`{:?}` != `{:?}`",
+            //         op, lhs_typing, rhs_typing
+            //     );
+            //     process::exit(1);
+            // }
 
             asm.push_str(
                 match op {
                     Operation::Add => "\tadd rax, rbx\n".to_string(),
-                    // Operation::Sub => "",
-                    // Operation::Mul => "",
-                    // Operation::Div => "",
-                    // Operation::Mod => "",
-                    // Operation::Inc => "",
-                    // Operation::Dec => "",
-                    // Operation::Inv => "",
-                    // Operation::Neg => "",
+                    Operation::Sub => "\tsub rax, rbx\n".to_string(),
+                    Operation::Mul => "\timul rax, rbx\n".to_string(),
+                    Operation::Div => "\tmov rdx, 0\n\tdiv rbx\n".to_string(),
+                    Operation::Mod => "\tmov rdx, 0\n\tdiv rbx\n\tmov rax, rdx\n".to_string(),
                     // Operation::Or => "",
                     // Operation::And => "",
                     // Operation::Eq => "",
                     // Operation::Neq => "",
                     Operation::LT => "\tcmp rax, rbx\n\tsetl al\n\tmovzx rax, al\n".to_string(),
-                    // Operation::GT => "",
+                    Operation::GT => "\tcmp rax, rbx\n\tsetg al\n\tmovzx rax, al\n".to_string(),
                     // Operation::LTE => "",
                     // Operation::GTE => "",
                     Operation::ArrAcc => {
@@ -177,6 +195,26 @@ pub fn compile_to_asm(
 
             asm
         }
+        AST::UnaryExpr { op, child } => {
+            let mut asm = String::new();
+
+            asm.push_str(compile_to_asm(program_config.clone(), child.clone(), scope).as_str());
+            asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+                                                                      // let typing = calculate_expression_type(child, scope).unwrap();
+
+            asm.push_str(match op {
+                // Operation::Inc => "",
+                // Operation::Dec => "",
+                // Operation::Inv => "",
+                Operation::Neg => "\tneg rax\n",
+                _ => {
+                    eprintln!("[ASM] Unimplemented binary operation: {:?}", op);
+                    process::exit(1);
+                }
+            });
+
+            asm
+        }
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
@@ -207,7 +245,9 @@ pub fn compile_to_asm(
         } => {
             let mut asm = String::new();
 
-            let width = 8; // TODO: Hardcoded to 8 byte width
+            let collapsed =
+                collapse_type_tree(string_to_type_tree(variable_type.clone()).unwrap()).unwrap();
+            let width = get_type_size(collapsed).unwrap();
             let offset = scope.add_variable(name.clone(), variable_type, width).1;
             asm.push_str(
                 format!(

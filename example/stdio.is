@@ -31,3 +31,17 @@ fn println: void = (str: []char) {
 	print(str);
 	putchar(0xa);
 }
+
+fn printnum: void = (num: int) {
+	let a: int = num;
+
+	if (a < 0) {
+		putchar(45); // -
+		a = -a;
+	}
+	if (a > 9) {	
+		printnum(a / 10);
+	}
+
+	putchar(48 + a % 10);
+}

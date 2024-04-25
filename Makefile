@@ -15,3 +15,6 @@ compile_asm:
 
 run_asm:
 	./example/hello_world
+
+debug:
+	gdb ./example/hello_world

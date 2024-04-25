@@ -31,7 +31,7 @@ impl ScopeContext {
         let first_offset = self
             .variables
             .first()
-            .unwrap_or(&("TEMP".to_string(), "TEMP".to_string(), 0))
+            .unwrap_or(&("".to_string(), "".to_string(), 0))
             .2;
         let new_offset = first_offset - width;
         self.variables.insert(0, (name, param_type, new_offset));
@@ -47,9 +47,14 @@ impl ScopeContext {
         width: i64,
     ) -> (i64, String) {
         if self.variable_exists(name.clone()) {
-            eprintln!("[BlockScope] Variable '{}' already exists", name);
+            eprintln!("[BlockScope] Variable `{}` already exists", name);
             process::exit(1);
         }
+        println!("{:#?}", self.variables);
+        println!(
+            "Size before: {}\t|\tnew var: {name}: {width}",
+            self.stack_size
+        );
         self.stack_size += width;
         self.variables
             .push((name.clone(), variable_type.clone(), self.stack_size));
@@ -151,8 +156,8 @@ impl ScopeContext {
             strings: self.strings.clone(),
         }
     }
-    pub fn absorb_stack(&mut self, scope: ScopeContext) {
-        self.stack_size = std::cmp::max(self.stack_size, scope.stack_size);
+    pub fn absorb_stack(&mut self, _scope: ScopeContext) {
+        // self.stack_size = std::cmp::max(self.stack_size, scope.stack_size);
     }
     pub fn absorb_sub_scope_globals(&mut self, sub_scope: ScopeContext) {
         self.absorb_strings(sub_scope.clone());

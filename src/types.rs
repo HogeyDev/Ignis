@@ -33,7 +33,7 @@ pub fn is_primative_type(potential: String) -> bool {
     vec!["int", "char"].contains(&potential.as_str())
 }
 
-pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
+pub fn get_primative_type_size(prim: String) -> Result<i64, &'static str> {
     match prim.as_str() {
         "int" => Ok(8),
         "char" => Ok(1),
@@ -41,7 +41,7 @@ pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     }
 }
 
-pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
+pub fn get_type_size(comp: Box<Type>) -> Result<i64, &'static str> {
     match *comp {
         Type::Primative(prim) => get_primative_type_size(prim),
         Type::Pointer(sub) => get_type_size(sub),
