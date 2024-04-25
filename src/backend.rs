@@ -6,7 +6,7 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::calculate_expression_type,
+    types::{calculate_expression_type, get_type_size, Type},
     util::get_asm_size_prefix,
 };
 
@@ -69,7 +69,7 @@ pub fn compile_to_asm(
 
             let mut body_scope = scope.sub_scope();
 
-            body_scope.add_parameter("".to_string(), "usize *".to_string(), 8);
+            body_scope.add_parameter("".to_string(), "@usize".to_string(), 8);
 
             let mut params = Vec::new();
             for param in prototype.iter().rev().cloned() {
@@ -117,8 +117,8 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let lhs_typing = calculate_expression_type(lhs, scope).unwrap();
-            let _rhs_typing = calculate_expression_type(rhs, scope).unwrap();
+            let lhs_typing = calculate_expression_type(lhs.clone(), scope).unwrap();
+            // let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
 
             asm.push_str(
                 match op {
@@ -140,21 +140,28 @@ pub fn compile_to_asm(
                     // Operation::LTE => "",
                     // Operation::GTE => "",
                     Operation::ArrAcc => {
-                        if lhs_typing.1 == 4 {
+                        let element_size = match *lhs_typing {
+                            Type::Array(sub) => get_type_size(sub).unwrap(),
+                            _ => {
+                                eprintln!("[ASM] Array access on non array type");
+                                process::exit(1);
+                            }
+                        };
+                        if element_size == 4 {
                             format!(
                                 "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n",
-                                lhs_typing.1
+                                element_size
                             )
-                        } else if lhs_typing.1 == 8 {
+                        } else if element_size == 8 {
                             format!(
                                 "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
-                                lhs_typing.1,
+                                element_size,
                             )
                         } else {
                             format!(
                                 "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
-                                lhs_typing.1,
-                                get_asm_size_prefix(lhs_typing.1.try_into().unwrap_or(0))
+                                element_size,
+                                get_asm_size_prefix(element_size.try_into().unwrap_or(0))
                             )
                         }
                     }

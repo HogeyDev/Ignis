@@ -43,8 +43,8 @@ lbl0:
 	push rax ; recalled `i`
 	pop qword rbx
 	pop qword rax
-	imul rbx, 8
-	mov rax, qword [rax + rbx]
+	imul rbx, 1
+	movzx rax, byte [rax + rbx]
 	push rax
 	pop qword rax
 	cmp rax, 0
@@ -55,8 +55,8 @@ lbl0:
 	push rax ; recalled `i`
 	pop qword rbx
 	pop qword rax
-	imul rbx, 8
-	mov rax, qword [rax + rbx]
+	imul rbx, 1
+	movzx rax, byte [rax + rbx]
 	push rax
 	call _putchar
 	add rsp, 8

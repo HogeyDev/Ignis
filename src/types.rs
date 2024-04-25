@@ -5,9 +5,9 @@ use crate::{
     scope::ScopeContext,
 };
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    Primative(&'static str),
+    Primative(String),
     Array(Box<Type>),
     Pointer(Box<Type>),
     UnaryOperation(Operation, Box<Type>),
@@ -23,26 +23,10 @@ impl Type {
 pub fn calculate_expression_type(
     ast: Box<AST>,
     scope: &ScopeContext,
-) -> Result<(Box<Type>, usize), &'static str> {
-    //     // [TYPE, SIZE]
-    //     match *ast {
-    //         AST::Integer(_) => Ok(("int".to_string(), 8)),
-    //         AST::UnaryExpr { child, .. } => Ok(calculate_expression_type(child, scope).unwrap()),
-    //         AST::BinaryExpression { lhs, .. } => Ok(calculate_expression_type(lhs, scope).unwrap()),
-    //         AST::VariableCall { name } => {
-    //             let variable_type = scope.get_variable_data(name).0;
-    //             Ok((variable_type.clone(), get_type_size(variable_type).unwrap()))
-    //         }
-    //         AST::FunctionCall { name, .. } => {
-    //             let function_type = scope.get_function_data(name).0;
-    //             Ok((function_type.clone(), get_type_size(function_type).unwrap()))
-    //         }
-    //         _ => Err("Unable to parse type of ast"),
-    //     }
-
+) -> Result<Box<Type>, &'static str> {
     let tree = ast_to_type_tree(ast, scope)?;
     let collapsed = collapse_type_tree(tree)?;
-    Ok((collapsed.clone(), get_type_size(collapsed).unwrap()))
+    Ok(collapsed.clone())
 }
 
 pub fn is_primative_type(potential: String) -> bool {
@@ -57,14 +41,26 @@ pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     }
 }
 
-pub fn get_type_size(_comp: Box<Type>) -> Result<usize, &'static str> {
-    Ok(8)
+pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
+    match *comp {
+        Type::Primative(prim) => get_primative_type_size(prim),
+        Type::Pointer(sub) => get_type_size(sub),
+        Type::UnaryOperation(_, sub) => get_type_size(sub),
+        Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
+        _ => {
+            eprintln!(
+                "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
+                *comp
+            );
+            process::exit(1);
+        }
+    }
 }
 
 pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
     match *ast {
-        AST::Integer(_) => Ok(Box::new(Type::Primative("int"))),
-        AST::String(_) => Ok(Box::new(Type::Primative("char *"))),
+        AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
+        AST::String(_) => Ok(Box::new(Type::Primative("[]char".to_string()))),
         AST::UnaryExpr { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             Ok(Box::new(Type::UnaryOperation(op, child_type)))
@@ -109,9 +105,11 @@ pub fn string_to_type_tree(type_str: String) -> Result<Box<Type>, &'static str> 
     TypeParser::new(type_tokens).parse()
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum StrTokType {
     AtSign,
+    LeftBracket,
+    RightBracket,
     Identifier(String),
 }
 
@@ -157,6 +155,8 @@ impl TypeLexer {
             } else {
                 token_list.push(match self.current_char {
                     '@' => StrTokType::AtSign,
+                    '[' => StrTokType::LeftBracket,
+                    ']' => StrTokType::RightBracket,
                     _ => {
                         eprintln!(
                             "[TypeParser] Character `{}` is not parseable in a type",
@@ -168,9 +168,7 @@ impl TypeLexer {
                 self.advance();
             }
         }
-
-        println!("{:#?}", token_list);
-        unimplemented!("Type was tokenized, but parsing is still being implemented!");
+        token_list
     }
 }
 
@@ -188,7 +186,49 @@ impl TypeParser {
             current_token: tokens[0].clone(),
         }
     }
-    pub fn parse(&self) -> Result<Box<Type>, &'static str> {
-        Ok(Box::new(Type::Primative("int")))
+    fn peek(&self, offset: i64) -> StrTokType {
+        let new_index: usize = (self.index as i64 + offset)
+            .try_into()
+            .unwrap_or(self.tokens.len());
+        self.tokens[new_index].clone()
+    }
+    fn advance(&mut self) {
+        self.current_token = self.peek(1);
+        self.index += 1;
+    }
+    pub fn parse(&mut self) -> Result<Box<Type>, &'static str> {
+        match self.current_token.clone() {
+            StrTokType::AtSign => {
+                self.advance();
+                let pointer_type = self.parse().unwrap();
+                let pointer = Type::Pointer(pointer_type);
+                Ok(Box::new(pointer))
+            }
+            StrTokType::LeftBracket => {
+                self.advance();
+                if self.current_token == StrTokType::RightBracket {
+                    self.advance();
+                } else {
+                    eprintln!(
+                        "[TypeParser] Expected a RightBracket, but recieved {:?}",
+                        self.current_token
+                    );
+                    process::exit(1);
+                }
+                Ok(Box::new(Type::Array(self.parse().unwrap())))
+            }
+            StrTokType::RightBracket => {
+                eprintln!("[TypeParser] Found a random RightBracket");
+                process::exit(1);
+            }
+            StrTokType::Identifier(id) => match id.as_str() {
+                "int" => Ok(Box::new(Type::Primative("int".to_string()))),
+                "char" => Ok(Box::new(Type::Primative("char".to_string()))),
+                _ => {
+                    eprintln!("[TypeParser] Resolving complex types does not exist yet! Are you in the future?");
+                    process::exit(1);
+                }
+            },
+        }
     }
 }

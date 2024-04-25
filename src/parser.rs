@@ -31,7 +31,7 @@ pub enum Operation {
 
 #[derive(Debug, Clone)]
 pub enum AST {
-    Integer(i64), // TODO: maybe implement 64 bits???
+    Integer(i64),
     String(String),
     UnaryExpr {
         op: Operation,

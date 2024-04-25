@@ -10,7 +10,7 @@ fn putchar: void = (c: char) {
 	add rsp, 8";
 }
 
-fn strlen: int = (str: @char) {
+fn strlen: int = (str: []char) {
 	asm "	mov rsi, qword [rbp+16]
 	mov rax, -1
 .looper:
@@ -19,7 +19,7 @@ fn strlen: int = (str: @char) {
 	jne .looper";
 }
 
-fn print: void = (str: @char) {
+fn print: void = (str: []char) {
 	let i: int = 0;
 	while (str[i]) {
 	 	putchar(str[i]);
@@ -27,7 +27,7 @@ fn print: void = (str: @char) {
 	}
 }
 
-fn println: void = (str: @char) {
+fn println: void = (str: []char) {
 	print(str);
 	putchar(0xa);
 }
