@@ -108,7 +108,7 @@ _main:
 	push rax
 	call _println
 	add rsp, 8
-	mov rdx, 69
+	mov rdx, 42
 	push rdx
 	call _exit
 	add rsp, 8

@@ -3,5 +3,5 @@ import example.stdlib;
 
 fn main: int = () {
   println("Hello, World!");
-  exit(0x45);
+  exit(0x2a);
 }
