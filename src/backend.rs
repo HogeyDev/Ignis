@@ -6,9 +6,7 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::{
-        calculate_expression_type, collapse_type_tree, get_type_size, string_to_type_tree, Type,
-    },
+    types::{calculate_expression_type, get_type_size, string_to_collapsed_type_tree, Type},
     util::get_asm_size_prefix,
 };
 
@@ -158,8 +156,9 @@ pub fn compile_to_asm(
                     // Operation::LTE => "",
                     // Operation::GTE => "",
                     Operation::ArrAcc => {
-                        let element_size = match *lhs_typing {
-                            Type::Array(sub) => get_type_size(sub).unwrap(),
+                        let element_size = match *lhs_typing.clone() {
+                            Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
+                            Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
                             _ => {
                                 eprintln!("[ASM] Array access on non array type");
                                 process::exit(1);
@@ -191,7 +190,12 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            asm.push_str(scope.push("rax".to_string(), 8).as_str());
+            let lhs_size = get_type_size(lhs_typing).unwrap();
+            asm.push_str(
+                scope
+                    .push("rax".to_string(), lhs_size.try_into().unwrap())
+                    .as_str(),
+            );
 
             asm
         }
@@ -200,7 +204,7 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config.clone(), child.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-                                                                      // let typing = calculate_expression_type(child, scope).unwrap();
+            let typing = calculate_expression_type(child, scope).unwrap();
 
             asm.push_str(match op {
                 // Operation::Inc => "",
@@ -212,6 +216,15 @@ pub fn compile_to_asm(
                     process::exit(1);
                 }
             });
+
+            asm.push_str(
+                scope
+                    .push(
+                        "rax".to_string(),
+                        get_type_size(typing).unwrap().try_into().unwrap(),
+                    )
+                    .as_str(),
+            );
 
             asm
         }
@@ -245,9 +258,8 @@ pub fn compile_to_asm(
         } => {
             let mut asm = String::new();
 
-            let collapsed =
-                collapse_type_tree(string_to_type_tree(variable_type.clone()).unwrap()).unwrap();
-            let width = get_type_size(collapsed).unwrap();
+            let collapsed = string_to_collapsed_type_tree(variable_type.clone()).unwrap();
+            let width = get_type_size(collapsed).unwrap().try_into().unwrap();
             let offset = scope.add_variable(name.clone(), variable_type, width).1;
             asm.push_str(
                 format!(
@@ -264,7 +276,19 @@ pub fn compile_to_asm(
         AST::VariableAssignment { name, value } => {
             let mut asm = String::new();
 
-            asm.push_str(compile_to_asm(program_config, value, scope).as_str());
+            asm.push_str(compile_to_asm(program_config, value.clone(), scope).as_str());
+            let lhs_string_type = scope.get_variable_data(name.clone()).0;
+            let lhs_typing = string_to_collapsed_type_tree(lhs_string_type.clone()).unwrap();
+            let rhs_typing = calculate_expression_type(value, scope).unwrap();
+
+            if lhs_typing != rhs_typing {
+                eprintln!(
+                    "[ASM] Attempted to assign expression of type `{}` to variable of type `{}`",
+                    rhs_typing.to_string(),
+                    lhs_string_type,
+                );
+                process::exit(1);
+            }
 
             let offset = scope.get_variable_offset(name.clone()).1;
             asm.push_str(scope.pop("rax".to_string(), 8).as_str());

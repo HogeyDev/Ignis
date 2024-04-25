@@ -2,7 +2,10 @@ import example.stdio;
 import example.stdlib;
 
 fn main: int = () {
-  printnum(-42);
+  let a: int = 14;
+  let b: usize = int_to_usize(a);
+
+  printnum(b);
   putchar(0xa);
   exit(0);
 }

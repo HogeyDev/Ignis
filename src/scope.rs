@@ -50,11 +50,11 @@ impl ScopeContext {
             eprintln!("[BlockScope] Variable `{}` already exists", name);
             process::exit(1);
         }
-        println!("{:#?}", self.variables);
-        println!(
-            "Size before: {}\t|\tnew var: {name}: {width}",
-            self.stack_size
-        );
+        // println!("{:#?}", self.variables);
+        // println!(
+        //     "Size before: {}\t|\tnew var: {name}: {width}",
+        //     self.stack_size
+        // );
         self.stack_size += width;
         self.variables
             .push((name.clone(), variable_type.clone(), self.stack_size));

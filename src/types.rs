@@ -8,7 +8,8 @@ use crate::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Primative(String),
-    Array(Box<Type>),
+    DynamicArray(Box<Type>),
+    FixedArray(usize, Box<Type>),
     Pointer(Box<Type>),
     UnaryOperation(Operation, Box<Type>),
     BinaryOperation(Operation, Box<Type>, Box<Type>),
@@ -16,7 +17,16 @@ pub enum Type {
 
 impl Type {
     pub fn to_string(&self) -> String {
-        todo!("Implement Type::to_string()");
+        match self.clone() {
+            Self::Primative(id) => id,
+            Self::FixedArray(size, sub) => format!("[{}]{}", size, sub.to_string()),
+            Self::DynamicArray(sub) => format!("[]{}", sub.to_string()),
+            Self::Pointer(sub) => format!("@{}", sub.to_string()),
+            _ => {
+                eprintln!("[TypeParser] Cannot stringify type `{:?}`", self);
+                process::exit(1);
+            }
+        }
     }
 }
 
@@ -33,27 +43,30 @@ pub fn is_primative_type(potential: String) -> bool {
     vec!["int", "char"].contains(&potential.as_str())
 }
 
-pub fn get_primative_type_size(prim: String) -> Result<i64, &'static str> {
+pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     match prim.as_str() {
         "int" => Ok(8),
         "char" => Ok(1),
+        "usize" => Ok(8),
         _ => Err("Not a primative type"),
     }
 }
 
-pub fn get_type_size(comp: Box<Type>) -> Result<i64, &'static str> {
+pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
     match *comp {
         Type::Primative(prim) => get_primative_type_size(prim),
-        Type::Pointer(sub) => get_type_size(sub),
+        Type::Pointer(_) => get_primative_type_size("usize".to_string()),
         Type::UnaryOperation(_, sub) => get_type_size(sub),
         Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
-        _ => {
-            eprintln!(
-                "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
-                *comp
-            );
-            process::exit(1);
-        }
+        Type::FixedArray(size, sub) => Ok(get_type_size(sub).unwrap() * size),
+        Type::DynamicArray(_) => get_primative_type_size("usize".to_string()),
+        // _ => {
+        //     eprintln!(
+        //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
+        //         *comp
+        //     );
+        //     process::exit(1);
+        // }
     }
 }
 
@@ -75,8 +88,13 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
             let variable_type_tree = string_to_type_tree(type_str).unwrap();
             Ok(variable_type_tree)
         }
+        AST::FunctionCall { name, .. } => {
+            let type_str = scope.get_function_data(name).0;
+            let function_type_tree = string_to_type_tree(type_str).unwrap();
+            Ok(function_type_tree)
+        }
         _ => {
-            eprintln!("[TypeParser] {:?}", ast);
+            // eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able")
         }
     }
@@ -96,7 +114,13 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
             Ok(collapsed_lhs)
         }
         Type::Pointer(sub_type) => Ok(Box::new(Type::Pointer(collapse_type_tree(sub_type)?))),
-        Type::Array(sub_type) => Ok(Box::new(Type::Array(collapse_type_tree(sub_type)?))),
+        Type::DynamicArray(sub_type) => {
+            Ok(Box::new(Type::DynamicArray(collapse_type_tree(sub_type)?)))
+        }
+        Type::FixedArray(size, sub_type) => Ok(Box::new(Type::FixedArray(
+            size,
+            collapse_type_tree(sub_type)?,
+        ))),
     }
 }
 
@@ -105,12 +129,17 @@ pub fn string_to_type_tree(type_str: String) -> Result<Box<Type>, &'static str> 
     TypeParser::new(type_tokens).parse()
 }
 
+pub fn string_to_collapsed_type_tree(type_str: String) -> Result<Box<Type>, &'static str> {
+    collapse_type_tree(string_to_type_tree(type_str)?)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum StrTokType {
     AtSign,
     LeftBracket,
     RightBracket,
     Identifier(String),
+    Integer(usize),
 }
 
 struct TypeLexer {
@@ -152,6 +181,13 @@ impl TypeLexer {
                     self.advance();
                 }
                 token_list.push(StrTokType::Identifier(full_id));
+            } else if self.current_char.is_numeric() {
+                let mut full_number = String::new();
+                while self.current_char.is_numeric() {
+                    full_number.push(self.current_char);
+                    self.advance()
+                }
+                token_list.push(StrTokType::Integer(full_number.parse::<usize>().unwrap()))
             } else {
                 token_list.push(match self.current_char {
                     '@' => StrTokType::AtSign,
@@ -206,16 +242,30 @@ impl TypeParser {
             }
             StrTokType::LeftBracket => {
                 self.advance();
-                if self.current_token == StrTokType::RightBracket {
-                    self.advance();
-                } else {
-                    eprintln!(
-                        "[TypeParser] Expected a RightBracket, but recieved {:?}",
-                        self.current_token
-                    );
-                    process::exit(1);
+                let mut is_dynamic = false;
+                let mut size = 0;
+                match self.current_token {
+                    StrTokType::RightBracket => {
+                        self.advance();
+                        is_dynamic = true;
+                    }
+                    StrTokType::Integer(value) => {
+                        self.advance();
+                        size = value;
+                    }
+                    _ => {
+                        eprintln!(
+                            "[TypeParser] Expected a RightBracket, but recieved {:?}",
+                            self.current_token
+                        );
+                        process::exit(1);
+                    }
                 }
-                Ok(Box::new(Type::Array(self.parse().unwrap())))
+                if is_dynamic {
+                    Ok(Box::new(Type::DynamicArray(self.parse().unwrap())))
+                } else {
+                    Ok(Box::new(Type::FixedArray(size, self.parse().unwrap())))
+                }
             }
             StrTokType::RightBracket => {
                 eprintln!("[TypeParser] Found a random RightBracket");
@@ -224,11 +274,16 @@ impl TypeParser {
             StrTokType::Identifier(id) => match id.as_str() {
                 "int" => Ok(Box::new(Type::Primative("int".to_string()))),
                 "char" => Ok(Box::new(Type::Primative("char".to_string()))),
+                "usize" => Ok(Box::new(Type::Primative("usize".to_string()))),
                 _ => {
-                    eprintln!("[TypeParser] Resolving complex types does not exist yet! Are you in the future?");
+                    eprintln!("[TypeParser] Resolving complex types does not exist yet!");
                     process::exit(1);
                 }
             },
+            _ => {
+                eprintln!("[TypeParser] No way to parse `{:?}`", self.current_token);
+                process::exit(1);
+            }
         }
     }
 }

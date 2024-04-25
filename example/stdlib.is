@@ -3,3 +3,7 @@ fn exit: void = (code: int) {
 	mov rdi, qword [rbp+16]
 	syscall";
 }
+
+fn int_to_usize: usize = (n: int) {
+    asm "    mov rax, qword [rbp+16]";
+}
