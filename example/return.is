@@ -1,11 +1,14 @@
 import example.stdio;
 import example.stdlib;
 
-fn main: int = () {
-  println("Should get here!");
+fn mather: int = (a: int, b: int) {
+  return a + b * 3;
+}
 
-  return 1;
-  println("But not here!");
+fn main: int = () {
+  let a: int = mather(4, 5);
+
+  printnum(a);
 
   return 0;
 }

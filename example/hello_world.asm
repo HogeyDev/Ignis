@@ -206,23 +206,49 @@ lbl3:
 	mov rsp, rbp
 	pop rbp
 	ret
-global _main
-_main:
+global _mather
+_mather:
 	push rbp
 	mov rbp, rsp
-	mov rax, STR0
-	push rax
-	call _println
-	add rsp, 8
-	mov rdx, 1
+	mov rax, qword [rbp+24]
+	push rax ; recalled `a`
+	mov rax, qword [rbp+16]
+	push rax ; recalled `b`
+	mov rdx, 3
 	push rdx
+	pop qword rbx
+	pop qword rax
+	imul rax, rbx
+	push rax
+	pop qword rbx
+	pop qword rax
+	add rax, rbx
+	push rax
 	pop qword rax
 	mov rsp, rbp
 	pop rbp
 	ret
-	mov rax, STR1
+	mov rsp, rbp
+	pop rbp
+	ret
+global _main
+_main:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 8
+	mov qword [rbp-8], 0
+	mov rdx, 4
+	push rdx
+	mov rdx, 5
+	push rdx
+	call _mather
+	add rsp, 16
 	push rax
-	call _println
+	pop qword rax
+	mov qword [rbp-8], rax ; assigned `a`
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	call _printnum
 	add rsp, 8
 	mov rdx, 0
 	push rdx
@@ -243,5 +269,3 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
-	STR0 db "Should get here!", 0
-	STR1 db "But not here!", 0

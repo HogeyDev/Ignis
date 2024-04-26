@@ -46,7 +46,7 @@ pub fn compile_to_asm(
             let function_data = scope.get_function_data(name.clone()); // also checks if function
                                                                        // exists
                                                                        // println!("{name}, {:?}", arguments);
-            for (i, arg) in arguments.iter().rev().cloned().enumerate() {
+            for (i, arg) in arguments.iter().cloned().enumerate() {
                 asm.push_str(compile_to_asm(program_config, arg.clone(), scope).as_str());
 
                 // check typing
