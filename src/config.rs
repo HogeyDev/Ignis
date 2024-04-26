@@ -23,7 +23,7 @@ pub fn get_config() -> Configuration {
         .unwrap()
         .to_string();
     Configuration {
-        main_file: String::from("example/hello_world.is"), // TODO: Hard-coded
+        main_file: String::from("example/return.is"), // TODO: Hard-coded
         root_path,
         imported_files: Vec::new(),
     }

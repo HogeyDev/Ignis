@@ -15,7 +15,7 @@ pub mod types;
 pub mod util;
 
 fn main() {
-    let input_file_path = String::from("example/hello_world.is");
+    let input_file_path = String::from("example/return.is");
     let input_file = read_file(input_file_path);
     let mut program_config = get_config();
 

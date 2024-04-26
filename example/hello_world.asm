@@ -210,27 +210,26 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 8
-	mov qword [rbp-8], 0
-	mov rdx, 14
+	mov rax, STR0
+	push rax
+	call _println
+	add rsp, 8
+	mov rdx, 1
 	push rdx
 	pop qword rax
-	mov qword [rbp-8], rax ; assigned `a`
-	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
-	call _printnum
-	add rsp, 8
-	mov rdx, 10
-	push rdx
-	call _int_to_char
-	add rsp, 8
+	mov rsp, rbp
+	pop rbp
+	ret
+	mov rax, STR1
 	push rax
-	call _putchar
+	call _println
 	add rsp, 8
 	mov rdx, 0
 	push rdx
-	call _exit
-	add rsp, 8
+	pop qword rax
+	mov rsp, rbp
+	pop rbp
+	ret
 	mov rsp, rbp
 	pop rbp
 	ret
@@ -244,3 +243,5 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
+	STR0 db "Should get here!", 0
+	STR1 db "But not here!", 0

@@ -54,6 +54,7 @@ pub fn compile_to_asm(
                 let func_arg_type =
                     string_to_collapsed_type_tree(function_data.1[i].clone()).unwrap();
                 if arg_type != func_arg_type {
+                    eprintln!("{:?}\n{:?}", func_arg_type, arg_type);
                     eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
                     process::exit(1);
                 }
@@ -258,7 +259,7 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config, value, scope).as_str());
             asm.push_str(scope.pop(String::from("rax"), 8).as_str());
-            asm.push_str("\tret\n");
+            asm.push_str("\tmov rsp, rbp\n\tpop rbp\n\tret\n");
 
             asm
         }

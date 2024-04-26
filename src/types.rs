@@ -73,7 +73,7 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
 pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
-        AST::String(_) => Ok(Box::new(Type::Primative("[]char".to_string()))),
+        AST::String(_) => string_to_collapsed_type_tree("[]char".to_string()),
         AST::UnaryExpr { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             Ok(Box::new(Type::UnaryOperation(op, child_type)))

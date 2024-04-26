@@ -1,0 +1,11 @@
+import example.stdio;
+import example.stdlib;
+
+fn main: int = () {
+  println("Should get here!");
+
+  return 1;
+  println("But not here!");
+
+  return 0;
+}
