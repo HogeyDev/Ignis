@@ -3,9 +3,8 @@ import example.stdlib;
 
 fn main: int = () {
   let a: int = 14;
-  let b: usize = int_to_usize(a);
 
-  printnum(b);
-  putchar(0xa);
+  printnum(a);
+  putchar(int_to_char(0xa));
   exit(0);
 }

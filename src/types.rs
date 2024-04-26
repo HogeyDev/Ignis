@@ -93,8 +93,9 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
             let function_type_tree = string_to_type_tree(type_str).unwrap();
             Ok(function_type_tree)
         }
+        AST::Argument(sub) => ast_to_type_tree(sub, scope),
         _ => {
-            // eprintln!("[TypeParser] {:?}", ast);
+            eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able")
         }
     }
@@ -104,11 +105,17 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
     match *tree {
         Type::Primative(type_name) => Ok(Box::new(Type::Primative(type_name))),
         Type::UnaryOperation(_, child) => collapse_type_tree(child),
-        Type::BinaryOperation(_, lhs, rhs) => {
-            let collapsed_lhs = collapse_type_tree(lhs)?;
+        Type::BinaryOperation(op, lhs, rhs) => {
+            let collapsed_lhs = collapse_type_tree(lhs.clone())?;
             let collapsed_rhs = collapse_type_tree(rhs)?;
 
-            if collapsed_lhs != collapsed_rhs {
+            if op == Operation::ArrAcc {
+                return match *lhs {
+                    Type::FixedArray(_, sub) => Ok(sub),
+                    Type::DynamicArray(sub) => Ok(sub),
+                    _ => Err("Tried to do array access on non array type"),
+                };
+            } else if collapsed_lhs != collapsed_rhs {
                 return Err("Types do not match");
             }
             Ok(collapsed_lhs)

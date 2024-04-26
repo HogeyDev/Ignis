@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub fn compile_to_asm(
-    program_config: Configuration,
+    program_config: &mut Configuration,
     root: Box<AST>,
     scope: &mut ScopeContext,
 ) -> String {
@@ -22,9 +22,7 @@ pub fn compile_to_asm(
             let mut block_scope = scope.sub_scope();
 
             for statement in statements {
-                asm.push_str(
-                    compile_to_asm(program_config.clone(), statement, &mut block_scope).as_str(),
-                );
+                asm.push_str(compile_to_asm(program_config, statement, &mut block_scope).as_str());
             }
 
             scope.absorb_sub_scope_globals(block_scope.to_owned());
@@ -33,20 +31,32 @@ pub fn compile_to_asm(
         AST::Import { module } => {
             let path_with_ending = module.replace('.', "/") + ".is";
             let full_path = program_config.root_path.clone() + "/" + path_with_ending.as_str();
-            let file = read_file(full_path);
-            compile_to_asm(
-                program_config.clone(),
-                parse_file(program_config, file),
-                scope,
-            )
+            let file = read_file(full_path.clone());
+
+            if program_config.imported_files.contains(&full_path) {
+                return "".to_string();
+            }
+            program_config.imported_files.push(full_path);
+
+            compile_to_asm(program_config, parse_file(program_config, file), scope)
         }
         AST::FunctionCall { name, arguments } => {
             let mut asm = String::new();
 
             let function_data = scope.get_function_data(name.clone()); // also checks if function
                                                                        // exists
-            for arg in arguments.iter().rev().cloned() {
-                asm.push_str(compile_to_asm(program_config.clone(), arg, scope).as_str());
+                                                                       // println!("{name}, {:?}", arguments);
+            for (i, arg) in arguments.iter().rev().cloned().enumerate() {
+                asm.push_str(compile_to_asm(program_config, arg.clone(), scope).as_str());
+
+                // check typing
+                let arg_type = calculate_expression_type(arg, scope).unwrap();
+                let func_arg_type =
+                    string_to_collapsed_type_tree(function_data.1[i].clone()).unwrap();
+                if arg_type != func_arg_type {
+                    eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
+                    process::exit(1);
+                }
             }
             asm.push_str(
                 format!("\tcall _{}\n\tadd rsp, {}\n", name, 8 * arguments.len()).as_str(),
@@ -74,7 +84,7 @@ pub fn compile_to_asm(
             let mut params = Vec::new();
             for param in prototype.iter().rev().cloned() {
                 asm.push_str(
-                    compile_to_asm(program_config.clone(), param.clone(), &mut body_scope).as_str(),
+                    compile_to_asm(program_config, param.clone(), &mut body_scope).as_str(),
                 );
                 match *param {
                     AST::Parameter { param_type, name } => {
@@ -91,7 +101,7 @@ pub fn compile_to_asm(
 
             body_scope.add_function(name, return_type, params.clone());
 
-            asm.push_str(compile_to_asm(program_config.clone(), body, &mut body_scope).as_str());
+            asm.push_str(compile_to_asm(program_config, body, &mut body_scope).as_str());
             asm.push_str("\tmov rsp, rbp\n\tpop rbp\n\tret\n");
 
             scope.absorb_sub_scope_globals(body_scope);
@@ -110,7 +120,7 @@ pub fn compile_to_asm(
 
             let end_label_id = scope.add_label();
 
-            asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
+            asm.push_str(compile_to_asm(program_config, condition, scope).as_str());
             asm.push_str(scope.pop("rax".to_string(), 8).as_str());
             asm.push_str(format!("\tcmp rax, 0\n\tje lbl{}\n", end_label_id).as_str());
 
@@ -125,7 +135,7 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
-            asm.push_str(compile_to_asm(program_config.clone(), lhs.clone(), scope).as_str());
+            asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str());
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
@@ -202,7 +212,7 @@ pub fn compile_to_asm(
         AST::UnaryExpr { op, child } => {
             let mut asm = String::new();
 
-            asm.push_str(compile_to_asm(program_config.clone(), child.clone(), scope).as_str());
+            asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
             let typing = calculate_expression_type(child, scope).unwrap();
 
@@ -316,7 +326,7 @@ pub fn compile_to_asm(
             let tail_label_id = scope.add_label();
 
             asm.push_str(format!("lbl{}:\n", head_label_id).as_str());
-            asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
+            asm.push_str(compile_to_asm(program_config, condition, scope).as_str());
             asm.push_str(scope.pop("rax".to_string(), 8).as_str());
             asm.push_str(format!("\tcmp rax, 0\n\tje lbl{}\n", tail_label_id).as_str());
 

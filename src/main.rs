@@ -17,14 +17,11 @@ pub mod util;
 fn main() {
     let input_file_path = String::from("example/hello_world.is");
     let input_file = read_file(input_file_path);
-    let program_config = get_config();
+    let mut program_config = get_config();
 
     let mut scope = ScopeContext::new();
-    let section_text = compile_to_asm(
-        program_config.clone(),
-        parse_file(program_config, input_file),
-        &mut scope,
-    );
+    let parsed_input_file = parse_file(&program_config, input_file);
+    let section_text = compile_to_asm(&mut program_config, parsed_input_file, &mut scope);
     let section_data = scope.compile_strings();
 
     let compiled = format!(

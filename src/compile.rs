@@ -5,7 +5,7 @@ use crate::{
     parser::{Parser, AST},
 };
 
-pub fn parse_file(_program_config: Configuration, file: SourceFile) -> Box<AST> {
+pub fn parse_file(_program_config: &Configuration, file: SourceFile) -> Box<AST> {
     let mut tokenizer = Tokenizer::new(file);
     let mut token_list = tokenizer.tokenize();
 

@@ -1,4 +1,30 @@
 section .text
+global _exit
+_exit:
+	push rbp
+	mov rbp, rsp
+	mov rax, 60
+	mov rdi, qword [rbp+16]
+	syscall
+	mov rsp, rbp
+	pop rbp
+	ret
+global _int_to_usize
+_int_to_usize:
+	push rbp
+	mov rbp, rsp
+    mov rax, qword [rbp+16]
+	mov rsp, rbp
+	pop rbp
+	ret
+global _int_to_char
+_int_to_char:
+	push rbp
+	mov rbp, rsp
+    mov rax, qword [rbp+16]
+	mov rsp, rbp
+	pop rbp
+	ret
 global _putchar
 _putchar:
 	push rbp
@@ -85,6 +111,9 @@ _println:
 	add rsp, 8
 	mov rdx, 10
 	push rdx
+	call _int_to_char
+	add rsp, 8
+	push rax
 	call _putchar
 	add rsp, 8
 	mov rsp, rbp
@@ -115,6 +144,9 @@ _printnum:
 	je lbl2
 	mov rdx, 45
 	push rdx
+	call _int_to_char
+	add rsp, 8
+	push rax
 	call _putchar
 	add rsp, 8
 	mov rax, qword [rbp-8]
@@ -166,26 +198,11 @@ lbl3:
 	pop qword rax
 	add rax, rbx
 	push rax
+	call _int_to_char
+	add rsp, 8
+	push rax
 	call _putchar
 	add rsp, 8
-	mov rsp, rbp
-	pop rbp
-	ret
-global _exit
-_exit:
-	push rbp
-	mov rbp, rsp
-	mov rax, 60
-	mov rdi, qword [rbp+16]
-	syscall
-	mov rsp, rbp
-	pop rbp
-	ret
-global _int_to_usize
-_int_to_usize:
-	push rbp
-	mov rbp, rsp
-    mov rax, qword [rbp+16]
 	mov rsp, rbp
 	pop rbp
 	ret
@@ -199,21 +216,15 @@ _main:
 	push rdx
 	pop qword rax
 	mov qword [rbp-8], rax ; assigned `a`
-	sub rsp, 8
-	mov qword [rbp-16], 0
 	mov rax, qword [rbp-8]
 	push rax ; recalled `a`
-	call _int_to_usize
-	add rsp, 8
-	push rax
-	pop qword rax
-	mov qword [rbp-16], rax ; assigned `b`
-	mov rax, qword [rbp-16]
-	push rax ; recalled `b`
 	call _printnum
 	add rsp, 8
 	mov rdx, 10
 	push rdx
+	call _int_to_char
+	add rsp, 8
+	push rax
 	call _putchar
 	add rsp, 8
 	mov rdx, 0

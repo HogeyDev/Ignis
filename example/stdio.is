@@ -1,3 +1,4 @@
+import example.stdlib;
 // asm "extern printf";
 
 fn putchar: void = (c: char) {
@@ -29,19 +30,19 @@ fn print: void = (str: []char) {
 
 fn println: void = (str: []char) {
 	print(str);
-	putchar(0xa);
+	putchar(int_to_char(0xa));
 }
 
 fn printnum: void = (num: int) {
 	let a: int = num;
 
 	if (a < 0) {
-		putchar(45); // -
+		putchar(int_to_char(45)); // -
 		a = -a;
 	}
 	if (a > 9) {	
 		printnum(a / 10);
 	}
 
-	putchar(48 + a % 10);
+	putchar(int_to_char(48 + a % 10));
 }
