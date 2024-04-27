@@ -16,6 +16,12 @@ impl Configuration {
     }
 }
 
+impl Default for Configuration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn get_config(main_file: String) -> Configuration {
     let root_path = std::env::current_dir()
         .expect("Could not get current working directory")
@@ -23,7 +29,7 @@ pub fn get_config(main_file: String) -> Configuration {
         .unwrap()
         .to_string();
     Configuration {
-        main_file: String::from(main_file),
+        main_file,
         root_path,
         imported_files: Vec::new(),
     }

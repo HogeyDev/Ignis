@@ -40,7 +40,7 @@ pub fn calculate_expression_type(
 }
 
 pub fn is_primative_type(potential: String) -> bool {
-    vec!["int", "char", "usize"].contains(&potential.as_str())
+    ["int", "char", "usize"].contains(&potential.as_str())
 }
 
 pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
@@ -161,16 +161,16 @@ impl TypeLexer {
         TypeLexer {
             type_string: type_string.clone(),
             index: 0,
-            current_char: type_string.bytes().nth(0).unwrap_or(0).into(),
+            current_char: type_string.as_bytes().first().copied().unwrap_or(0).into(),
         }
     }
     fn get_char(&self, index: usize) -> char {
         self.type_string
-            .bytes()
-            .nth(index)
+            .as_bytes()
+            .get(index)
+            .copied()
             .unwrap_or(0)
-            .try_into()
-            .unwrap()
+            .into()
     }
     fn peek(&self, offset: i64) -> char {
         self.get_char((self.index as i64 + offset).try_into().unwrap())

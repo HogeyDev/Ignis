@@ -59,10 +59,8 @@ impl ScopeContext {
         self.get_variable_offset(name)
     }
     pub fn get_variable_data(&self, name: String) -> (String, i64) {
-        match self.variables.iter().filter(|x| x.0 == name).next() {
-            Some(value) => {
-                return (value.clone().1, value.2);
-            }
+        match self.variables.iter().find(|x| x.0 == name) {
+            Some(value) => (value.clone().1, value.2),
             None => {
                 eprintln!("[BlockScope] Could not find variable named `{}`", name);
                 process::exit(1);
@@ -88,7 +86,7 @@ impl ScopeContext {
         self.functions.push((name, function_type, args));
     }
     pub fn get_function_data(&self, name: String) -> (String, Vec<String>) {
-        match self.functions.iter().filter(|x| x.0 == name).next() {
+        match self.functions.iter().find(|x| x.0 == name) {
             Some(value) => (
                 value.clone().1,
                 value.2.iter().map(|x| x.1.clone()).collect(),
