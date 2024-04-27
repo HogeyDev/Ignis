@@ -1,8 +1,8 @@
 import example.stdio;
-import example.stdlib;
+// import example.stdlib;
 
 fn main: int = () {
-  let a: int = 42;
+  let a: int = 41;
   let ptr: @int = &a;
   
   print("ptr = ");

@@ -247,7 +247,7 @@ _main:
 	mov rbp, rsp
 	sub rsp, 8
 	mov qword [rbp-8], 0
-	mov rdx, 42
+	mov rdx, 41
 	push rdx
 	pop rax
 	mov qword [rbp-8], rax; assigned `a`
