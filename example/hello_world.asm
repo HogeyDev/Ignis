@@ -25,6 +25,19 @@ _int_to_char:
 	mov rsp, rbp
 	pop rbp
 	ret
+global _strlen
+_strlen:
+	push rbp
+	mov rbp, rsp
+	mov rsi, qword [rbp+16]
+	mov rax, -1
+.looper:
+	inc rax
+	cmp byte [rsi+rax], 0x00
+	jne .looper
+	mov rsp, rbp
+	pop rbp
+	ret
 global _putchar
 _putchar:
 	push rbp
@@ -39,63 +52,67 @@ _putchar:
 	mov rsp, rbp
 	pop rbp
 	ret
-global _strlen
-_strlen:
-	push rbp
-	mov rbp, rsp
-	mov rsi, qword [rbp+16]
-	mov rax, -1
-.looper:
-	inc rax
-	cmp byte [rsi+rax], 0x00
-	jne .looper
-	mov rsp, rbp
-	pop rbp
-	ret
 global _print
 _print:
 	push rbp
 	mov rbp, rsp
 	sub rsp, 8
 	mov qword [rbp-8], 0
+	mov rax, qword [rbp+16]
+	push rax; recalled `str`
+	call _strlen
+	add rsp, 8
+	push rax
+	pop rax
+	mov qword [rbp-8], rax; assigned `string_length`
+	sub rsp, 8
+	mov qword [rbp-16], 0
 	mov rdx, 0
 	push rdx
-	pop qword rax
-	mov qword [rbp-8], rax ; assigned `i`
+	pop rax
+	mov qword [rbp-16], rax; assigned `i`
 lbl0:
-	mov rax, qword [rbp+16]
-	push rax ; recalled `str`
+	mov rax, qword [rbp-16]
+	push rax; recalled `i`
 	mov rax, qword [rbp-8]
-	push rax ; recalled `i`
-	pop qword rbx
-	pop qword rax
-	imul rbx, 1
-	movzx rax, byte [rax + rbx]
+	push rax; recalled `string_length`
+	pop rbx
+	pop rax
+	cmp rax, rbx
+	setl al
+	movzx rax, al
 	push rax
-	pop qword rax
+	pop rax
 	cmp rax, 0
 	je lbl1
+	sub rsp, 1
+	mov byte [rbp-17], 0
 	mov rax, qword [rbp+16]
-	push rax ; recalled `str`
-	mov rax, qword [rbp-8]
-	push rax ; recalled `i`
-	pop qword rbx
-	pop qword rax
+	push rax; recalled `str`
+	mov rax, qword [rbp-16]
+	push rax; recalled `i`
+	pop rbx
+	pop rax
 	imul rbx, 1
 	movzx rax, byte [rax + rbx]
 	push rax
+	pop rax
+	mov byte [rbp-17], al; assigned `c`
+	mov al, byte [rbp-17]
+	movzx rax, al
+	push rax; recalled `c`
 	call _putchar
 	add rsp, 8
-	mov rax, qword [rbp-8]
-	push rax ; recalled `i`
+	mov rax, qword [rbp-16]
+	push rax; recalled `i`
 	mov rdx, 1
 	push rdx
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	add rax, rbx
 	push rax
-	pop qword rax
-	mov qword [rbp-8], rax ; assigned `i`
+	pop rax
+	mov qword [rbp-16], rax; assigned `i`
 	jmp lbl0
 lbl1:
 	mov rsp, rbp
@@ -106,14 +123,11 @@ _println:
 	push rbp
 	mov rbp, rsp
 	mov rax, qword [rbp+16]
-	push rax ; recalled `str`
+	push rax; recalled `str`
 	call _print
 	add rsp, 8
 	mov rdx, 10
 	push rdx
-	call _int_to_char
-	add rsp, 8
-	push rax
 	call _putchar
 	add rsp, 8
 	mov rsp, rbp
@@ -126,56 +140,57 @@ _printnum:
 	sub rsp, 8
 	mov qword [rbp-8], 0
 	mov rax, qword [rbp+16]
-	push rax ; recalled `num`
-	pop qword rax
-	mov qword [rbp-8], rax ; assigned `a`
+	push rax; recalled `num`
+	pop rax
+	mov qword [rbp-8], rax; assigned `a`
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
+	push rax; recalled `a`
 	mov rdx, 0
 	push rdx
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	cmp rax, rbx
 	setl al
 	movzx rax, al
 	push rax
-	pop qword rax
+	pop rax
 	cmp rax, 0
 	je lbl2
 	mov rdx, 45
 	push rdx
 	call _int_to_char
 	add rsp, 8
+	movzx rax, al
 	push rax
 	call _putchar
 	add rsp, 8
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
-	pop qword rax
+	push rax; recalled `a`
+	pop rax
 	neg rax
 	push rax
-	pop qword rax
-	mov qword [rbp-8], rax ; assigned `a`
+	pop rax
+	mov qword [rbp-8], rax; assigned `a`
 lbl2:
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
+	push rax; recalled `a`
 	mov rdx, 9
 	push rdx
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	cmp rax, rbx
 	setg al
 	movzx rax, al
 	push rax
-	pop qword rax
+	pop rax
 	cmp rax, 0
 	je lbl3
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
+	push rax; recalled `a`
 	mov rdx, 10
 	push rdx
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	mov rdx, 0
 	div rbx
 	push rax
@@ -185,49 +200,25 @@ lbl3:
 	mov rdx, 48
 	push rdx
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
+	push rax; recalled `a`
 	mov rdx, 10
 	push rdx
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	mov rdx, 0
 	div rbx
 	mov rax, rdx
 	push rax
-	pop qword rbx
-	pop qword rax
+	pop rbx
+	pop rax
 	add rax, rbx
 	push rax
 	call _int_to_char
 	add rsp, 8
+	movzx rax, al
 	push rax
 	call _putchar
 	add rsp, 8
-	mov rsp, rbp
-	pop rbp
-	ret
-global _mather
-_mather:
-	push rbp
-	mov rbp, rsp
-	mov rax, qword [rbp+24]
-	push rax ; recalled `a`
-	mov rax, qword [rbp+16]
-	push rax ; recalled `b`
-	mov rdx, 3
-	push rdx
-	pop qword rbx
-	pop qword rax
-	imul rax, rbx
-	push rax
-	pop qword rbx
-	pop qword rax
-	add rax, rbx
-	push rax
-	pop qword rax
-	mov rsp, rbp
-	pop rbp
-	ret
 	mov rsp, rbp
 	pop rbp
 	ret
@@ -237,22 +228,38 @@ _main:
 	mov rbp, rsp
 	sub rsp, 8
 	mov qword [rbp-8], 0
-	mov rdx, 4
+	mov rdx, 69
 	push rdx
-	mov rdx, 5
-	push rdx
-	call _mather
-	add rsp, 16
-	push rax
-	pop qword rax
-	mov qword [rbp-8], rax ; assigned `a`
+	pop rax
+	mov qword [rbp-8], rax; assigned `a`
+	sub rsp, 8
+	mov qword [rbp-16], 0
 	mov rax, qword [rbp-8]
-	push rax ; recalled `a`
+	push rax; recalled `a`
+	pop rax
+	not rax
+	push rax
+	pop rax
+	mov qword [rbp-16], rax; assigned `b`
+	mov rax, qword [rbp-8]
+	push rax; recalled `a`
 	call _printnum
+	add rsp, 8
+	mov rax, STR0
+	push rax
+	call _print
+	add rsp, 8
+	mov rax, qword [rbp-16]
+	push rax; recalled `b`
+	call _printnum
+	add rsp, 8
+	mov rax, STR1
+	push rax
+	call _println
 	add rsp, 8
 	mov rdx, 0
 	push rdx
-	pop qword rax
+	pop rax
 	mov rsp, rbp
 	pop rbp
 	ret
@@ -269,3 +276,5 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
+	STR0 db " -> ", 0
+	STR1 db "", 0

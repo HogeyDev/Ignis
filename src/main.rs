@@ -15,9 +15,9 @@ pub mod types;
 pub mod util;
 
 fn main() {
-    let input_file_path = String::from("example/return.is");
-    let input_file = read_file(input_file_path);
-    let mut program_config = get_config();
+    let input_file_path = String::from("example/hello_world.is");
+    let input_file = read_file(input_file_path.clone());
+    let mut program_config = get_config(input_file_path);
 
     let mut scope = ScopeContext::new();
     let parsed_input_file = parse_file(&program_config, input_file);
@@ -34,12 +34,4 @@ fn main() {
         contents: compiled.clone(),
     };
     write_file(output_file);
-    // println!("{}", compiled)
-    // println!(
-    //     "AST:\n{:#?}",
-    //     parse_file(
-    //         Configuration::new(),
-    //         read_file("example/stdio.is".to_string())
-    //     )
-    // );
 }

@@ -10,6 +10,7 @@ pub enum TokenType {
     Let,
     Asm,
     For,
+    Else,
     While,
     Return,
     Import,
@@ -47,6 +48,7 @@ pub enum TokenType {
 
     String,
     Integer,
+    Character,
 
     At,
 
@@ -129,6 +131,7 @@ impl Tokenizer {
             "let" => TokenType::Let,
             "asm" => TokenType::Asm,
             "for" => TokenType::For,
+            "else" => TokenType::Else,
             "while" => TokenType::While,
             "return" => TokenType::Return,
             "import" => TokenType::Import,
@@ -143,6 +146,36 @@ impl Tokenizer {
         };
         self.next();
         while self.current_character != '\"' {
+            token.value.push(self.current_character);
+            self.next();
+        }
+        self.next();
+        token
+    }
+    fn parse_character(&mut self) -> Token {
+        let mut token = Token {
+            value: String::new(),
+            token_type: TokenType::Character,
+        };
+        self.next();
+        if self.current_character == '\\' {
+            token.value.push(match self.peek(1) {
+                '\\' => '\\',
+                'n' => '\n',
+                't' => '\t',
+                '0' => '\0',
+                _ => {
+                    eprintln!(
+                        "Unknown (or unimplemented) escape character `{}`",
+                        self.current_character
+                    );
+                    process::exit(1);
+                }
+            });
+            self.next();
+            self.next();
+            // todo!("Implement complex characters (characters prefixed with `\\`)");
+        } else {
             token.value.push(self.current_character);
             self.next();
         }
@@ -205,6 +238,9 @@ impl Tokenizer {
         }
         if self.current_character == '\"' {
             return self.parse_string();
+        }
+        if self.current_character == '\'' {
+            return self.parse_character();
         }
         if self.current_character.is_ascii_digit() {
             return self.parse_number();

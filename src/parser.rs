@@ -33,7 +33,8 @@ pub enum Operation {
 pub enum AST {
     Integer(i64),
     String(String),
-    UnaryExpr {
+    Character(char),
+    UnaryExpression {
         op: Operation,
         child: Box<AST>,
     },
@@ -71,6 +72,7 @@ pub enum AST {
     If {
         condition: Box<AST>,
         body: Box<AST>,
+        alt: Option<Box<AST>>,
     },
     While {
         condition: Box<AST>,
@@ -243,7 +245,16 @@ impl Parser {
                 self.eat(TokenType::If);
                 let condition = self.expression();
                 let body = self.scope();
-                stmt = Some(Box::new(AST::If { condition, body }));
+                let mut alt = None;
+                if self.current_token.token_type == TokenType::Else {
+                    self.eat(TokenType::Else);
+                    alt = Some(self.scope());
+                }
+                stmt = Some(Box::new(AST::If {
+                    condition,
+                    body,
+                    alt,
+                }));
             } else if self.current_token.token_type == TokenType::Return {
                 self.eat(TokenType::Return);
                 let value = self.expression();
@@ -516,7 +527,7 @@ impl Parser {
                 }
             };
             self.advance();
-            return Box::new(AST::UnaryExpr {
+            return Box::new(AST::UnaryExpression {
                 op,
                 child: self.accessor(),
             });
@@ -568,6 +579,11 @@ impl Parser {
                 let value = self.current_token.value.clone();
                 self.eat(TokenType::String);
                 Box::new(AST::String(value))
+            }
+            TokenType::Character => {
+                let value = self.current_token.value.chars().nth(0).unwrap_or('\0');
+                self.eat(TokenType::Character);
+                Box::new(AST::Character(value))
             }
             TokenType::Identifier => {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {

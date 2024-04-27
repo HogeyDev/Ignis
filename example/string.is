@@ -1,0 +1,8 @@
+fn strlen: int = (str: []char) {
+	asm "	mov rsi, qword [rbp+16]
+	mov rax, -1
+.looper:
+	inc rax
+	cmp byte [rsi+rax], 0x00
+	jne .looper";
+}

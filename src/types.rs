@@ -40,7 +40,7 @@ pub fn calculate_expression_type(
 }
 
 pub fn is_primative_type(potential: String) -> bool {
-    vec!["int", "char"].contains(&potential.as_str())
+    vec!["int", "char", "usize"].contains(&potential.as_str())
 }
 
 pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
@@ -73,8 +73,9 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
 pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
+        AST::Character(_) => Ok(Box::new(Type::Primative("char".to_string()))),
         AST::String(_) => string_to_collapsed_type_tree("[]char".to_string()),
-        AST::UnaryExpr { op, child } => {
+        AST::UnaryExpression { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             Ok(Box::new(Type::UnaryOperation(op, child_type)))
         }

@@ -16,14 +16,14 @@ impl Configuration {
     }
 }
 
-pub fn get_config() -> Configuration {
+pub fn get_config(main_file: String) -> Configuration {
     let root_path = std::env::current_dir()
         .expect("Could not get current working directory")
         .to_str()
         .unwrap()
         .to_string();
     Configuration {
-        main_file: String::from("example/return.is"), // TODO: Hard-coded
+        main_file: String::from(main_file),
         root_path,
         imported_files: Vec::new(),
     }

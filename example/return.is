@@ -1,12 +1,12 @@
 import example.stdio;
 import example.stdlib;
 
-fn mather: int = (a: int, b: int) {
+fn math_func: int = (a: int, b: int) {
   return a + b * 3;
 }
 
 fn main: int = () {
-  let a: int = mather(4, 5);
+  let a: int = math_func(4, 5);
 
   printnum(a);
 

@@ -2,9 +2,13 @@ import example.stdio;
 import example.stdlib;
 
 fn main: int = () {
-  let a: int = 14;
+  let a: int = 69;
+  let b: int = !a;
 
   printnum(a);
-  putchar(int_to_char(0xa));
-  exit(0);
+  print(" -> ");
+  printnum(b);
+  println("");
+
+  return 0;
 }

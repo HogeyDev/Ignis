@@ -1,6 +1,6 @@
 use std::process;
 
-use crate::util::get_asm_size_prefix;
+use crate::util::asm_size_prefix;
 
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
@@ -115,7 +115,7 @@ impl ScopeContext {
     }
     pub fn pop(&mut self, destination: String, width: i64) -> String {
         self.stack_size -= width;
-        format!("\tpop {} {}\n", get_asm_size_prefix(width), destination)
+        format!("\tpop {}\n", destination)
     }
     pub fn absorb_strings(&mut self, scope: ScopeContext) {
         for str in scope.strings {

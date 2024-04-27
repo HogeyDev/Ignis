@@ -7,7 +7,7 @@ use crate::{
     parser::{Operation, AST},
     scope::ScopeContext,
     types::{calculate_expression_type, get_type_size, string_to_collapsed_type_tree, Type},
-    util::get_asm_size_prefix,
+    util::{asm_size_prefix, asm_size_to_register},
 };
 
 pub fn compile_to_asm(
@@ -46,6 +46,17 @@ pub fn compile_to_asm(
             let function_data = scope.get_function_data(name.clone()); // also checks if function
                                                                        // exists
                                                                        // println!("{name}, {:?}", arguments);
+
+            if function_data.1.len() != arguments.len() {
+                eprintln!(
+                    "[ASM] Function `{}` expected `{}` arguments, but recieved `{}`",
+                    name,
+                    function_data.1.len(),
+                    arguments.len()
+                );
+                process::exit(1);
+            }
+            let mut added_stack_size = 0;
             for (i, arg) in arguments.iter().cloned().enumerate() {
                 asm.push_str(compile_to_asm(program_config, arg.clone(), scope).as_str());
 
@@ -58,13 +69,21 @@ pub fn compile_to_asm(
                     eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
                     process::exit(1);
                 }
+                added_stack_size += 8;
+                // added_stack_size += get_type_size(arg_type).unwrap();
             }
-            asm.push_str(
-                format!("\tcall _{}\n\tadd rsp, {}\n", name, 8 * arguments.len()).as_str(),
-            );
+            asm.push_str(format!("\tcall _{}\n\tadd rsp, {}\n", name, added_stack_size).as_str());
+            scope.stack_size -= added_stack_size as i64;
             if function_data.0 != "void" {
                 // has a notable return value
-                asm.push_str(scope.push("rax".to_string(), 8).as_str());
+                let type_size =
+                    get_type_size(string_to_collapsed_type_tree(function_data.0).unwrap()).unwrap()
+                        as i64;
+                let register = asm_size_to_register(type_size, "a");
+                if type_size < 8 {
+                    asm.push_str(format!("\tmovzx rax, {}\n", register).as_str());
+                }
+                asm.push_str(scope.push("rax".to_string(), type_size).as_str());
             }
             asm
         }
@@ -116,7 +135,11 @@ pub fn compile_to_asm(
             // );
             String::new()
         }
-        AST::If { condition, body } => {
+        AST::If {
+            condition,
+            body,
+            alt,
+        } => {
             let mut asm = String::new();
 
             let end_label_id = scope.add_label();
@@ -127,6 +150,9 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config, body, scope).as_str());
             asm.push_str(format!("lbl{}:\n", end_label_id).as_str());
+            if let Some(val) = alt {
+                asm.push_str(compile_to_asm(program_config, val, scope).as_str());
+            }
 
             // asm.push_str(compile_to_asm(program_config.clone(), condition, scope).as_str());
             // asm.push_str(compile_to_asm(program_config, body, scope).as_str());
@@ -160,12 +186,12 @@ pub fn compile_to_asm(
                     Operation::Mod => "\tmov rdx, 0\n\tdiv rbx\n\tmov rax, rdx\n".to_string(),
                     // Operation::Or => "",
                     // Operation::And => "",
-                    // Operation::Eq => "",
+                    Operation::Eq => "\tcmp rax, rbx\n\tsete al\n\tmovzx rax, al\n".to_string(),
                     // Operation::Neq => "",
                     Operation::LT => "\tcmp rax, rbx\n\tsetl al\n\tmovzx rax, al\n".to_string(),
                     Operation::GT => "\tcmp rax, rbx\n\tsetg al\n\tmovzx rax, al\n".to_string(),
-                    // Operation::LTE => "",
-                    // Operation::GTE => "",
+                    Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
+                    Operation::GTE => "\tcmp rax, rbx\n\tsetge al\n\tmovzx rax, al\n".to_string(),
                     Operation::ArrAcc => {
                         let element_size = match *lhs_typing.clone() {
                             Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
@@ -189,7 +215,7 @@ pub fn compile_to_asm(
                             format!(
                                 "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
                                 element_size,
-                                get_asm_size_prefix(element_size.try_into().unwrap_or(0))
+                                asm_size_prefix(element_size.try_into().unwrap_or(0))
                             )
                         }
                     }
@@ -210,7 +236,7 @@ pub fn compile_to_asm(
 
             asm
         }
-        AST::UnaryExpr { op, child } => {
+        AST::UnaryExpression { op, child } => {
             let mut asm = String::new();
 
             asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
@@ -218,9 +244,9 @@ pub fn compile_to_asm(
             let typing = calculate_expression_type(child, scope).unwrap();
 
             asm.push_str(match op {
-                // Operation::Inc => "",
-                // Operation::Dec => "",
-                // Operation::Inv => "",
+                Operation::Inc => "\tinc rax\n",
+                Operation::Dec => "\tdec rax\n",
+                Operation::Inv => "\tnot rax\n",
                 Operation::Neg => "\tneg rax\n",
                 _ => {
                     eprintln!("[ASM] Unimplemented binary operation: {:?}", op);
@@ -242,9 +268,18 @@ pub fn compile_to_asm(
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
+            let variable_type = scope.get_variable_data(name.clone()).0;
+            let type_size = get_type_size(string_to_collapsed_type_tree(variable_type).unwrap())
+                .unwrap() as i64;
             let offset = scope.get_variable_offset(name.clone()).1;
-            asm.push_str(format!("\tmov rax, qword [rbp{}]\n", offset).as_str());
-            asm.push_str(scope.push(format!("rax ; recalled `{}`", name), 8).as_str());
+            let register = asm_size_to_register(type_size, "a");
+            let asm_sizing = asm_size_prefix(type_size);
+
+            asm.push_str(format!("\tmov {}, {} [rbp{}]\n", register, asm_sizing, offset).as_str());
+            if type_size < 8 {
+                asm.push_str("\tmovzx rax, al\n");
+            }
+            asm.push_str(scope.push(format!("rax; recalled `{}`", name), 8).as_str());
 
             asm
         }
@@ -276,7 +311,7 @@ pub fn compile_to_asm(
                 format!(
                     "\tsub rsp, {}\n\tmov {} [rbp{}], 0\n",
                     width,
-                    get_asm_size_prefix(width),
+                    asm_size_prefix(width),
                     offset
                 )
                 .as_str(),
@@ -301,10 +336,20 @@ pub fn compile_to_asm(
                 process::exit(1);
             }
 
+            let variable_type = scope.get_variable_data(name.clone()).0;
+            let type_size = get_type_size(string_to_collapsed_type_tree(variable_type).unwrap())
+                .unwrap() as i64;
+            let asm_sizing = asm_size_prefix(type_size);
+            let register = asm_size_to_register(type_size, "a");
+
             let offset = scope.get_variable_offset(name.clone()).1;
             asm.push_str(scope.pop("rax".to_string(), 8).as_str());
             asm.push_str(
-                format!("\tmov qword [rbp{}], rax ; assigned `{}`\n", offset, name).as_str(),
+                format!(
+                    "\tmov {} [rbp{}], {}; assigned `{}`\n",
+                    asm_sizing, offset, register, name
+                )
+                .as_str(),
             );
 
             asm
@@ -347,6 +392,12 @@ pub fn compile_to_asm(
             let id = scope.add_string(value);
             asm.push_str(format!("\tmov rax, STR{}\n", id).as_str());
             asm.push_str(scope.push("rax".to_string(), 8).as_str());
+            asm
+        }
+        AST::Character(value) => {
+            let mut asm = String::new();
+            asm.push_str(format!("\tmov rdx, {}\n", value as i8).as_str());
+            asm.push_str(scope.push("rdx".to_string(), 8).as_str());
             asm
         }
         _ => {
