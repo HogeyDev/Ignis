@@ -45,8 +45,6 @@ pub fn compile_to_asm(
 
             let function_data = scope.get_function_data(name.clone()); // also checks if function
                                                                        // exists
-                                                                       // println!("{name}, {:?}", arguments);
-
             if function_data.1.len() != arguments.len() {
                 eprintln!(
                     "[ASM] Function `{}` expected `{}` arguments, but recieved `{}`",
@@ -65,7 +63,7 @@ pub fn compile_to_asm(
                 let func_arg_type =
                     string_to_collapsed_type_tree(function_data.1[i].clone()).unwrap();
                 if arg_type != func_arg_type {
-                    eprintln!("{:?}\n{:?}", func_arg_type, arg_type);
+                    // eprintln!("{:?}\n{:?}", func_arg_type, arg_type);
                     eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
                     process::exit(1);
                 }
@@ -241,20 +239,49 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let typing = calculate_expression_type(child, scope).unwrap();
+            let typing = calculate_expression_type(child.clone(), scope).unwrap();
 
-            asm.push_str(match op {
-                Operation::Inc => "\tinc rax\n",
-                Operation::Dec => "\tdec rax\n",
-                Operation::Inv => "\tnot rax\n",
-                Operation::Neg => "\tneg rax\n",
-                Operation::Ref => "\tlea rax, []\n",
-                Operation::Deref => "",
-                _ => {
-                    eprintln!("[ASM] Unimplemented unary operation: {:?}", op);
-                    process::exit(1);
+            asm.push_str(
+                match op {
+                    Operation::Inc => "\tinc rax\n".to_string(),
+                    Operation::Dec => "\tdec rax\n".to_string(),
+                    Operation::Inv => "\tnot rax\n".to_string(),
+                    Operation::Neg => "\tneg rax\n".to_string(),
+                    Operation::Ref => {
+                        match *child {
+                            AST::VariableCall { name } => {
+                                // this is good!
+                                let stack_offset = scope.get_variable_offset(name).0;
+                                format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
+                            }
+                            _ => {
+                                // this is bad!
+                                eprintln!("[ASM] Cannot reference non variable value");
+                                process::exit(1);
+                            }
+                        }
+                    }
+                    Operation::Deref => {
+                        let size = get_type_size(typing.clone()).unwrap() as i64;
+                        let asm_sizing = asm_size_prefix(size);
+                        let register = asm_size_to_register(size, "a");
+                        match *typing {
+                            Type::Pointer(_) => {
+                                format!("\tmov {}, {} [rax]\n", register, asm_sizing)
+                            }
+                            _ => {
+                                eprintln!("[ASM] Cannot dereference non-pointer type");
+                                process::exit(1);
+                            }
+                        }
+                    }
+                    _ => {
+                        eprintln!("[ASM] Unimplemented unary operation: {:?}", op);
+                        process::exit(1);
+                    }
                 }
-            });
+                .as_str(),
+            );
 
             asm.push_str(
                 scope

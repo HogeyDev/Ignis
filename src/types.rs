@@ -77,7 +77,17 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         AST::String(_) => string_to_collapsed_type_tree("[]char".to_string()),
         AST::UnaryExpression { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
-            Ok(Box::new(Type::UnaryOperation(op, child_type)))
+            match op {
+                Operation::Ref => Ok(Box::new(Type::Pointer(child_type))),
+                Operation::Deref => match *child_type {
+                    Type::Pointer(sub) => Ok(sub),
+                    _ => {
+                        eprintln!("[TypeParser] Non pointers cannot be de-referenced");
+                        process::exit(1);
+                    }
+                },
+                _ => Ok(Box::new(Type::UnaryOperation(op, child_type))),
+            }
         }
         AST::BinaryExpression { op, lhs, rhs } => {
             let lhs_type = ast_to_type_tree(lhs, scope)?;

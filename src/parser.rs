@@ -521,9 +521,9 @@ impl Parser {
                 TokenType::Minus => Operation::Neg,
                 TokenType::Bang => Operation::Inv,
                 TokenType::Increment => Operation::Inc,
+                TokenType::Decrement => Operation::Dec,
                 TokenType::Ampersand => Operation::Ref,
                 TokenType::At => Operation::Deref,
-                TokenType::Decrement => Operation::Dec,
                 _ => {
                     eprintln!(
                         "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
