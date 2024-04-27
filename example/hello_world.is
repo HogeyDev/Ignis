@@ -2,13 +2,11 @@ import example.stdio;
 import example.stdlib;
 
 fn main: int = () {
-  let a: int = 69;
-  let b: int = !a;
-
-  printnum(a);
-  print(" -> ");
-  printnum(b);
-  println("");
+  let a: int = 42;
+  let ptr: @int = &a;
+  
+  print("ptr = ");
+  printintpointer(ptr);
 
   return 0;
 }

@@ -27,6 +27,8 @@ pub enum Operation {
     GTE, // >=
 
     ArrAcc, // []
+    Ref,    // &
+    Deref,  // @
 }
 
 #[derive(Debug, Clone)]
@@ -511,12 +513,16 @@ impl Parser {
             || self.current_token.token_type == TokenType::Minus
             || self.current_token.token_type == TokenType::Increment
             || self.current_token.token_type == TokenType::Decrement
+            || self.current_token.token_type == TokenType::Ampersand
+            || self.current_token.token_type == TokenType::At
         {
             // println!("unary");
             let op = match self.current_token.token_type {
                 TokenType::Minus => Operation::Neg,
                 TokenType::Bang => Operation::Inv,
                 TokenType::Increment => Operation::Inc,
+                TokenType::Ampersand => Operation::Ref,
+                TokenType::At => Operation::Deref,
                 TokenType::Decrement => Operation::Dec,
                 _ => {
                     eprintln!(

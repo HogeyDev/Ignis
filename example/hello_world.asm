@@ -222,13 +222,32 @@ lbl3:
 	mov rsp, rbp
 	pop rbp
 	ret
+global _printintpointer
+_printintpointer:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 8
+	mov qword [rbp-8], 0
+	mov rdx, 0
+	push rdx
+	pop rax
+	mov qword [rbp-8], rax; assigned `as_int`
+	mov rax, qword [rbp+16]
+	mov qword [rbp-8], rax
+	mov rax, qword [rbp-8]
+	push rax; recalled `as_int`
+	call _printnum
+	add rsp, 8
+	mov rsp, rbp
+	pop rbp
+	ret
 global _main
 _main:
 	push rbp
 	mov rbp, rsp
 	sub rsp, 8
 	mov qword [rbp-8], 0
-	mov rdx, 69
+	mov rdx, 42
 	push rdx
 	pop rax
 	mov qword [rbp-8], rax; assigned `a`
@@ -237,25 +256,16 @@ _main:
 	mov rax, qword [rbp-8]
 	push rax; recalled `a`
 	pop rax
-	not rax
 	push rax
 	pop rax
-	mov qword [rbp-16], rax; assigned `b`
-	mov rax, qword [rbp-8]
-	push rax; recalled `a`
-	call _printnum
-	add rsp, 8
+	mov qword [rbp-16], rax; assigned `ptr`
 	mov rax, STR0
 	push rax
 	call _print
 	add rsp, 8
 	mov rax, qword [rbp-16]
-	push rax; recalled `b`
-	call _printnum
-	add rsp, 8
-	mov rax, STR1
-	push rax
-	call _println
+	push rax; recalled `ptr`
+	call _printintpointer
 	add rsp, 8
 	mov rdx, 0
 	push rdx
@@ -276,5 +286,4 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
-	STR0 db " -> ", 0
-	STR1 db "", 0
+	STR0 db "ptr = ", 0

@@ -51,6 +51,7 @@ pub enum TokenType {
     Character,
 
     At,
+    Ampersand,
 
     EndOfFile,
 }
@@ -307,6 +308,7 @@ impl Tokenizer {
             '/' => TokenType::Slash,
             '%' => TokenType::Percent,
             '@' => TokenType::At,
+            '&' => TokenType::Ampersand,
             _ => {
                 if self.index >= self.source.len() {
                     TokenType::EndOfFile

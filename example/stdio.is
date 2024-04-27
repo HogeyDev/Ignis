@@ -41,3 +41,10 @@ fn printnum: void = (num: int) {
 
 	putchar(int_to_char(48 + a % 10));
 }
+
+fn printintpointer: void = (ptr: @int) {
+	let as_int: int = 0;
+	asm "	mov rax, qword [rbp+16]"; // move `ptr` into rax
+	asm "	mov qword [rbp-8], rax"; // move rax into `as_int`
+	printnum(as_int);
+}

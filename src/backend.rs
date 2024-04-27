@@ -184,10 +184,10 @@ pub fn compile_to_asm(
                     Operation::Mul => "\timul rax, rbx\n".to_string(),
                     Operation::Div => "\tmov rdx, 0\n\tdiv rbx\n".to_string(),
                     Operation::Mod => "\tmov rdx, 0\n\tdiv rbx\n\tmov rax, rdx\n".to_string(),
-                    // Operation::Or => "",
-                    // Operation::And => "",
+                    Operation::Or => "\tor rax, rbx\n".to_string(),
+                    Operation::And => "\tand rax, rbx\n".to_string(),
                     Operation::Eq => "\tcmp rax, rbx\n\tsete al\n\tmovzx rax, al\n".to_string(),
-                    // Operation::Neq => "",
+                    Operation::Neq => "\tcmp rax, rbx\n\tsetne al\n\tmovzx rax, al\n".to_string(),
                     Operation::LT => "\tcmp rax, rbx\n\tsetl al\n\tmovzx rax, al\n".to_string(),
                     Operation::GT => "\tcmp rax, rbx\n\tsetg al\n\tmovzx rax, al\n".to_string(),
                     Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
@@ -248,8 +248,10 @@ pub fn compile_to_asm(
                 Operation::Dec => "\tdec rax\n",
                 Operation::Inv => "\tnot rax\n",
                 Operation::Neg => "\tneg rax\n",
+                Operation::Ref => "\tlea rax, []\n",
+                Operation::Deref => "",
                 _ => {
-                    eprintln!("[ASM] Unimplemented binary operation: {:?}", op);
+                    eprintln!("[ASM] Unimplemented unary operation: {:?}", op);
                     process::exit(1);
                 }
             });

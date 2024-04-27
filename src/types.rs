@@ -105,7 +105,10 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
 pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
     match *tree {
         Type::Primative(type_name) => Ok(Box::new(Type::Primative(type_name))),
-        Type::UnaryOperation(_, child) => collapse_type_tree(child),
+        Type::UnaryOperation(op, child) => match op {
+            Operation::Ref => Ok(Box::new(Type::Pointer(collapse_type_tree(child)?))),
+            _ => collapse_type_tree(child),
+        },
         Type::BinaryOperation(op, lhs, rhs) => {
             let collapsed_lhs = collapse_type_tree(lhs.clone())?;
             let collapsed_rhs = collapse_type_tree(rhs)?;
