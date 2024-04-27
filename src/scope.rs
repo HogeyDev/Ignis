@@ -1,7 +1,5 @@
 use std::process;
 
-use crate::util::asm_size_prefix;
-
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
     pub stack_size: i64, // in bytes
