@@ -1,17 +1,10 @@
 import example.stdio;
-// import example.stdlib;
+
+struct Person {
+  name: []char;
+  phone_number: int;
+}
 
 fn main: int = () {
-  let a: int = 41;
-  let ptr: @int = &a;
-  
-  print("ptr = ");
-  printintpointer(ptr);
-  putchar('\n');
-
-  print("a = ");
-  printnum(@ptr);
-  putchar('\n');
-
   return 0;
 }

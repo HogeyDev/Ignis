@@ -92,6 +92,10 @@ pub enum AST {
     Import {
         module: String,
     },
+    Struct {
+        name: String,
+        members: Vec<(String, String)>, // [NAME, TYPE]
+    },
 }
 
 pub struct Parser {
@@ -323,6 +327,29 @@ impl Parser {
                 let body = self.scope();
 
                 stmt = Some(Box::new(AST::While { condition, body }));
+            } else if self.current_token.token_type == TokenType::Struct {
+                self.eat(TokenType::Struct);
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+
+                self.eat(TokenType::LeftBrace);
+                let mut members = Vec::new();
+                while self.current_token.token_type != TokenType::RightBrace {
+                    let name = self.current_token.value.clone();
+                    self.eat(TokenType::Identifier);
+                    self.eat(TokenType::Colon);
+
+                    let mut sub = String::new();
+                    while self.current_token.token_type != TokenType::SemiColon {
+                        sub.push_str(self.current_token.value.as_str());
+                        self.advance();
+                    }
+                    self.eat(TokenType::SemiColon);
+                    members.push((name, sub));
+                }
+                self.eat(TokenType::RightBrace);
+
+                stmt = Some(Box::new(AST::Struct { name, members }));
             } else if self.current_token.token_type == TokenType::Identifier {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
                     // function call
