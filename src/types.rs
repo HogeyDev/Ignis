@@ -135,6 +135,10 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
             Err("lmao, it failed you!")
             // Ok(Box::new(Type::Struct(members)))
         }
+        AST::StructInitializer { name, .. } => {
+            let collapsed = string_to_collapsed_type_tree(name, scope)?;
+            Ok(Box::new(Type::Pointer(collapsed)))
+        }
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able")
@@ -194,7 +198,7 @@ pub fn string_to_collapsed_type_tree(
     type_str: String,
     scope: &ScopeContext,
 ) -> Result<Box<Type>, &'static str> {
-    println!("Got: `{}`", type_str);
+    // println!("Got: `{}`", type_str);
     collapse_type_tree(string_to_type_tree(type_str, scope)?)
 }
 
@@ -362,15 +366,15 @@ impl TypeParser {
                         .unwrap()
                         .1
                         .clone();
-                    print!("Type: `{}` -> ", type_string);
-                    let collapsed = string_to_collapsed_type_tree(type_string, scope);
-                    println!("`{:?}`", collapsed);
+                    // print!("Type: `{}` -> ", type_string);
+                    string_to_collapsed_type_tree(type_string, scope)
+                    // println!("`{:?}`", collapsed);
 
-                    eprintln!(
-                        "[TypeParser] Resolving complex types does not exist yet!\n\t{:#?}",
-                        id
-                    );
-                    process::exit(1);
+                    // eprintln!(
+                    //     "[TypeParser] Resolving complex types does not exist yet!\n\t{:#?}",
+                    //     id
+                    // );
+                    // process::exit(1);
                 }
             },
             StrTokType::LeftBrace => {
@@ -397,6 +401,11 @@ impl TypeParser {
                         self.advance();
                     }
                     members.push(string_to_collapsed_type_tree(buf_str, scope).unwrap());
+                    if self.current_token == StrTokType::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
                 }
                 Ok(Box::new(Type::Struct(members)))
             }

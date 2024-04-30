@@ -97,8 +97,8 @@ pub enum AST {
         members: Vec<(String, String)>, // [NAME, TYPE]
     },
     StructInitializer {
-        name: String,
         spreads: bool,
+        name: String,
         members: Vec<(String, Box<AST>)>, // [NAME, VALUE]
     },
     MemberAccess {

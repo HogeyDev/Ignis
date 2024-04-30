@@ -29,7 +29,7 @@ pub fn asm_size_to_register(width: i64, reg: &str) -> String {
         4 => format!("e{}x", reg),
         8 => format!("r{}x", reg),
         _ => {
-            eprintln!("[ASM] Binary width is not valid: `{width}`");
+            eprintln!("[ASM] Binary width is not valid for a register: `{width}`");
             process::exit(1);
         }
     }

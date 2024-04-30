@@ -6,7 +6,10 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::{calculate_expression_type, get_type_size, string_to_collapsed_type_tree, Type},
+    types::{
+        ast_to_type_tree, calculate_expression_type, get_type_size, string_to_collapsed_type_tree,
+        Type,
+    },
     util::{asm_size_prefix, asm_size_to_register},
 };
 
@@ -436,6 +439,78 @@ pub fn compile_to_asm(
         AST::Struct { name, members } => {
             scope.add_struct(name, members);
             String::new()
+        }
+        AST::StructInitializer {
+            spreads,
+            name,
+            members,
+        } => {
+            let mut asm = String::new();
+
+            let member_types = scope.get_struct_data(name.clone());
+            if spreads {
+                // scope.add_struct(name, member_types);
+                for (_, (member_name, member_type)) in member_types.iter().enumerate() {
+                    let expected = string_to_collapsed_type_tree(member_type.clone(), scope);
+                    let recieved = ast_to_type_tree(members[0].1.clone(), scope);
+                    if match *members[0].1 {
+                        AST::Integer(0) => true,
+                        _ => false,
+                    } {
+                    } else if expected != recieved {
+                        eprintln!("[ASM] Cannot initialize struct `{}` because member `{}` expects type `{:?}`, but recieved type `{:?}`", name, member_name, expected, recieved);
+                        process::exit(1);
+                    }
+                    asm.push_str(
+                        compile_to_asm(program_config, members[0].1.clone(), scope).as_str(),
+                    );
+                }
+            } else {
+            }
+
+            asm
+        }
+        AST::MemberAccess { accessed, member } => {
+            let mut asm = String::new();
+
+            let name = match *accessed {
+                AST::VariableCall { name } => name,
+                _ => {
+                    eprintln!("[ASM] Cannot perform member access on non-variable\n\tAccessed `{}` from `{:?}`", member, accessed);
+                    process::exit(1);
+                }
+            };
+
+            let data = scope.get_variable_data(name.clone());
+            let member_types = scope.get_struct_data(data.0);
+            let inter_offset = scope.get_variable_offset(name).0;
+            let mut intra_offset = 0;
+            let mut type_size = 0;
+            for (member_name, member_type) in member_types {
+                if member_name == member {
+                    type_size =
+                        get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
+                            .unwrap();
+                    break;
+                }
+                intra_offset +=
+                    get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
+                        .unwrap();
+            }
+            let type_size: i64 = type_size as i64;
+            let register = asm_size_to_register(type_size, "a");
+            let asm_sizing = asm_size_prefix(type_size);
+            asm.push_str(
+                format!(
+                    "\tmov {}, {} [rbp{:+}]",
+                    register,
+                    asm_sizing,
+                    inter_offset - intra_offset as i64
+                )
+                .as_str(),
+            );
+
+            asm
         }
         _ => {
             eprintln!(
