@@ -245,49 +245,6 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 8
-	mov qword [rbp-8], 0
-	mov rdx, 41
-	push rdx
-	pop rax
-	mov qword [rbp-8], rax; assigned `a`
-	sub rsp, 8
-	mov qword [rbp-16], 0
-	mov rax, qword [rbp-8]
-	push rax; recalled `a`
-	pop rax
-	mov rax, rbp
-	sub rax, 8
-	push rax
-	pop rax
-	mov qword [rbp-16], rax; assigned `ptr`
-	mov rax, STR0
-	push rax
-	call _print
-	add rsp, 8
-	mov rax, qword [rbp-16]
-	push rax; recalled `ptr`
-	call _printintpointer
-	add rsp, 8
-	mov rdx, 10
-	push rdx
-	call _putchar
-	add rsp, 8
-	mov rax, STR1
-	push rax
-	call _print
-	add rsp, 8
-	mov rax, qword [rbp-16]
-	push rax; recalled `ptr`
-	pop rax
-	mov rax, qword [rax]
-	push rax
-	call _printnum
-	add rsp, 8
-	mov rdx, 10
-	push rdx
-	call _putchar
-	add rsp, 8
 	mov rdx, 0
 	push rdx
 	pop rax
@@ -307,5 +264,3 @@ _start:
 	mov rdi, 0
 	syscall
 section .data
-	STR0 db "ptr = ", 0
-	STR1 db "a = ", 0

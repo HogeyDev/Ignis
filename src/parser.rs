@@ -96,6 +96,15 @@ pub enum AST {
         name: String,
         members: Vec<(String, String)>, // [NAME, TYPE]
     },
+    StructInitializer {
+        name: String,
+        spreads: bool,
+        members: Vec<(String, Box<AST>)>, // [NAME, VALUE]
+    },
+    MemberAccess {
+        accessed: Box<AST>,
+        member: String,
+    },
 }
 
 pub struct Parser {
@@ -571,24 +580,38 @@ impl Parser {
         // should be used for '->', '[]', '.' type operators
         let mut lhs = self.primary();
 
-        while self.current_token.token_type == TokenType::LeftBracket {
-            let rhs;
-            let op = match self.current_token.token_type {
-                TokenType::LeftBracket => {
-                    self.eat(TokenType::LeftBracket);
-                    rhs = self.expression();
-                    self.eat(TokenType::RightBracket);
-                    Operation::ArrAcc
-                }
-                _ => {
-                    eprintln!(
+        if self.current_token.token_type == TokenType::Period {
+            self.eat(TokenType::Period);
+            lhs = Box::new(AST::MemberAccess {
+                accessed: lhs,
+                member: self.current_token.value.clone(),
+            });
+            self.eat(TokenType::Identifier);
+        } else {
+            while self.current_token.token_type == TokenType::LeftBracket
+                || self.current_token.token_type == TokenType::Period
+            {
+                // match self.current_token.token_type {
+                //     TokenType::LeftBracket
+                // }
+                let rhs;
+                let op = match self.current_token.token_type {
+                    TokenType::LeftBracket => {
+                        self.eat(TokenType::LeftBracket);
+                        rhs = self.expression();
+                        self.eat(TokenType::RightBracket);
+                        Operation::ArrAcc
+                    }
+                    _ => {
+                        eprintln!(
                         "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
                         self.current_token.token_type
                     );
-                    process::exit(1);
-                }
-            };
-            lhs = Box::new(AST::BinaryExpression { op, lhs, rhs });
+                        process::exit(1);
+                    }
+                };
+                lhs = Box::new(AST::BinaryExpression { op, lhs, rhs });
+            }
         }
 
         lhs
@@ -634,6 +657,44 @@ impl Parser {
                     }
                     self.eat(TokenType::RightParenthesis);
                     return Box::new(AST::FunctionCall { name, arguments });
+                } else if self.peek(1).token_type == TokenType::LeftBrace {
+                    // println!("struct initializer");
+                    // self.print_token_debug_stack(4);
+                    let name = self.current_token.value.clone();
+                    self.eat(TokenType::Identifier);
+                    self.eat(TokenType::LeftBrace);
+                    let initializer = if self.current_token.token_type == TokenType::Identifier
+                        && self.peek(1).token_type == TokenType::Colon
+                    {
+                        // yep, its a full initialization
+                        let mut members = Vec::new();
+                        while self.current_token.token_type != TokenType::RightBrace {
+                            let member_name = self.current_token.value.clone();
+                            self.eat(TokenType::Identifier);
+                            if self.current_token.token_type != TokenType::Colon {
+                                break;
+                            }
+                            self.eat(TokenType::Colon);
+                            let member_value = self.expression();
+                            self.eat(TokenType::Comma);
+                            members.push((member_name, member_value));
+                        }
+                        Box::new(AST::StructInitializer {
+                            spreads: false,
+                            name,
+                            members,
+                        })
+                    } else {
+                        // single expression fill
+                        let value = self.expression();
+                        Box::new(AST::StructInitializer {
+                            spreads: true,
+                            name,
+                            members: vec![("".to_string(), value)],
+                        })
+                    };
+                    self.eat(TokenType::RightBrace);
+                    return initializer;
                 }
                 // println!("variable call");
                 let name = self.current_token.value.clone();

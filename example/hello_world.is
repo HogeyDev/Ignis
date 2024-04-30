@@ -2,9 +2,12 @@ import example.stdio;
 
 struct Person {
   name: []char;
-  phone_number: int;
+  age: int;
 }
 
 fn main: int = () {
-  return 0;
+  let person: Person = Person { 0 };
+  let bage: int = person.age;
+
+  return person;
 }

@@ -1,5 +1,7 @@
 use std::process;
 
+use crate::types::{string_to_collapsed_type_tree, Type};
+
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
     pub stack_size: i64, // in bytes
@@ -7,6 +9,8 @@ pub struct ScopeContext {
     pub variables: Vec<(String, String, i64)>, // [NAME, TYPE, LOCATION]
     pub functions: Vec<(String, String, Vec<(String, String)>)>, // [NAME, TYPE, [[ARG0, TYPE], [ARG1, TYPE], ... [ARGN, TYPE]]]
     pub strings: Vec<(String, usize)>,                           // [VALUE, ID]
+    pub structs: Vec<(String, Vec<(String, String)>)>,           // [NAME, [MEMBER , TYPE]]
+    pub defined_types: Vec<(String, String)>,                    // [NAME, TYPE]
 }
 
 impl Default for ScopeContext {
@@ -23,6 +27,8 @@ impl ScopeContext {
             variables: Vec::new(),
             functions: Vec::new(),
             strings: Vec::new(),
+            structs: Vec::new(),
+            defined_types: Vec::new(),
         }
     }
     pub fn add_parameter(&mut self, name: String, param_type: String, width: i64) -> i64 {
@@ -105,6 +111,36 @@ impl ScopeContext {
             self.functions.push(func);
         }
     }
+    pub fn add_struct(&mut self, name: String, members: Vec<(String, String)>) {
+        self.structs.push((name.clone(), members.clone()));
+        let type_string = Type::Struct(
+            members
+                .iter()
+                .map(|x| string_to_collapsed_type_tree(x.1.clone(), self).unwrap())
+                .collect(),
+        )
+        .to_string();
+        self.defined_types.push((name, type_string));
+    }
+    pub fn absorb_structs(&mut self, scope: ScopeContext) {
+        for str in scope.structs {
+            if self.structs.iter().any(|x| x.0 == str.0) {
+                continue;
+            }
+            self.structs.push(str);
+        }
+    }
+    pub fn add_type(&mut self, name: String, type_string: String) {
+        self.defined_types.push((name, type_string));
+    }
+    pub fn absorb_types(&mut self, scope: ScopeContext) {
+        for ty in scope.defined_types {
+            if self.defined_types.iter().any(|x| x.0 == ty.0) {
+                continue;
+            }
+            self.defined_types.push(ty);
+        }
+    }
     pub fn push(&mut self, source: String, width: i64) -> String {
         self.stack_size += width;
         format!("\tpush {}\n", source)
@@ -144,13 +180,16 @@ impl ScopeContext {
         self.label_counter = std::cmp::max(scope.label_counter, self.label_counter);
     }
     pub fn sub_scope(&self) -> ScopeContext {
-        ScopeContext {
-            stack_size: self.stack_size,
-            label_counter: self.label_counter,
-            variables: self.variables.clone(),
-            functions: self.functions.clone(),
-            strings: self.strings.clone(),
-        }
+        self.clone()
+        // ScopeContext {
+        //     stack_size: self.stack_size,
+        //     label_counter: self.label_counter,
+        //     variables: self.variables.clone(),
+        //     functions: self.functions.clone(),
+        //     strings: self.strings.clone(),
+        //     structs: self.structs.clone(),
+        //     defined_types: self.defined_types.clone(),
+        // }
     }
     pub fn absorb_stack(&mut self, _scope: ScopeContext) {
         // self.stack_size = std::cmp::max(self.stack_size, scope.stack_size);
@@ -159,6 +198,8 @@ impl ScopeContext {
         self.absorb_strings(sub_scope.clone());
         self.absorb_functions(sub_scope.clone());
         self.absorb_labels(sub_scope.clone());
-        self.absorb_stack(sub_scope);
+        self.absorb_stack(sub_scope.clone());
+        self.absorb_structs(sub_scope.clone());
+        self.absorb_types(sub_scope);
     }
 }

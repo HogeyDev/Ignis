@@ -20,7 +20,7 @@
         struct Person {
             name: []char;
             phone_number: int;
-        };
+        }
 
 [X] Variables should use rbp, not rsp
     - Ex:

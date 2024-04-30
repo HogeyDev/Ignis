@@ -13,6 +13,7 @@ pub enum Type {
     Pointer(Box<Type>),
     UnaryOperation(Operation, Box<Type>),
     BinaryOperation(Operation, Box<Type>, Box<Type>),
+    Struct(Vec<Box<Type>>),
 }
 
 impl Type {
@@ -22,6 +23,24 @@ impl Type {
             Self::FixedArray(size, sub) => format!("[{}]{}", size, sub.to_string()),
             Self::DynamicArray(sub) => format!("[]{}", sub.to_string()),
             Self::Pointer(sub) => format!("@{}", sub.to_string()),
+            Self::Struct(members) => {
+                let mut stringified = "{".to_string();
+
+                let num_members = members.len();
+                for (i, member) in members.iter().enumerate() {
+                    stringified.push_str(
+                        format!(
+                            "{}{}",
+                            member.to_string(),
+                            if i == num_members - 1 { "" } else { "," }
+                        )
+                        .as_str(),
+                    );
+                }
+
+                stringified.push('}');
+                stringified
+            }
             _ => {
                 eprintln!("[TypeParser] Cannot stringify type `{:?}`", self);
                 process::exit(1);
@@ -60,13 +79,19 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
         Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
         Type::FixedArray(size, sub) => Ok(get_type_size(sub).unwrap() * size),
         Type::DynamicArray(_) => get_primative_type_size("usize".to_string()),
-        // _ => {
-        //     eprintln!(
-        //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
-        //         *comp
-        //     );
-        //     process::exit(1);
-        // }
+        Type::Struct(members) => {
+            let mut size = 0usize;
+            for member in members {
+                size += get_type_size(member).unwrap();
+            }
+            Ok(size)
+        } // _ => {
+          //     eprintln!(
+          //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
+          //         *comp
+          //     );
+          //     process::exit(1);
+          // }
     }
 }
 
@@ -74,7 +99,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
         AST::Character(_) => Ok(Box::new(Type::Primative("char".to_string()))),
-        AST::String(_) => string_to_collapsed_type_tree("[]char".to_string()),
+        AST::String(_) => string_to_collapsed_type_tree("[]char".to_string(), scope),
         AST::UnaryExpression { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             match op {
@@ -96,15 +121,20 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         }
         AST::VariableCall { name } => {
             let type_str = scope.get_variable_data(name).0;
-            let variable_type_tree = string_to_type_tree(type_str).unwrap();
+            let variable_type_tree = string_to_type_tree(type_str, scope).unwrap();
             Ok(variable_type_tree)
         }
         AST::FunctionCall { name, .. } => {
             let type_str = scope.get_function_data(name).0;
-            let function_type_tree = string_to_type_tree(type_str).unwrap();
+            let function_type_tree = string_to_type_tree(type_str, scope).unwrap();
             Ok(function_type_tree)
         }
         AST::Argument(sub) => ast_to_type_tree(sub, scope),
+        AST::Struct { name, members } => {
+            let member_types = members.iter().map(|x| x).for_each(|x| println!("{:?}", x));
+            Err("lmao, it failed you!")
+            // Ok(Box::new(Type::Struct(members)))
+        }
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able")
@@ -142,16 +172,30 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
             size,
             collapse_type_tree(sub_type)?,
         ))),
+        Type::Struct(members) => {
+            let mut collapsed = Vec::new();
+            for member in members {
+                collapsed.push(collapse_type_tree(member).unwrap());
+            }
+            Ok(Box::new(Type::Struct(collapsed)))
+        }
     }
 }
 
-pub fn string_to_type_tree(type_str: String) -> Result<Box<Type>, &'static str> {
-    let type_tokens = TypeLexer::new(type_str).parse();
-    TypeParser::new(type_tokens).parse()
+pub fn string_to_type_tree(
+    type_str: String,
+    scope: &ScopeContext,
+) -> Result<Box<Type>, &'static str> {
+    let type_tokens = TypeLexer::new(type_str).tokenize();
+    TypeParser::new(type_tokens).parse(scope)
 }
 
-pub fn string_to_collapsed_type_tree(type_str: String) -> Result<Box<Type>, &'static str> {
-    collapse_type_tree(string_to_type_tree(type_str)?)
+pub fn string_to_collapsed_type_tree(
+    type_str: String,
+    scope: &ScopeContext,
+) -> Result<Box<Type>, &'static str> {
+    println!("Got: `{}`", type_str);
+    collapse_type_tree(string_to_type_tree(type_str, scope)?)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -159,6 +203,9 @@ enum StrTokType {
     AtSign,
     LeftBracket,
     RightBracket,
+    LeftBrace,
+    RightBrace,
+    Comma,
     Identifier(String),
     Integer(usize),
 }
@@ -192,7 +239,7 @@ impl TypeLexer {
         self.current_char = self.peek(1);
         self.index += 1;
     }
-    pub fn parse(&mut self) -> Vec<StrTokType> {
+    pub fn tokenize(&mut self) -> Vec<StrTokType> {
         let mut token_list = Vec::new();
         while self.index < self.type_string.len() {
             if self.current_char.is_alphabetic() {
@@ -214,6 +261,9 @@ impl TypeLexer {
                     '@' => StrTokType::AtSign,
                     '[' => StrTokType::LeftBracket,
                     ']' => StrTokType::RightBracket,
+                    '{' => StrTokType::LeftBrace,
+                    '}' => StrTokType::RightBrace,
+                    ',' => StrTokType::Comma,
                     _ => {
                         eprintln!(
                             "[TypeParser] Character `{}` is not parseable in a type",
@@ -237,10 +287,15 @@ struct TypeParser {
 
 impl TypeParser {
     pub fn new(tokens: Vec<StrTokType>) -> TypeParser {
-        TypeParser {
-            tokens: tokens.clone(),
-            index: 0,
-            current_token: tokens[0].clone(),
+        if tokens.len() > 0 {
+            TypeParser {
+                tokens: tokens.clone(),
+                index: 0,
+                current_token: tokens[0].clone(),
+            }
+        } else {
+            eprintln!("THJKDFLASJ");
+            process::exit(1);
         }
     }
     fn peek(&self, offset: i64) -> StrTokType {
@@ -253,11 +308,11 @@ impl TypeParser {
         self.current_token = self.peek(1);
         self.index += 1;
     }
-    pub fn parse(&mut self) -> Result<Box<Type>, &'static str> {
+    pub fn parse(&mut self, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
         match self.current_token.clone() {
             StrTokType::AtSign => {
                 self.advance();
-                let pointer_type = self.parse().unwrap();
+                let pointer_type = self.parse(scope).unwrap();
                 let pointer = Type::Pointer(pointer_type);
                 Ok(Box::new(pointer))
             }
@@ -283,9 +338,9 @@ impl TypeParser {
                     }
                 }
                 if is_dynamic {
-                    Ok(Box::new(Type::DynamicArray(self.parse().unwrap())))
+                    Ok(Box::new(Type::DynamicArray(self.parse(scope).unwrap())))
                 } else {
-                    Ok(Box::new(Type::FixedArray(size, self.parse().unwrap())))
+                    Ok(Box::new(Type::FixedArray(size, self.parse(scope).unwrap())))
                 }
             }
             StrTokType::RightBracket => {
@@ -297,10 +352,54 @@ impl TypeParser {
                 "char" => Ok(Box::new(Type::Primative("char".to_string()))),
                 "usize" => Ok(Box::new(Type::Primative("usize".to_string()))),
                 _ => {
-                    eprintln!("[TypeParser] Resolving complex types does not exist yet!");
+                    // 1. get the full type string
+                    // 2. parse the type string
+                    // 3. return the type
+                    let type_string = scope
+                        .defined_types
+                        .iter()
+                        .find(|x| x.0 == id)
+                        .unwrap()
+                        .1
+                        .clone();
+                    print!("Type: `{}` -> ", type_string);
+                    let collapsed = string_to_collapsed_type_tree(type_string, scope);
+                    println!("`{:?}`", collapsed);
+
+                    eprintln!(
+                        "[TypeParser] Resolving complex types does not exist yet!\n\t{:#?}",
+                        id
+                    );
                     process::exit(1);
                 }
             },
+            StrTokType::LeftBrace => {
+                self.advance();
+                let mut members = Vec::new();
+                while self.current_token != StrTokType::RightBrace {
+                    let mut buf_str = String::new();
+                    while self.current_token != StrTokType::Comma
+                        && self.current_token != StrTokType::RightBrace
+                    {
+                        buf_str.push_str(
+                            match self.current_token.clone() {
+                                StrTokType::AtSign => "@".to_string(),
+                                StrTokType::Integer(val) => val.to_string(),
+                                StrTokType::LeftBracket => "[".to_string(),
+                                StrTokType::RightBracket => "]".to_string(),
+                                StrTokType::LeftBrace => "{".to_string(),
+                                StrTokType::RightBrace => "{".to_string(),
+                                StrTokType::Comma => ",".to_string(),
+                                StrTokType::Identifier(id) => id,
+                            }
+                            .as_str(),
+                        );
+                        self.advance();
+                    }
+                    members.push(string_to_collapsed_type_tree(buf_str, scope).unwrap());
+                }
+                Ok(Box::new(Type::Struct(members)))
+            }
             _ => {
                 eprintln!("[TypeParser] No way to parse `{:?}`", self.current_token);
                 process::exit(1);
