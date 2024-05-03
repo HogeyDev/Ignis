@@ -1,6 +1,6 @@
 use std::process;
 
-use crate::types::{ast_to_type_tree, string_to_collapsed_type_tree, Type};
+use crate::types::{string_to_collapsed_type_tree, Type};
 
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
@@ -123,7 +123,7 @@ impl ScopeContext {
         self.defined_types.push((name, type_string));
     }
     pub fn get_struct_data(&self, name: String) -> Vec<(String, String)> {
-        println!("SFS: {}", name);
+        // println!("SFS: {}", name);
         self.structs.iter().find(|x| x.0 == name).unwrap().1.clone()
     }
     pub fn absorb_structs(&mut self, scope: ScopeContext) {

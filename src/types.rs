@@ -49,10 +49,7 @@ impl Type {
     }
 }
 
-pub fn calculate_expression_type(
-    ast: Box<AST>,
-    scope: &ScopeContext,
-) -> Result<Box<Type>, &'static str> {
+pub fn calculate_ast_type(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
     let tree = ast_to_type_tree(ast, scope)?;
     let collapsed = collapse_type_tree(tree)?;
     Ok(collapsed.clone())
@@ -132,12 +129,28 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         AST::Argument(sub) => ast_to_type_tree(sub, scope),
         AST::Struct { name, members } => {
             let member_types = members.iter().map(|x| x).for_each(|x| println!("{:?}", x));
-            Err("lmao, it failed you!")
+            eprintln!("FAILURE!");
+            process::exit(1);
             // Ok(Box::new(Type::Struct(members)))
         }
-        AST::StructInitializer { name, .. } => {
-            let collapsed = string_to_collapsed_type_tree(name, scope)?;
-            Ok(Box::new(Type::Pointer(collapsed)))
+        AST::StructInitializer { name, .. } => Ok(string_to_collapsed_type_tree(name, scope)?),
+        AST::MemberAccess { accessed, member } => {
+            let name = match *accessed {
+                AST::VariableCall { name } => name,
+                _ => {
+                    eprintln!("Cannot access member of non variable type");
+                    process::exit(1);
+                }
+            };
+            let struct_name = scope.get_variable_data(name).0;
+            let member_type_string = scope
+                .get_struct_data(struct_name)
+                .iter()
+                .find(|x| x.0 == member)
+                .unwrap()
+                .1
+                .clone();
+            string_to_collapsed_type_tree(member_type_string, scope)
         }
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
@@ -198,7 +211,6 @@ pub fn string_to_collapsed_type_tree(
     type_str: String,
     scope: &ScopeContext,
 ) -> Result<Box<Type>, &'static str> {
-    // println!("Got: `{}`", type_str);
     collapse_type_tree(string_to_type_tree(type_str, scope)?)
 }
 

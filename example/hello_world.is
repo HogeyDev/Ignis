@@ -6,8 +6,8 @@ struct Person {
 }
 
 fn main: int = () {
-  let person: @Person = Person { 0 };
-  let bage: int = person.age;
+  let person: Person = Person { 0 };
+  person.age = 14;
 
-  return person;
+  return bage;
 }

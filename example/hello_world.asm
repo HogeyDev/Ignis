@@ -245,8 +245,25 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
+	sub rsp, 16
+	mov qword [rbp-16], 0
+	mov qword [rbp-24], 0
 	mov rdx, 0
 	push rdx
+	mov rdx, 0
+	push rdx
+	mov rax, qword [rbp-16]
+	mov qword [rbp-16], rax
+	mov rax, qword [rbp-8]
+	mov qword [rbp-8], rax
+	add rsp, 16
+	sub rsp, 8
+	mov qword [rbp-40], 0
+	mov rax, qword [rbp+8]
+	pop rax
+	mov qword [rbp-40], rax; assigned `bage`
+	mov rax, qword [rbp-40]
+	push rax; recalled `bage`
 	pop rax
 	mov rsp, rbp
 	pop rbp

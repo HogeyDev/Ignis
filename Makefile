@@ -1,7 +1,7 @@
 all: run compile_asm run_asm
 
 run:
-	cargo run
+	RUST_BACKTRACE=1 cargo run
 
 # compile_asm_win:
 # 	nasm -f win64 example/hello_world.asm -o example/hello_world.o

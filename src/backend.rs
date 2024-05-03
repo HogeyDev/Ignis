@@ -6,11 +6,8 @@ use crate::{
     io::read_file,
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::{
-        ast_to_type_tree, calculate_expression_type, get_type_size, string_to_collapsed_type_tree,
-        Type,
-    },
-    util::{asm_size_prefix, asm_size_to_register},
+    types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
+    util::{asm_size_prefix, asm_size_to_register, initialize_struct},
 };
 
 pub fn compile_to_asm(
@@ -62,7 +59,7 @@ pub fn compile_to_asm(
                 asm.push_str(compile_to_asm(program_config, arg.clone(), scope).as_str());
 
                 // check typing
-                let arg_type = calculate_expression_type(arg, scope).unwrap();
+                let arg_type = calculate_ast_type(arg, scope).unwrap();
                 let func_arg_type =
                     string_to_collapsed_type_tree(function_data.1[i].clone(), scope).unwrap();
                 if arg_type != func_arg_type {
@@ -167,7 +164,7 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let lhs_typing = calculate_expression_type(lhs, scope).unwrap();
+            let lhs_typing = calculate_ast_type(lhs, scope).unwrap();
             // let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
 
             // if lhs_typing != rhs_typing {
@@ -242,7 +239,7 @@ pub fn compile_to_asm(
 
             asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let typing = calculate_expression_type(child.clone(), scope).unwrap();
+            let typing = calculate_ast_type(child.clone(), scope).unwrap();
 
             asm.push_str(
                 match op {
@@ -306,6 +303,7 @@ pub fn compile_to_asm(
             )
             .unwrap() as i64;
             let offset = scope.get_variable_offset(name.clone()).1;
+            // println!("{name}");
             let register = asm_size_to_register(type_size, "a");
             let asm_sizing = asm_size_prefix(type_size);
 
@@ -339,17 +337,41 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             let collapsed = string_to_collapsed_type_tree(variable_type.clone(), scope).unwrap();
-            let width = get_type_size(collapsed).unwrap().try_into().unwrap();
-            let offset = scope.add_variable(name.clone(), variable_type, width).1;
-            asm.push_str(
-                format!(
-                    "\tsub rsp, {}\n\tmov {} [rbp{}], 0\n",
-                    width,
-                    asm_size_prefix(width),
-                    offset
-                )
-                .as_str(),
-            );
+            let width = get_type_size(collapsed.clone())
+                .unwrap()
+                .try_into()
+                .unwrap();
+            let offsets = scope.add_variable(name.clone(), variable_type, width);
+            // TODO: Use some loop to fill stack with zeros when type is >8 bytes
+            if width > 8 {
+                match *collapsed.clone() {
+                    Type::Struct(members) => {
+                        asm.push_str(
+                            initialize_struct(
+                                scope.to_owned(),
+                                offsets.0,
+                                collapsed,
+                                members.iter().map(|_| "0".to_string()).collect(),
+                            )
+                            .as_str(),
+                        );
+                    }
+                    _ => {
+                        eprintln!("[ASM] Cannot zero out type `{}` because size is {} (>8) and is not a struct", collapsed.to_string(), width);
+                        process::exit(1);
+                    }
+                }
+            } else {
+                asm.push_str(
+                    format!(
+                        "\tsub rsp, {}\n\tmov {} [rbp{}], 0\n",
+                        width,
+                        asm_size_prefix(width),
+                        offsets.1
+                    )
+                    .as_str(),
+                );
+            }
 
             asm
         }
@@ -359,34 +381,64 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, value.clone(), scope).as_str());
             let lhs_string_type = scope.get_variable_data(name.clone()).0;
             let lhs_typing = string_to_collapsed_type_tree(lhs_string_type.clone(), scope).unwrap();
-            let rhs_typing = calculate_expression_type(value, scope).unwrap();
+            let rhs_typing = calculate_ast_type(value, scope).unwrap();
 
             if lhs_typing != rhs_typing {
                 eprintln!(
                     "[ASM] Attempted to assign expression of type `{}` to variable of type `{}`",
                     rhs_typing.to_string(),
-                    lhs_string_type,
+                    lhs_typing.to_string(),
                 );
                 process::exit(1);
             }
 
-            let variable_type = scope.get_variable_data(name.clone()).0;
-            let type_size = get_type_size(
-                string_to_collapsed_type_tree(variable_type, scope).unwrap(),
-            )
-            .unwrap() as i64;
-            let asm_sizing = asm_size_prefix(type_size);
-            let register = asm_size_to_register(type_size, "a");
+            let type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
+            if type_size > 8 {
+                match *lhs_typing.clone() {
+                    Type::Struct(members) => {
+                        let offset = -scope.get_variable_offset(name).0;
+                        let temporary_start = -scope.stack_size + type_size;
+                        let mut internal_offset = 0;
+                        for member in members {
+                            let member_size = get_type_size(member).unwrap() as i64;
 
-            let offset = scope.get_variable_offset(name.clone()).1;
-            asm.push_str(scope.pop("rax".to_string(), 8).as_str());
-            asm.push_str(
-                format!(
-                    "\tmov {} [rbp{}], {}; assigned `{}`\n",
-                    asm_sizing, offset, register, name
-                )
-                .as_str(),
-            );
+                            asm.push_str(
+                                format!(
+                                    "\tmov rax, {} [rbp{:+}]\n\tmov {} [rbp{:+}], rax\n",
+                                    "qword",
+                                    temporary_start + internal_offset,
+                                    "qword",
+                                    offset + internal_offset
+                                )
+                                .as_str(),
+                            );
+
+                            internal_offset += member_size;
+                        }
+                        asm.push_str(format!("\tadd rsp, {}\n", type_size).as_str());
+                    }
+                    _ => {
+                        eprintln!(
+                            "[ASM] type `{}` has size {} (>8), but isn't a struct",
+                            lhs_typing.to_string(),
+                            type_size
+                        );
+                    }
+                }
+            } else {
+                let asm_sizing = asm_size_prefix(type_size);
+                let register = asm_size_to_register(type_size, "a");
+
+                let offset = scope.get_variable_offset(name.clone()).1;
+                asm.push_str(scope.pop("rax".to_string(), 8).as_str());
+                asm.push_str(
+                    format!(
+                        "\tmov {} [rbp{}], {}; assigned `{}`\n",
+                        asm_sizing, offset, register, name
+                    )
+                    .as_str(),
+                );
+            }
 
             asm
         }
@@ -452,7 +504,7 @@ pub fn compile_to_asm(
                 // scope.add_struct(name, member_types);
                 for (_, (member_name, member_type)) in member_types.iter().enumerate() {
                     let expected = string_to_collapsed_type_tree(member_type.clone(), scope);
-                    let recieved = ast_to_type_tree(members[0].1.clone(), scope);
+                    let recieved = calculate_ast_type(members[0].1.clone(), scope);
                     if match *members[0].1 {
                         AST::Integer(0) => true,
                         _ => false,
