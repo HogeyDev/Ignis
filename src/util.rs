@@ -1,8 +1,9 @@
 use std::{backtrace::Backtrace, process};
 
 use crate::{
+    parser::AST,
     scope::ScopeContext,
-    types::{get_type_size, Type},
+    types::{calculate_ast_type, get_type_size, Type},
 };
 
 pub fn asm_size_prefix(width: i64) -> String {
@@ -89,4 +90,23 @@ pub fn initialize_struct(
     }
 
     asm
+}
+
+pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, String> {
+    match *ast {
+        AST::VariableCall { name } => Ok(scope.get_variable_offset(name).0 as i64),
+        AST::MemberAccess { accessed, member } => {
+            let base_addr = resolve_address(scope, accessed)?;
+            let typing = calculate_ast_type(ast, scope)?;
+            let offset = 0;
+            match *typing {
+                Type::Struct(members) => {
+                    let offset = ;
+                }
+                _ => {}
+            }
+            Ok(base_addr + offset)
+        }
+        _ => Err(format!("Can't resolve address of: {:?}", ast)),
+    }
 }

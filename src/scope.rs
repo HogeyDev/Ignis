@@ -1,6 +1,6 @@
 use std::process;
 
-use crate::types::{string_to_collapsed_type_tree, Type};
+use crate::types::{get_type_size, string_to_collapsed_type_tree, Type};
 
 #[derive(Debug, Clone)]
 pub struct ScopeContext {
@@ -9,7 +9,7 @@ pub struct ScopeContext {
     pub variables: Vec<(String, String, i64)>, // [NAME, TYPE, LOCATION]
     pub functions: Vec<(String, String, Vec<(String, String)>)>, // [NAME, TYPE, [[ARG0, TYPE], [ARG1, TYPE], ... [ARGN, TYPE]]]
     pub strings: Vec<(String, usize)>,                           // [VALUE, ID]
-    pub structs: Vec<(String, Vec<(String, String)>)>,           // [NAME, [MEMBER , TYPE]]
+    pub structs: Vec<(String, Vec<(String, String)>)>,           // [NAME, [MEMBER, TYPE]]
     pub defined_types: Vec<(String, String)>,                    // [NAME, TYPE]
 }
 
@@ -125,6 +125,26 @@ impl ScopeContext {
     pub fn get_struct_data(&self, name: String) -> Vec<(String, String)> {
         // println!("SFS: {}", name);
         self.structs.iter().find(|x| x.0 == name).unwrap().1.clone()
+    }
+    pub fn get_struct_member_offset(&self, name: String, member: String) -> Result<i64, String> {
+        let struct_data = self.get_struct_data(name);
+        let mut tot_off = 0;
+        let mut found_result = false;
+        for mem in struct_data {
+            if mem.0 == member {
+                found_result = true;
+                break;
+            }
+            tot_off += get_type_size(string_to_collapsed_type_tree(mem.1, self)?)? as i64;
+        }
+        if found_result {
+            Ok(tot_off)
+        } else {
+            Err(format!(
+                "Could not find member `{}` in struct `{}`",
+                member, name
+            ))
+        }
     }
     pub fn absorb_structs(&mut self, scope: ScopeContext) {
         for str in scope.structs {

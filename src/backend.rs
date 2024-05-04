@@ -164,7 +164,7 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-            let lhs_typing = calculate_ast_type(lhs, scope).unwrap();
+            let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             // let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
 
             // if lhs_typing != rhs_typing {
@@ -216,6 +216,17 @@ pub fn compile_to_asm(
                                 asm_size_prefix(element_size.try_into().unwrap_or(0))
                             )
                         }
+                    }
+                    Operation::Assign => {
+                        let mut asm = String::new();
+                        // 1. acquire address of lhs
+                        // 2. calculate rhs
+                        // 3. move result to address
+
+                        let addr = resolve_address(lhs.clone()).unwrap();
+                        println!("{:?} -> {addr}", lhs);
+
+                        asm
                     }
                     _ => {
                         eprintln!("[ASM] Unimplemented binary operation: {:?}", op);
