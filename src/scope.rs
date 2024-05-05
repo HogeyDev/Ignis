@@ -114,6 +114,7 @@ impl ScopeContext {
     pub fn add_struct(&mut self, name: String, members: Vec<(String, String)>) {
         self.structs.push((name.clone(), members.clone()));
         let type_string = Type::Struct(
+            name.clone(),
             members
                 .iter()
                 .map(|x| string_to_collapsed_type_tree(x.1.clone(), self).unwrap())
@@ -127,7 +128,7 @@ impl ScopeContext {
         self.structs.iter().find(|x| x.0 == name).unwrap().1.clone()
     }
     pub fn get_struct_member_offset(&self, name: String, member: String) -> Result<i64, String> {
-        let struct_data = self.get_struct_data(name);
+        let struct_data = self.get_struct_data(name.clone());
         let mut tot_off = 0;
         let mut found_result = false;
         for mem in struct_data {

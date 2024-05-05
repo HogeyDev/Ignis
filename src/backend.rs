@@ -7,7 +7,7 @@ use crate::{
     parser::{Operation, AST},
     scope::ScopeContext,
     types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
-    util::{asm_size_prefix, asm_size_to_register, initialize_struct},
+    util::{asm_size_prefix, asm_size_to_register, initialize_struct, resolve_address},
 };
 
 pub fn compile_to_asm(
@@ -223,7 +223,7 @@ pub fn compile_to_asm(
                         // 2. calculate rhs
                         // 3. move result to address
 
-                        let addr = resolve_address(lhs.clone()).unwrap();
+                        let addr = resolve_address(scope, lhs.clone()).unwrap();
                         println!("{:?} -> {addr}", lhs);
 
                         asm
@@ -356,7 +356,7 @@ pub fn compile_to_asm(
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
             if width > 8 {
                 match *collapsed.clone() {
-                    Type::Struct(members) => {
+                    Type::Struct(name, members) => {
                         asm.push_str(
                             initialize_struct(
                                 scope.to_owned(),
@@ -406,7 +406,7 @@ pub fn compile_to_asm(
             let type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
             if type_size > 8 {
                 match *lhs_typing.clone() {
-                    Type::Struct(members) => {
+                    Type::Struct(name, members) => {
                         let offset = -scope.get_variable_offset(name).0;
                         let temporary_start = -scope.stack_size + type_size;
                         let mut internal_offset = 0;

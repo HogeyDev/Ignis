@@ -9,5 +9,5 @@ fn main: int = () {
   let person: Person = Person { 0 };
   person.age = 14;
 
-  return bage;
+  return person.age;
 }

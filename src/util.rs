@@ -55,7 +55,7 @@ pub fn initialize_struct(
     );
 
     let members = match *struct_type {
-        Type::Struct(members) => members,
+        Type::Struct(name, members) => members,
         _ => {
             eprintln!(
                 "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
@@ -93,18 +93,16 @@ pub fn initialize_struct(
 }
 
 pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, String> {
-    match *ast {
+    let typing = calculate_ast_type(ast.clone(), scope)?;
+    println!("TY: {:?}", typing);
+    match *ast.clone() {
         AST::VariableCall { name } => Ok(scope.get_variable_offset(name).0 as i64),
         AST::MemberAccess { accessed, member } => {
             let base_addr = resolve_address(scope, accessed)?;
-            let typing = calculate_ast_type(ast, scope)?;
-            let offset = 0;
-            match *typing {
-                Type::Struct(members) => {
-                    let offset = ;
-                }
-                _ => {}
-            }
+            let offset = match *typing {
+                Type::Struct(name, members) => 4,
+                _ => unreachable!(),
+            };
             Ok(base_addr + offset)
         }
         _ => Err(format!("Can't resolve address of: {:?}", ast)),

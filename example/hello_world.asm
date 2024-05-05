@@ -105,14 +105,17 @@ lbl0:
 	add rsp, 8
 	mov rax, qword [rbp-16]
 	push rax; recalled `i`
+	mov rax, qword [rbp-16]
+	push rax; recalled `i`
 	mov rdx, 1
 	push rdx
 	pop rbx
 	pop rax
 	add rax, rbx
 	push rax
+	pop rbx
 	pop rax
-	mov qword [rbp-16], rax; assigned `i`
+	push rax
 	jmp lbl0
 lbl1:
 	mov rsp, rbp
@@ -166,11 +169,14 @@ _printnum:
 	add rsp, 8
 	mov rax, qword [rbp-8]
 	push rax; recalled `a`
+	mov rax, qword [rbp-8]
+	push rax; recalled `a`
 	pop rax
 	neg rax
 	push rax
+	pop rbx
 	pop rax
-	mov qword [rbp-8], rax; assigned `a`
+	push rax
 lbl2:
 	mov rax, qword [rbp-8]
 	push rax; recalled `a`
@@ -257,14 +263,12 @@ _main:
 	mov rax, qword [rbp-8]
 	mov qword [rbp-8], rax
 	add rsp, 16
-	sub rsp, 8
-	mov qword [rbp-40], 0
-	mov rax, qword [rbp+8]
+	mov rax, qword [rbp+8]	mov rdx, 14
+	push rdx
+	pop rbx
 	pop rax
-	mov qword [rbp-40], rax; assigned `bage`
-	mov rax, qword [rbp-40]
-	push rax; recalled `bage`
-	pop rax
+	push rax
+	mov rax, qword [rbp+8]	pop rax
 	mov rsp, rbp
 	pop rbp
 	ret
