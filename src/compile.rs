@@ -26,5 +26,7 @@ pub fn parse_file(_program_config: &Configuration, file: SourceFile) -> Box<AST>
     // }
 
     let mut parser = Parser::new(token_list);
-    parser.parse()
+    let parsed = parser.parse();
+    // println!("{:#?}", parsed);
+    parsed
 }

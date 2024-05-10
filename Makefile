@@ -18,5 +18,8 @@ compile_asm:
 run_asm:
 	./example/hello_world
 
-debug:
+debug_asm:
 	gdb ./example/hello_world
+
+debug:
+	gdb ./target/debug/ignis

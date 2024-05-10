@@ -1,4 +1,4 @@
-use std::process;
+use std::{backtrace::Backtrace, process};
 
 use crate::types::{get_type_size, string_to_collapsed_type_tree, Type};
 
@@ -68,6 +68,8 @@ impl ScopeContext {
         match self.variables.iter().find(|x| x.0 == name) {
             Some(value) => (value.clone().1, value.2),
             None => {
+                let bt = Backtrace::capture();
+                eprintln!("{}", bt);
                 eprintln!("[BlockScope] Could not find variable named `{}`", name);
                 process::exit(1);
             }

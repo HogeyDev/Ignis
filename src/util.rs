@@ -55,7 +55,7 @@ pub fn initialize_struct(
     );
 
     let members = match *struct_type {
-        Type::Struct(name, members) => members,
+        Type::Struct(_name, members) => members,
         _ => {
             eprintln!(
                 "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
@@ -92,16 +92,57 @@ pub fn initialize_struct(
     asm
 }
 
+pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>) -> String {
+    let mut asm = String::new();
+    match *val_type {
+        Type::Struct(_, members) => {
+            for member_type in members {
+                asm.push_str(initialize_type(scope, member_type).as_str());
+            }
+        }
+        Type::Primative(_) => {
+            let size = get_type_size(val_type).unwrap() as i64;
+            asm.push_str(
+                scope
+                    .push("0 ; zero-initialize primative".to_string(), size)
+                    .as_str(),
+            )
+        }
+        Type::DynamicArray(_) => {
+            asm.push_str(
+                scope
+                    .push("0 ; zero-initialize dynamic array".to_string(), 8)
+                    .as_str(),
+            );
+        }
+        _ => {
+            eprintln!(
+                "[ASM] Cannot zero initialize this thingy:\n\t{:?}",
+                val_type
+            );
+            process::exit(1);
+        }
+    }
+    asm
+}
+
 pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, String> {
     let typing = calculate_ast_type(ast.clone(), scope)?;
-    println!("TY: {:?}", typing);
+    // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => Ok(scope.get_variable_offset(name).0 as i64),
-        AST::MemberAccess { accessed, member } => {
+        AST::MemberAccess { accessed, .. } => {
+            let acc_typing = calculate_ast_type(accessed.clone(), scope)?;
             let base_addr = resolve_address(scope, accessed)?;
-            let offset = match *typing {
-                Type::Struct(name, members) => 4,
-                _ => unreachable!(),
+            let offset = match *acc_typing {
+                Type::Struct(_name, _members) => 0,
+                _ => {
+                    eprintln!(
+                        "Failure to resolve: {:?}\n\tgoes with {:?}",
+                        acc_typing, ast
+                    );
+                    process::exit(1);
+                }
             };
             Ok(base_addr + offset)
         }

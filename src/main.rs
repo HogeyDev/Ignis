@@ -25,7 +25,7 @@ fn main() {
     let section_data = scope.compile_strings();
 
     let compiled = format!(
-        "section .text\n{}\nglobal _start\n_start:\n\tpush rbp\n\tmov rbp, rsp\n\tcall _main\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\nsection .data\n{}",
+        "section .text\n{}\nglobal _start\n_start:\n\tpush rbp\n\tmov rbp, rsp\n\tcall _main\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n{}",
         section_text, section_data
     );
 

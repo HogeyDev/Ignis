@@ -7,7 +7,9 @@ use crate::{
     parser::{Operation, AST},
     scope::ScopeContext,
     types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
-    util::{asm_size_prefix, asm_size_to_register, initialize_struct, resolve_address},
+    util::{
+        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, resolve_address,
+    },
 };
 
 pub fn compile_to_asm(
@@ -218,7 +220,7 @@ pub fn compile_to_asm(
                         }
                     }
                     Operation::Assign => {
-                        let mut asm = String::new();
+                        let asm = String::new();
                         // 1. acquire address of lhs
                         // 2. calculate rhs
                         // 3. move result to address
@@ -356,7 +358,7 @@ pub fn compile_to_asm(
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
             if width > 8 {
                 match *collapsed.clone() {
-                    Type::Struct(name, members) => {
+                    Type::Struct(_, members) => {
                         asm.push_str(
                             initialize_struct(
                                 scope.to_owned(),
@@ -406,7 +408,7 @@ pub fn compile_to_asm(
             let type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
             if type_size > 8 {
                 match *lhs_typing.clone() {
-                    Type::Struct(name, members) => {
+                    Type::Struct(_, members) => {
                         let offset = -scope.get_variable_offset(name).0;
                         let temporary_start = -scope.stack_size + type_size;
                         let mut internal_offset = 0;
@@ -505,8 +507,8 @@ pub fn compile_to_asm(
         }
         AST::StructInitializer {
             spreads,
-            name,
-            members,
+            ref name,
+            ref members,
         } => {
             let mut asm = String::new();
 
@@ -517,9 +519,11 @@ pub fn compile_to_asm(
                     let expected = string_to_collapsed_type_tree(member_type.clone(), scope);
                     let recieved = calculate_ast_type(members[0].1.clone(), scope);
                     if match *members[0].1 {
-                        AST::Integer(0) => true,
+                        AST::Integer(num) => num == 0,
                         _ => false,
                     } {
+                        let struct_type = calculate_ast_type(root.clone(), scope).unwrap();
+                        asm.push_str(initialize_type(scope, struct_type).as_str());
                     } else if expected != recieved {
                         eprintln!("[ASM] Cannot initialize struct `{}` because member `{}` expects type `{:?}`, but recieved type `{:?}`", name, member_name, expected, recieved);
                         process::exit(1);
@@ -553,27 +557,27 @@ pub fn compile_to_asm(
                 if member_name == member {
                     type_size =
                         get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
-                            .unwrap();
+                            .unwrap() as i64;
                     break;
                 }
                 intra_offset +=
                     get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
                         .unwrap();
             }
-            let type_size: i64 = type_size as i64;
             let register = asm_size_to_register(type_size, "a");
             let asm_sizing = asm_size_prefix(type_size);
             asm.push_str(
                 format!(
-                    "\tmov {}, {} [rbp{:+}]",
+                    "\tmov {}, {} [rbp{:+}]\n",
                     register,
                     asm_sizing,
-                    inter_offset - intra_offset as i64
+                    -(inter_offset + intra_offset as i64)
                 )
                 .as_str(),
             );
 
             asm
+            // String::from("PLEASE\n")
         }
         _ => {
             eprintln!(
