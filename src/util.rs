@@ -127,7 +127,7 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>) -> String 
 }
 
 pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, String> {
-    let typing = calculate_ast_type(ast.clone(), scope)?;
+    let _typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => Ok(scope.get_variable_offset(name).0 as i64),

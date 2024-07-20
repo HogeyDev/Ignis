@@ -136,7 +136,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         }
         AST::StructInitializer { name, .. } => Ok(string_to_collapsed_type_tree(name, scope)?),
         AST::MemberAccess { accessed, member } => {
-            println!("`{:?}` from `{}`", accessed, member);
+            println!("`{}` from `{:?}`", member, accessed);
             let name = match *accessed {
                 AST::VariableCall { name } => name,
                 _ => {

@@ -128,7 +128,7 @@ impl Tokenizer {
             self.next();
         }
         token.token_type = match token.value.as_str() {
-            "fn" => TokenType::Function,
+            "func" => TokenType::Function,
             "if" => TokenType::If,
             "let" => TokenType::Let,
             "asm" => TokenType::Asm,

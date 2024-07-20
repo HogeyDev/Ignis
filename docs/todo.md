@@ -1,3 +1,6 @@
+[ ] Buff out the Command Line Interface because it needs it and is necessary
+    - "./ignis -o main main.is"
+
 [ ] Use enum variants for asm abstraction instead of strings - Ex:
              "\tadd rsp, 8" -> ASM::Add("rsp", "8")
              - IDK if this is actually any better, but it seems interesting.

@@ -5,7 +5,7 @@ use crate::{
     parser::{Parser, AST},
 };
 
-pub fn parse_file(_program_config: &Configuration, file: SourceFile) -> Box<AST> {
+pub fn parse_file(program_config: &Configuration, file: SourceFile) -> Box<AST> {
     let mut tokenizer = Tokenizer::new(file);
     let mut token_list = tokenizer.tokenize();
 
@@ -21,12 +21,17 @@ pub fn parse_file(_program_config: &Configuration, file: SourceFile) -> Box<AST>
         value: String::from("}"),
     });
 
-    // for token in token_list.clone() {
-    //     println!("{:?}", token);
-    // }
+
+    if program_config.debug_tokens {
+        for token in token_list.clone() {
+            println!("{:?}", token);
+        }
+    }
 
     let mut parser = Parser::new(token_list);
     let parsed = parser.parse();
-    // println!("{:#?}", parsed);
+    if program_config.debug_ast {
+        println!("{:#?}", parsed);
+    }
     parsed
 }

@@ -1,4 +1,6 @@
+use std::process::{self, Command};
 use backend::compile_to_asm;
+use cli::CliParser;
 use compile::parse_file;
 use config::get_config;
 use io::{read_file, write_file, SourceFile};
@@ -13,11 +15,18 @@ pub mod parser;
 pub mod scope;
 pub mod types;
 pub mod util;
+pub mod cli;
 
 fn main() {
-    let input_file_path = String::from("example/hello_world.is");
+    let cli_parser = CliParser::from(std::env::args().collect());
+    if cli_parser.arguments.len() == 0 || cli_parser.arguments.len() > 1 {
+        let reason = if cli_parser.arguments.len() > 1 { "More than one" } else { "No" };
+        eprintln!("Error: {} input file found\n\tUsage: {} main.is -o output.is", reason, cli_parser.args.first().unwrap());
+        process::exit(1);
+    }
+    let input_file_path = String::from(cli_parser.arguments.first().unwrap());
     let input_file = read_file(input_file_path.clone());
-    let mut program_config = get_config(input_file_path);
+    let mut program_config = get_config(input_file_path, &cli_parser);
 
     let mut scope = ScopeContext::new();
     let parsed_input_file = parse_file(&program_config, input_file);
@@ -29,9 +38,26 @@ fn main() {
         section_text, section_data
     );
 
-    let output_file = SourceFile {
-        path: String::from("example/hello_world.asm"),
+    let output_file_path = cli_parser.option_value("o", "a.out");
+    let output_asm_file = SourceFile {
+        path: format!("{}{}", output_file_path, ".asm"),
         contents: compiled.clone(),
     };
-    write_file(output_file);
+    write_file(output_asm_file);
+
+    Command::new("nasm")
+        .arg("-f elf64").arg(format!("{}.asm", output_file_path)).arg(format!("-o {}.o", output_file_path)).arg("-g")
+        .output().unwrap();
+    Command::new("ld")
+        .arg("-m").arg("elf_x86_64").arg(format!("{}.o", output_file_path)).arg("-o").arg(output_file_path.clone())
+        .output().unwrap();
+    Command::new("rm")
+        .arg(format!("{}.o", output_file_path))
+        .output().unwrap();
+
+    if !program_config.debug_asm {
+        Command::new("rm")
+            .arg(format!("{}.asm", output_file_path))
+            .output().unwrap();
+    }
 }

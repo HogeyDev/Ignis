@@ -1,14 +1,17 @@
-// import example.stdio;
-// import example.stdlib;
+import stdio;
+// import stdlib;
 
-struct Person {  // 16 bytes
-  name: []char;  // 8 bytes
-  age: int;      // 8 bytes
-}
+// struct Person {     // 16 bytes
+//     name: []char;   // 8 bytes
+//     age: int;       // 8 bytes
+// }
 
-fn main: int = () {
-  let person: Person = Person { 0 };
-  // person.age = 14;
+func main: int = () {
+    // let person: Person = Person { 0 };
+    // person.name = "Hello, World!";
+    // println(person.name);
+    let my_str: []char = "It definitely did not work lmao";
+    println(my_str);
 
-  return person.age;
+    return 0;
 }

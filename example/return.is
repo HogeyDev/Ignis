@@ -1,11 +1,11 @@
 import example.stdio;
 import example.stdlib;
 
-fn math_func: int = (a: int, b: int) {
+func math_func: int = (a: int, b: int) {
   return a + b * 3;
 }
 
-fn main: int = () {
+func main: int = () {
   let a: int = math_func(4, 5);
 
   printnum(a);

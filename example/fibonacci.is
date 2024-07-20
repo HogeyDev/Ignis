@@ -1,6 +1,6 @@
 import example.stdio;
 
-fn fibonacci: int = (n: int) {
+func fibonacci: int = (n: int) {
     if (n < 2) {
         return n;
     }
@@ -21,7 +21,7 @@ fn fibonacci: int = (n: int) {
     return curr;
 }
 
-fn main: int = () {
+func main: int = () {
     let n: int = 10;
 
     print("Fibonacci sequence up to the ");

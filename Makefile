@@ -1,9 +1,14 @@
-all: run compile_asm run_asm
+# all: run compile_asm run_asm
+# 
+# run:
+# 	cargo run
+# 	# RUST_BACKTRACE=1 cargo run
+# 	# RUST_BACKTRACE=full cargo run
 
-run:
-	cargo run
-	RUST_BACKTRACE=1 cargo run
-	RUST_BACKTRACE=full cargo run
+all: compile test
+
+compile:
+	cargo build
 
 # compile_asm_win:
 # 	nasm -f win64 example/hello_world.asm -o example/hello_world.o
@@ -23,3 +28,7 @@ debug_asm:
 
 debug:
 	gdb ./target/debug/ignis
+
+test:
+	gcc -o example/test example/test.c -g
+	cd example && ./test && rm test
