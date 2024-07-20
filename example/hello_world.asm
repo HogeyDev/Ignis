@@ -115,6 +115,7 @@ lbl0:
 	push rax
 	pop rbx
 	pop rax
+	mov qword [rbp-16], rbx
 	push rax
 	jmp lbl0
 lbl1:
@@ -176,6 +177,7 @@ _printnum:
 	push rax
 	pop rbx
 	pop rax
+	mov qword [rbp-8], rbx
 	push rax
 lbl2:
 	mov rax, qword [rbp-8]
@@ -251,14 +253,38 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 8
-	mov qword [rbp-8], 0 ; initialized `my_str`
+	sub rsp, 16
+	mov qword [rbp-16], 0
+	mov qword [rbp-24], 0
+	push 0 ; zero-initialize dynamic array
+	push 0 ; zero-initialize primative
+	mov rdx, 0
+	push rdx
+	push 0 ; zero-initialize dynamic array
+	push 0 ; zero-initialize primative
+	mov rdx, 0
+	push rdx
+	mov rax, qword [rbp-48]
+	mov qword [rbp-16], rax
+	mov rax, qword [rbp-40]
+	mov qword [rbp-8], rax
+	add rsp, 16
+	mov rax, qword [rbp-16]
 	mov rax, STR0
 	push rax
+	pop rbx
 	pop rax
-	mov qword [rbp-8], rax ; assigned `my_str`
-	mov rax, qword [rbp-8]
-	push rax ; recalled `my_str`
+	mov qword [rbp-16], rbx
+	push rax
+	mov rax, STR1
+	push rax
+	call _println
+	add rsp, 8
+	mov rax, qword [rbp-16]
+	call _println
+	add rsp, 8
+	mov rax, STR2
+	push rax
 	call _println
 	add rsp, 8
 	mov rdx, 0
@@ -280,4 +306,6 @@ _start:
 	mov rax, 60
 	syscall
 section .data
-	STR0 db "It definitely did not work lmao", 0
+	STR0 db "Hello, World!", 0
+	STR1 db "-----", 0
+	STR2 db "-----", 0

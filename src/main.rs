@@ -45,15 +45,19 @@ fn main() {
     };
     write_file(output_asm_file);
 
-    Command::new("nasm")
-        .arg(["-f", "elf64"]).arg(format!("{}.asm", output_file_path)).arg(format!("-o {}.o", output_file_path)).arg("-g")
+    let nasm_status = Command::new("nasm")
+        .arg("-f").arg("elf64").arg(format!("{}.asm", output_file_path)).arg(format!("-o {}.o", output_file_path)).arg("-g")
         .output().unwrap();
-    Command::new("ld")
+    let ld_status = Command::new("ld")
         .arg("-m").arg("elf_x86_64").arg(format!("{}.o", output_file_path)).arg("-o").arg(output_file_path.clone())
         .output().unwrap();
-    Command::new("rm")
+    let rm_status = Command::new("rm")
         .arg(format!("{}.o", output_file_path))
         .output().unwrap();
+
+    if !nasm_status.status.success() { eprint!("{}", String::from_utf8_lossy(&nasm_status.stderr)); process::exit(1); }
+    if !ld_status.status.success() { eprint!("{}", String::from_utf8_lossy(&ld_status.stderr)); process::exit(1); }
+    if !rm_status.status.success() { eprint!("{}", String::from_utf8_lossy(&rm_status.stderr)); process::exit(1); }
 
     if !program_config.debug_asm {
         Command::new("rm")

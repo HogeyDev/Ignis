@@ -161,7 +161,7 @@ pub fn compile_to_asm(
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
             asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
-            // let rhs_typing = calculate_expression_type(rhs, scope).unwrap();
+            let rhs_typing = calculate_ast_type(rhs, scope).unwrap();
 
             // if lhs_typing != rhs_typing {
             //     eprintln!(
@@ -214,13 +214,17 @@ pub fn compile_to_asm(
                         }
                     }
                     Operation::Assign => {
-                        let asm = String::new();
+                        let mut asm = String::new();
                         // 1. acquire address of lhs
                         // 2. calculate rhs
                         // 3. move result to address
 
                         let addr = resolve_address(scope, lhs.clone()).unwrap();
+                        let size = get_type_size(rhs_typing).unwrap() as i64;
+                        let size_prefix = asm_size_prefix(size);
+                        let register = asm_size_to_register(size, "b");
                         println!("{:?} -> {addr}", lhs);
+                        asm.push_str(format!("\tmov {} [rbp{:+}], {}\n", size_prefix, -addr, register).as_str());
 
                         asm
                     }

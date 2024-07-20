@@ -379,6 +379,7 @@ impl TypeParser {
                     // 1. get the full type string
                     // 2. parse the type string
                     // 3. return the type
+                    eprintln!("Searching for: {}", id);
                     let type_string = scope
                         .defined_types
                         .iter()
