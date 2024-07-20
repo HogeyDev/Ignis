@@ -55,7 +55,7 @@ pub fn initialize_struct(
     );
 
     let members = match *struct_type {
-        Type::Struct(_name, members) => members,
+        Type::Struct(_, members) => members,
         _ => {
             eprintln!(
                 "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
@@ -75,6 +75,7 @@ pub fn initialize_struct(
 
     let mut total_offset = 0;
     for (i, member) in members.iter().enumerate() {
+        total_offset += get_type_size(member.to_owned()).unwrap() as i64;
         let size = get_type_size(member.to_owned()).unwrap() as i64;
         let asm_size = asm_size_prefix(size);
         asm.push_str(
@@ -86,7 +87,6 @@ pub fn initialize_struct(
             )
             .as_str(),
         );
-        total_offset += get_type_size(member.to_owned()).unwrap() as i64;
     }
 
     asm
@@ -130,7 +130,7 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
     let _typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
-        AST::VariableCall { name } => Ok(scope.get_variable_offset(name).0 as i64),
+        AST::VariableCall { name } => Ok(scope.get_variable_offset(name) as i64),
         AST::MemberAccess { accessed, .. } => {
             let acc_typing = calculate_ast_type(accessed.clone(), scope)?;
             let base_addr = resolve_address(scope, accessed)?;

@@ -49,7 +49,7 @@ impl ScopeContext {
         name: String,
         variable_type: String,
         width: i64,
-    ) -> (i64, String) {
+    ) -> i64 {
         if self.variable_exists(name.clone()) {
             eprintln!("[BlockScope] Variable `{}` already exists", name);
             process::exit(1);
@@ -75,15 +75,8 @@ impl ScopeContext {
             }
         }
     }
-    pub fn get_variable_offset(&self, name: String) -> (i64, String) {
-        let numerical = self.get_variable_data(name).1;
-        let mut stringified = format!("{}", -numerical);
-        if stringified.chars().nth(0).unwrap_or('0') != '-' {
-            // positive number
-            stringified.insert(0, '+');
-        }
-
-        (numerical, stringified)
+    pub fn get_variable_offset(&self, name: String) -> i64 {
+        self.get_variable_data(name).1
     }
     pub fn add_function(
         &mut self,

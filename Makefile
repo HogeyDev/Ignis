@@ -31,4 +31,5 @@ debug:
 
 test:
 	gcc -o example/test example/test.c -g
-	cd example && ./test && rm test
+	cd example && ./test
+	rm example/test

@@ -156,6 +156,7 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
+            // TODO: distinguish in some way between lhs of a variable and lhs of member access???
             asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str());
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
@@ -223,7 +224,6 @@ pub fn compile_to_asm(
                         let size = get_type_size(rhs_typing).unwrap() as i64;
                         let size_prefix = asm_size_prefix(size);
                         let register = asm_size_to_register(size, "b");
-                        println!("{:?} -> {addr}", lhs);
                         asm.push_str(format!("\tmov {} [rbp{:+}], {}\n", size_prefix, -addr, register).as_str());
 
                         asm
@@ -262,7 +262,7 @@ pub fn compile_to_asm(
                         match *child {
                             AST::VariableCall { name } => {
                                 // this is good!
-                                let stack_offset = scope.get_variable_offset(name).0;
+                                let stack_offset = scope.get_variable_offset(name);
                                 format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -313,12 +313,12 @@ pub fn compile_to_asm(
                 string_to_collapsed_type_tree(variable_type, scope).unwrap(),
             )
             .unwrap() as i64;
-            let offset = scope.get_variable_offset(name.clone()).1;
+            let offset = scope.get_variable_offset(name.clone());
             // println!("{name}");
             let register = asm_size_to_register(type_size, "a");
             let asm_sizing = asm_size_prefix(type_size);
 
-            asm.push_str(format!("\tmov {}, {} [rbp{}]\n", register, asm_sizing, offset).as_str());
+            asm.push_str(format!("\tmov {}, {} [rbp{:+}]\n", register, asm_sizing, -offset).as_str());
             if type_size < 8 {
                 asm.push_str("\tmovzx rax, al\n");
             }
@@ -352,6 +352,7 @@ pub fn compile_to_asm(
                 .unwrap()
                 .try_into()
                 .unwrap();
+            let offset = scope.stack_size;
             let offsets = scope.add_variable(name.clone(), variable_type, width);
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
             if width > 8 {
@@ -360,7 +361,7 @@ pub fn compile_to_asm(
                         asm.push_str(
                             initialize_struct(
                                 scope.to_owned(),
-                                offsets.0,
+                                offset,
                                 collapsed,
                                 members.iter().map(|_| "0".to_string()).collect(),
                             )
@@ -368,17 +369,17 @@ pub fn compile_to_asm(
                         );
                     }
                     _ => {
-                        eprintln!("[ASM] Cannot zero out type `{}` because size is {} (>8) and is not a struct", collapsed.to_string(), width);
+                        eprintln!("[ASM] Cannot zero out type `{}` because its size is {} (>8) and it's not a struct", collapsed.to_string(), width);
                         process::exit(1);
                     }
                 }
             } else {
                 asm.push_str(
                     format!(
-                        "\tsub rsp, {}\n\tmov {} [rbp{}], 0 ; initialized `{}`\n",
+                        "\tsub rsp, {}\n\tmov {} [rbp{:+}], 0 ; initialized `{}`\n",
                         width,
                         asm_size_prefix(width),
-                        offsets.1,
+                        -offsets,
                         name
                     )
                     .as_str(),
@@ -408,7 +409,7 @@ pub fn compile_to_asm(
             if type_size > 8 {
                 match *lhs_typing.clone() {
                     Type::Struct(_, members) => {
-                        let offset = -scope.get_variable_offset(name).0;
+                        let offset = -scope.get_variable_offset(name);
                         let temporary_start = -scope.stack_size + type_size;
                         let mut internal_offset = 0;
                         for member in members {
@@ -441,12 +442,12 @@ pub fn compile_to_asm(
                 let asm_sizing = asm_size_prefix(type_size);
                 let register = asm_size_to_register(type_size, "a");
 
-                let offset = scope.get_variable_offset(name.clone()).1;
+                let offset = scope.get_variable_offset(name.clone());
                 asm.push_str(scope.pop("rax".to_string(), 8).as_str());
                 asm.push_str(
                     format!(
-                        "\tmov {} [rbp{}], {} ; assigned `{}`\n",
-                        asm_sizing, offset, register, name
+                        "\tmov {} [rbp{:+}], {} ; assigned `{}`\n",
+                        asm_sizing, -offset, register, name
                     )
                     .as_str(),
                 );
@@ -532,6 +533,7 @@ pub fn compile_to_asm(
                     );
                 }
             } else {
+                unreachable!();
             }
 
             asm
@@ -549,34 +551,34 @@ pub fn compile_to_asm(
 
             let data = scope.get_variable_data(name.clone());
             let member_types = scope.get_struct_data(data.0);
-            let inter_offset = scope.get_variable_offset(name).0;
+            let inter_offset = scope.get_variable_offset(name);
             let mut intra_offset = 0;
             let mut type_size = 0;
-            for (member_name, member_type) in member_types {
-                if member_name == member {
+            for (member_name, member_type) in &member_types[1..] {
+                if member_name.to_string() == member {
                     type_size =
-                        get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
+                        get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap())
                             .unwrap() as i64;
                     break;
                 }
                 intra_offset +=
-                    get_type_size(string_to_collapsed_type_tree(member_type, scope).unwrap())
+                    get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap())
                         .unwrap();
             }
             let register = asm_size_to_register(type_size, "a");
             let asm_sizing = asm_size_prefix(type_size);
             asm.push_str(
                 format!(
-                    "\tmov {}, {} [rbp{:+}]\n",
+                    "\tmov {}, {} [rbp{:+}] ; {} + {}\n",
                     register,
                     asm_sizing,
-                    -(inter_offset + intra_offset as i64)
+                    -(inter_offset + intra_offset as i64),
+                    inter_offset, intra_offset
                 )
                 .as_str(),
             );
 
             asm
-            // String::from("PLEASE\n")
         }
         _ => {
             eprintln!(

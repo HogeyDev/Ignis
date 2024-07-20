@@ -136,7 +136,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         }
         AST::StructInitializer { name, .. } => Ok(string_to_collapsed_type_tree(name, scope)?),
         AST::MemberAccess { accessed, member } => {
-            println!("`{}` from `{:?}`", member, accessed);
+            // println!("`{}` from `{:?}`", member, accessed);
             let name = match *accessed {
                 AST::VariableCall { name } => name,
                 _ => {
@@ -379,7 +379,6 @@ impl TypeParser {
                     // 1. get the full type string
                     // 2. parse the type string
                     // 3. return the type
-                    eprintln!("Searching for: {}", id);
                     let type_string = scope
                         .defined_types
                         .iter()
