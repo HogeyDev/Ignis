@@ -206,15 +206,16 @@ impl Parser {
                 self.eat(TokenType::Identifier);
 
                 self.eat(TokenType::Colon);
+                self.eat(TokenType::Colon);
+
+                self.eat(TokenType::LeftParenthesis);
                 let mut return_type = String::new();
-                while self.current_token.token_type != TokenType::Equals {
+                while ![TokenType::Comma, TokenType::RightParenthesis].contains(&self.current_token.token_type) {
                     return_type.push_str(self.current_token.value.as_str());
                     self.advance();
                 }
+                if self.current_token.token_type == TokenType::Comma { self.advance(); }
 
-                self.eat(TokenType::Equals);
-
-                self.eat(TokenType::LeftParenthesis);
                 let mut prototype = Vec::new(); // really just a vector of parameters, not a full
                                                 // prototype
                 while self.current_token.token_type != TokenType::RightParenthesis

@@ -1,12 +1,12 @@
 use std::process::{self, Command};
-use backend::compile_to_asm;
+use codegen::compile_to_asm;
 use cli::CliParser;
 use compile::parse_file;
 use config::get_config;
 use io::{read_file, write_file, SourceFile};
 use scope::ScopeContext;
 
-pub mod backend;
+pub mod codegen;
 pub mod compile;
 pub mod config;
 pub mod io;
@@ -46,7 +46,7 @@ fn main() {
     write_file(output_asm_file);
 
     Command::new("nasm")
-        .arg("-f elf64").arg(format!("{}.asm", output_file_path)).arg(format!("-o {}.o", output_file_path)).arg("-g")
+        .arg(["-f", "elf64"]).arg(format!("{}.asm", output_file_path)).arg(format!("-o {}.o", output_file_path)).arg("-g")
         .output().unwrap();
     Command::new("ld")
         .arg("-m").arg("elf_x86_64").arg(format!("{}.o", output_file_path)).arg("-o").arg(output_file_path.clone())

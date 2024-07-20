@@ -1,15 +1,9 @@
 use std::process;
 
 use crate::{
-    compile::parse_file,
-    config::Configuration,
-    io::read_file,
-    parser::{Operation, AST},
-    scope::ScopeContext,
-    types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
-    util::{
+    compile::parse_file, config::Configuration, io::read_file, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
         asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, resolve_address,
-    },
+    }
 };
 
 pub fn compile_to_asm(
@@ -324,7 +318,7 @@ pub fn compile_to_asm(
             if type_size < 8 {
                 asm.push_str("\tmovzx rax, al\n");
             }
-            asm.push_str(scope.push(format!("rax; recalled `{}`", name), 8).as_str());
+            asm.push_str(scope.push(format!("rax ; recalled `{}`", name), 8).as_str());
 
             asm
         }
@@ -377,10 +371,11 @@ pub fn compile_to_asm(
             } else {
                 asm.push_str(
                     format!(
-                        "\tsub rsp, {}\n\tmov {} [rbp{}], 0\n",
+                        "\tsub rsp, {}\n\tmov {} [rbp{}], 0 ; initialized `{}`\n",
                         width,
                         asm_size_prefix(width),
-                        offsets.1
+                        offsets.1,
+                        name
                     )
                     .as_str(),
                 );
@@ -446,7 +441,7 @@ pub fn compile_to_asm(
                 asm.push_str(scope.pop("rax".to_string(), 8).as_str());
                 asm.push_str(
                     format!(
-                        "\tmov {} [rbp{}], {}; assigned `{}`\n",
+                        "\tmov {} [rbp{}], {} ; assigned `{}`\n",
                         asm_sizing, offset, register, name
                     )
                     .as_str(),

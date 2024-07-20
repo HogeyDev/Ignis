@@ -6,7 +6,7 @@ import stdio;
 //     age: int;       // 8 bytes
 // }
 
-func main: int = () {
+func main :: (int) {
     // let person: Person = Person { 0 };
     // person.name = "Hello, World!";
     // println(person.name);

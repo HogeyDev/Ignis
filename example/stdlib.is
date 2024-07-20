@@ -1,13 +1,13 @@
-func exit: void = (code: int) {
+func exit :: (void, code: int) {
     asm "	mov rax, 60
 	mov rdi, qword [rbp+16]
 	syscall";
 }
 
-func int_to_usize: usize = (n: int) {
+func int_to_usize :: (usize, n: int) {
     asm "    mov rax, qword [rbp+16]";
 }
 
-func int_to_char: char = (n: int) {
+func int_to_char :: (char, n: int) {
     asm "    mov rax, qword [rbp+16]";
 }
