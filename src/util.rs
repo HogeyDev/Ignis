@@ -1,9 +1,9 @@
 use std::{backtrace::Backtrace, process};
 
 use crate::{
-    parser::AST,
+    parser::{Operation, AST},
     scope::ScopeContext,
-    types::{calculate_ast_type, get_type_size, Type},
+    types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
 };
 
 pub fn asm_size_prefix(width: i64) -> String {
@@ -131,21 +131,41 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => Ok(scope.get_variable_offset(name) as i64),
-        AST::MemberAccess { accessed, .. } => {
-            let acc_typing = calculate_ast_type(accessed.clone(), scope)?;
-            let base_addr = resolve_address(scope, accessed)?;
-            let offset = match *acc_typing {
-                Type::Struct(_name, _members) => 0,
+        AST::MemberAccess { accessed, member } => {
+            let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
+            let base_addr = resolve_address(scope, accessed)? - get_type_size(struct_typing.clone())? as i64;
+            let offset = match *struct_typing {
+                Type::Struct(name, _) => {
+                    let member_types = scope.get_struct_data(name);
+                    let mut inner = 0;
+                    for (member_name, member_type) in member_types {
+                        inner += get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap()).unwrap() as i64;
+                        if member_name.to_string() == member {
+                            break;
+                        }
+                    }
+                    inner
+                }
                 _ => {
                     eprintln!(
                         "Failure to resolve: {:?}\n\tgoes with {:?}",
-                        acc_typing, ast
+                        struct_typing, ast
                     );
                     process::exit(1);
                 }
             };
             Ok(base_addr + offset)
         }
-        _ => Err(format!("Can't resolve address of: {:?}", ast)),
+        AST::UnaryExpression { op, child } => {
+            match op {
+                Operation::Deref => resolve_address(scope, child),
+                _ => Err(format!("Cannot resolve address of: {:?}", ast)),
+            }
+        }
+        _ => Err(format!("Cannot resolve address of: {:?}", ast)),
     }
+}
+
+pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
+    scope.structs.iter().find(|x| x.0 == type_name).is_some()
 }

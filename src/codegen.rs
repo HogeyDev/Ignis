@@ -11,7 +11,7 @@ pub fn compile_to_asm(
     root: Box<AST>,
     scope: &mut ScopeContext,
 ) -> String {
-    match *root {
+    match *root.clone() {
         AST::Block(statements) => {
             let mut asm = String::new();
 
@@ -156,13 +156,15 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
-            // TODO: distinguish in some way between lhs of a variable and lhs of member access???
-            asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str());
+            let is_assignment = op == Operation::Assign;
+            if !is_assignment { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
-            asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+            if !is_assignment { asm.push_str(scope.pop(String::from("rax"), 8).as_str()); } // lhs
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             let rhs_typing = calculate_ast_type(rhs, scope).unwrap();
+
+            let lhs_size = get_type_size(lhs_typing.clone()).unwrap();
 
             // if lhs_typing != rhs_typing {
             //     eprintln!(
@@ -236,20 +238,24 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            let lhs_size = get_type_size(lhs_typing).unwrap();
-            asm.push_str(
-                scope
-                    .push("rax".to_string(), lhs_size.try_into().unwrap())
-                    .as_str(),
-            );
+            if !is_assignment {
+                asm.push_str(
+                    scope
+                        .push("rax".to_string(), lhs_size.try_into().unwrap())
+                        .as_str(),
+                );
+            }
 
             asm
         }
         AST::UnaryExpression { op, child } => {
             let mut asm = String::new();
 
-            asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
-            asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+            let is_memory_operation = [Operation::Ref, Operation::Deref].contains(&op);
+            if !is_memory_operation {
+                asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
+                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+            }
             let typing = calculate_ast_type(child.clone(), scope).unwrap();
 
             asm.push_str(
@@ -262,7 +268,8 @@ pub fn compile_to_asm(
                         match *child {
                             AST::VariableCall { name } => {
                                 // this is good!
-                                let stack_offset = scope.get_variable_offset(name);
+                                let variable_type_size = get_type_size(string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap()).unwrap() as i64;
+                                let stack_offset = scope.get_variable_offset(name) - variable_type_size;
                                 format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -319,8 +326,12 @@ pub fn compile_to_asm(
             let asm_sizing = asm_size_prefix(type_size);
 
             asm.push_str(format!("\tmov {}, {} [rbp{:+}]\n", register, asm_sizing, -offset).as_str());
-            if type_size < 8 {
+            if type_size == 1 {
                 asm.push_str("\tmovzx rax, al\n");
+            } else if type_size == 2 {
+                asm.push_str("\tmovzx rax, ax\n");
+            } else if type_size == 4 {
+                asm.push_str("\tmovzx rax, eax\n");
             }
             asm.push_str(scope.push(format!("rax ; recalled `{}`", name), 8).as_str());
 
@@ -541,42 +552,43 @@ pub fn compile_to_asm(
         AST::MemberAccess { accessed, member } => {
             let mut asm = String::new();
 
-            let name = match *accessed {
-                AST::VariableCall { name } => name,
+            let accessed_type = calculate_ast_type(accessed.clone(), scope).unwrap();
+            // eprintln!("HAS TYPE: {:#?}", accessed_type.clone());
+            let struct_name = match *accessed_type.clone() {
+                Type::Struct(name, _) => name,
                 _ => {
-                    eprintln!("[ASM] Cannot perform member access on non-variable\n\tAccessed `{}` from `{:?}`", member, accessed);
+                    eprintln!("[ASM] Cannot perform member access on non-struct\n\tAccessed `{}` from `{:?}`", member, accessed);
                     process::exit(1);
                 }
             };
-
-            let data = scope.get_variable_data(name.clone());
-            let member_types = scope.get_struct_data(data.0);
-            let inter_offset = scope.get_variable_offset(name);
-            let mut intra_offset = 0;
-            let mut type_size = 0;
-            for (member_name, member_type) in &member_types[1..] {
+            let member_types = scope.get_struct_data(struct_name.clone());
+            let offset = resolve_address(scope, root).unwrap();
+            let mut member_type_size = -1;
+            for (member_name, member_type) in member_types {
                 if member_name.to_string() == member {
-                    type_size =
+                    member_type_size =
                         get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap())
                             .unwrap() as i64;
                     break;
                 }
-                intra_offset +=
-                    get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap())
-                        .unwrap();
             }
-            let register = asm_size_to_register(type_size, "a");
-            let asm_sizing = asm_size_prefix(type_size);
+            if member_type_size < 0 {
+                eprintln!("Could not find member `{member}` in struct `{:?}`", accessed_type);
+                process::exit(1);
+            }
+            let register = asm_size_to_register(member_type_size, "a");
+            let size_prefix = asm_size_prefix(member_type_size);
             asm.push_str(
                 format!(
-                    "\tmov {}, {} [rbp{:+}] ; {} + {}\n",
+                    "\tmov {}, {} [rbp{:+}]\n",
                     register,
-                    asm_sizing,
-                    -(inter_offset + intra_offset as i64),
-                    inter_offset, intra_offset
+                    size_prefix,
+                    -offset,
+                    // outer_offset, inner_offset
                 )
                 .as_str(),
             );
+            asm.push_str(scope.push("rax".to_string(), member_type_size).as_str());
 
             asm
         }

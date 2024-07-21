@@ -82,13 +82,14 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
                 size += get_type_size(member).unwrap();
             }
             Ok(size)
-        } // _ => {
-          //     eprintln!(
-          //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
-          //         *comp
-          //     );
-          //     process::exit(1);
-          // }
+        }
+        // _ => {
+        //     eprintln!(
+        //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
+        //         *comp
+        //     );
+        //     process::exit(1);
+        // }
     }
 }
 
@@ -137,16 +138,16 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         AST::StructInitializer { name, .. } => Ok(string_to_collapsed_type_tree(name, scope)?),
         AST::MemberAccess { accessed, member } => {
             // println!("`{}` from `{:?}`", member, accessed);
-            let name = match *accessed {
-                AST::VariableCall { name } => name,
+            let accessed_type = collapse_type_tree(ast_to_type_tree(accessed.clone(), scope)?)?;
+            let struct_name = match *accessed_type {
+                Type::Struct(name, _) => name,
                 _ => {
-                    eprintln!("Cannot access member of non variable type");
+                    eprintln!("Cannot access member of non-struct type");
                     process::exit(1);
                 }
             };
-            let struct_name = scope.get_variable_data(name).0;
-            let member_type_string = scope
-                .get_struct_data(struct_name)
+            let struct_name = scope.get_struct_data(struct_name);
+            let member_type_string = struct_name
                 .iter()
                 .find(|x| x.0 == member)
                 .unwrap()

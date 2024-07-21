@@ -120,7 +120,12 @@ impl ScopeContext {
     }
     pub fn get_struct_data(&self, name: String) -> Vec<(String, String)> {
         // println!("SFS: {}", name);
-        self.structs.iter().find(|x| x.0 == name).unwrap().1.clone()
+        let struct_data = self.structs.iter().find(|x| x.0 == name);
+        if let Some(data) = struct_data {
+            return data.1.clone();
+        }
+        eprintln!("Cannot find struct named `{}`", name);
+        process::exit(1);
     }
     pub fn get_struct_member_offset(&self, name: String, member: String) -> Result<i64, String> {
         let struct_data = self.get_struct_data(name.clone());

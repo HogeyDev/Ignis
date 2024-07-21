@@ -1,4 +1,7 @@
-[ ] Buff out the Command Line Interface because it needs it and is necessary
+[ ] Add ability to move structs in memory
+    [ ] Should be able to move not just structs, but any data type
+
+[-] Buff out the Command Line Interface because it needs it and is necessary
     - "./ignis -o main main.is"
 
 [ ] Use enum variants for asm abstraction instead of strings - Ex:
@@ -19,7 +22,7 @@
              - Ex:
 
 
-[ ] Structs
+[-] Structs
              - Ex:
                           - `struct Person {
                                        name: []char;
