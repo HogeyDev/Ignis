@@ -166,6 +166,31 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
     }
 }
 
+pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from: String, to: String) -> String {
+    let mut asm = String::new();
+
+    let type_size = get_type_size(moved_type.clone()).unwrap() as i64;
+    if type_size > 8 {
+        // unimplemented!("Small type relocation");
+        // has to be a struct
+        let struct_name = if let Type::Struct(name, _) = *moved_type { name } else {
+            eprintln!("Cannot move type `{:?}` on stack with size {type_size} (>8) ", moved_type);
+            process::exit(1);
+        };
+        let members = scope.get_struct_data(struct_name);
+        for (member_name, member_type) in members {
+            println!("{member_name}: {member_type}");
+        }
+    } else {
+        let register = asm_size_to_register(type_size, "a");
+        let prefix = asm_size_prefix(type_size);
+        asm.push_str(format!("\tmov {register}, {prefix} [{}]\n\tmov {prefix} [{}], {register}\n", from, to).as_str());
+    }
+
+
+    asm
+}
+
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
     scope.structs.iter().find(|x| x.0 == type_name).is_some()
 }

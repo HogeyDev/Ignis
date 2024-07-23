@@ -111,8 +111,8 @@ lbl0:
 	pop rax
 	add rax, rbx
 	push rax
-	pop rbx
-	mov qword [rbp-16], rbx
+	mov rax, qword [rsp]
+	mov qword [rbp-16], rax
 	jmp lbl0
 lbl1:
 	mov rsp, rbp
@@ -169,8 +169,8 @@ _printnum:
 	pop rax
 	neg rax
 	push rax
-	pop rbx
-	mov qword [rbp-8], rbx
+	mov rax, qword [rsp]
+	mov qword [rbp-8], rax
 lbl2:
 	mov rax, qword [rbp-8]
 	push rax ; recalled `a`
@@ -241,30 +241,161 @@ _printintpointer:
 	mov rsp, rbp
 	pop rbp
 	ret
-global _print_person
-_print_person:
+global _fibonacci_loop
+_fibonacci_loop:
 	push rbp
 	mov rbp, rsp
-	mov rax, STR0
-	push rax
-	call _print
-	add rsp, 8
-	mov rax, qword [rbp+24]
-	push rax
-	call _print
-	add rsp, 8
-	mov rax, STR1
-	push rax
-	call _print
-	add rsp, 8
 	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	mov rdx, 2
+	push rdx
+	pop rbx
+	pop rax
+	cmp rax, rbx
+	setl al
+	movzx rax, al
 	push rax
-	call _printnum
-	add rsp, 8
-	mov rax, STR2
+	pop rax
+	cmp rax, 0
+	je lbl4
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	pop rax
+	mov rsp, rbp
+	pop rbp
+	ret
+lbl4:
+	sub rsp, 8
+	mov qword [rbp-8], 0 ; initialized `prev`
+	mov rdx, 0
+	push rdx
+	pop rax
+	mov qword [rbp-8], rax ; assigned `prev`
+	sub rsp, 8
+	mov qword [rbp-16], 0 ; initialized `curr`
+	mov rdx, 1
+	push rdx
+	pop rax
+	mov qword [rbp-16], rax ; assigned `curr`
+	sub rsp, 8
+	mov qword [rbp-24], 0 ; initialized `temp`
+	mov rdx, 0
+	push rdx
+	pop rax
+	mov qword [rbp-24], rax ; assigned `temp`
+	sub rsp, 8
+	mov qword [rbp-32], 0 ; initialized `i`
+	mov rdx, 2
+	push rdx
+	pop rax
+	mov qword [rbp-32], rax ; assigned `i`
+lbl5:
+	mov rax, qword [rbp-32]
+	push rax ; recalled `i`
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	pop rbx
+	pop rax
+	cmp rax, rbx
+	setle al
+	movzx rax, al
 	push rax
-	call _println
+	pop rax
+	cmp rax, 0
+	je lbl6
+	mov rax, qword [rbp-16]
+	push rax ; recalled `curr`
+	mov rax, qword [rsp]
+	mov qword [rbp-24], rax
+	mov rax, qword [rbp-8]
+	push rax ; recalled `prev`
+	mov rax, qword [rbp-16]
+	push rax ; recalled `curr`
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	mov rax, qword [rsp]
+	mov qword [rbp-16], rax
+	mov rax, qword [rbp-24]
+	push rax ; recalled `temp`
+	mov rax, qword [rsp]
+	mov qword [rbp-8], rax
+	mov rax, qword [rbp-32]
+	push rax ; recalled `i`
+	mov rdx, 1
+	push rdx
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	mov rax, qword [rsp]
+	mov qword [rbp-32], rax
+	jmp lbl5
+lbl6:
+	mov rax, qword [rbp-16]
+	push rax ; recalled `curr`
+	pop rax
+	mov rsp, rbp
+	pop rbp
+	ret
+	mov rsp, rbp
+	pop rbp
+	ret
+global _fibonacci_recursive
+_fibonacci_recursive:
+	push rbp
+	mov rbp, rsp
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	mov rdx, 2
+	push rdx
+	pop rbx
+	pop rax
+	cmp rax, rbx
+	setl al
+	movzx rax, al
+	push rax
+	pop rax
+	cmp rax, 0
+	je lbl7
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	pop rax
+	mov rsp, rbp
+	pop rbp
+	ret
+lbl7:
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	mov rdx, 1
+	push rdx
+	pop rbx
+	pop rax
+	sub rax, rbx
+	push rax
+	call _fibonacci_recursive
 	add rsp, 8
+	push rax
+	mov rax, qword [rbp+16]
+	push rax ; recalled `n`
+	mov rdx, 2
+	push rdx
+	pop rbx
+	pop rax
+	sub rax, rbx
+	push rax
+	call _fibonacci_recursive
+	add rsp, 8
+	push rax
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	pop rax
+	mov rsp, rbp
+	pop rbp
+	ret
 	mov rsp, rbp
 	pop rbp
 	ret
@@ -272,23 +403,37 @@ global _main
 _main:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 16
-	mov qword [rbp-8], 0
-	mov qword [rbp-16], 0
-	mov rdx, 14
+	sub rsp, 8
+	mov qword [rbp-8], 0 ; initialized `index`
+	mov rdx, 7
 	push rdx
-	pop rbx
-	mov qword [rbp-16], rbx
-	mov rax, STR3
-	push rax
-	pop rbx
-	mov qword [rbp-8], rbx
-	mov rax, rbp
-	sub rax, 0
-	push rax
-	call _print_person
+	pop rax
+	mov qword [rbp-8], rax ; assigned `index`
+	sub rsp, 8
+	mov qword [rbp-16], 0 ; initialized `rec`
+	mov rax, qword [rbp-8]
+	push rax ; recalled `index`
+	call _fibonacci_recursive
 	add rsp, 8
+	push rax
+	pop rax
+	mov qword [rbp-16], rax ; assigned `rec`
+	sub rsp, 8
+	mov qword [rbp-24], 0 ; initialized `looped`
+	mov rax, qword [rbp-8]
+	push rax ; recalled `index`
+	call _fibonacci_loop
+	add rsp, 8
+	push rax
+	pop rax
+	mov qword [rbp-24], rax ; assigned `looped`
 	mov rax, qword [rbp-16]
+	push rax ; recalled `rec`
+	mov rax, qword [rbp-24]
+	push rax ; recalled `looped`
+	pop rbx
+	pop rax
+	sub rax, rbx
 	push rax
 	pop rax
 	mov rsp, rbp
@@ -307,7 +452,3 @@ _start:
 	mov rax, 60
 	syscall
 section .data
-	STR0 db "Hi, my name is ", 0
-	STR1 db " and I'm ", 0
-	STR2 db " years old.", 0
-	STR3 db "Kourtet", 0

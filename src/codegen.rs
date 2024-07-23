@@ -2,7 +2,7 @@ use std::process;
 
 use crate::{
     compile::parse_file, config::Configuration, io::read_file, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
-        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, resolve_address,
+        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_type_on_stack, resolve_address
     }
 };
 
@@ -159,10 +159,12 @@ pub fn compile_to_asm(
             let is_assignment = op == Operation::Assign;
             if !is_assignment { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
-            asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
-            if !is_assignment { asm.push_str(scope.pop(String::from("rax"), 8).as_str()); } // lhs
+            if !is_assignment {
+                asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
+                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+            }
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
-            let rhs_typing = calculate_ast_type(rhs, scope).unwrap();
+            let rhs_typing = calculate_ast_type(rhs.clone(), scope).unwrap();
 
             let lhs_size = get_type_size(lhs_typing.clone()).unwrap();
 
@@ -222,11 +224,9 @@ pub fn compile_to_asm(
                         // 2. calculate rhs
                         // 3. move result to address
 
-                        let addr = resolve_address(scope, lhs.clone()).unwrap();
-                        let size = get_type_size(rhs_typing).unwrap() as i64;
-                        let size_prefix = asm_size_prefix(size);
-                        let register = asm_size_to_register(size, "b");
-                        asm.push_str(format!("\tmov {} [rbp{:+}], {}\n", size_prefix, -addr, register).as_str());
+                        let to_addr = -resolve_address(scope, lhs.clone()).unwrap();
+                        // let from_addr = -resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
+                        asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), format!("rbp{:+}", to_addr)).as_str());
 
                         asm
                     }
@@ -270,7 +270,8 @@ pub fn compile_to_asm(
                                 // this is good!
                                 let variable_type_size = get_type_size(string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap()).unwrap() as i64;
                                 let stack_offset = scope.get_variable_offset(name) - variable_type_size;
-                                format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
+                                format!("\tlea rax, [rbp{:+}]\n", stack_offset)
+                                // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
                                 // this is bad!
@@ -285,7 +286,7 @@ pub fn compile_to_asm(
                         let register = asm_size_to_register(size, "a");
                         match *typing {
                             Type::Pointer(_) => {
-                                format!("\tmov {}, {} [rax]\n", register, asm_sizing)
+                                format!("\tmov {}, {} [rax] ; deref or smth\n", register, asm_sizing)
                             }
                             _ => {
                                 eprintln!("[ASM] Cannot dereference non-pointer type");
@@ -550,6 +551,7 @@ pub fn compile_to_asm(
             asm
         }
         AST::MemberAccess { accessed, member } => {
+            eprintln!("{:#?}", accessed);
             let mut asm = String::new();
 
             let accessed_type = calculate_ast_type(accessed.clone(), scope).unwrap();
@@ -580,11 +582,10 @@ pub fn compile_to_asm(
             let size_prefix = asm_size_prefix(member_type_size);
             asm.push_str(
                 format!(
-                    "\tmov {}, {} [rbp{:+}]\n",
+                    "\tmov {}, {} [rbp{:+}] ; member `{member}`\n",
                     register,
                     size_prefix,
                     -offset,
-                    // outer_offset, inner_offset
                 )
                 .as_str(),
             );

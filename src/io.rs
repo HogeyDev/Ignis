@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, process};
 
 #[derive(Debug, Clone)]
 pub struct SourceFile {
@@ -7,9 +7,14 @@ pub struct SourceFile {
 }
 
 pub fn read_file(file_path: String) -> SourceFile {
+    let contents = fs::read_to_string(file_path.clone()); 
+    if contents.is_err() {
+        eprintln!("Cannot find file `{file_path}`");
+        process::exit(1);
+    }
     SourceFile {
-        path: file_path.clone(),
-        contents: fs::read_to_string(file_path).expect("Could not open file to read."),
+        path: file_path,
+        contents: contents.unwrap(),
     }
 }
 

@@ -119,7 +119,6 @@ impl ScopeContext {
         self.defined_types.push((name, type_string));
     }
     pub fn get_struct_data(&self, name: String) -> Vec<(String, String)> {
-        // println!("SFS: {}", name);
         let struct_data = self.structs.iter().find(|x| x.0 == name);
         if let Some(data) = struct_data {
             return data.1.clone();

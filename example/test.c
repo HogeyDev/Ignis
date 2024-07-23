@@ -78,7 +78,8 @@ void runTests(Tests *tests) {
 int main() {
     Tests tests = initTests();
 
-    addTest(&tests, "hello_world", "", 14);
+    addTest(&tests, "fibonacci", "", 0);
+    addTest(&tests, "person", "", 14);
 
     runTests(&tests);
     
