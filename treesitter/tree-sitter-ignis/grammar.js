@@ -60,7 +60,14 @@ module.exports = grammar({
         ),
         argument_list: $ => seq(
             '(',
-            repeat($.expression),
+            optional(
+                seq(
+                    $.expression,
+                    repeat(
+                        seq(',', $.expression),
+                    ),
+                )
+            ),
             ')',
         ),
         type: $ => choice(
@@ -87,6 +94,11 @@ module.exports = grammar({
         expression: $ => choice(
             $.number,
             $.identifier,
+            seq(
+                '(',
+                $.expression,
+                ')',
+            ),
         ),
         identifier: $ => /[_a-zA-Z][_a-zA-Z0-9]*/,
         number: $ => /\d+/,

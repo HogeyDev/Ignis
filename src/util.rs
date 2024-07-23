@@ -187,7 +187,6 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
         asm.push_str(format!("\tmov {register}, {prefix} [{}]\n\tmov {prefix} [{}], {register}\n", from, to).as_str());
     }
 
-
     asm
 }
 

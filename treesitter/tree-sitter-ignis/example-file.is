@@ -16,7 +16,7 @@ func print_person :: (void, person: @Person) {
 
 func main :: (int) {
     let person: Person;
-    person.age = 14;
+    person.age = 17;
     person.name = "Kourtet";
 
     print_person(&person);
