@@ -3,27 +3,47 @@ module.exports = grammar({
 
     rules: {
         source_file: $ => repeat($.statement),
-        statement: $ => choice(
-            $.function_definition,
-            $.import_statement,
+        statement: $ => seq(
+            choice(
+                $.function_definition,
+                $.import_statement,
+                $.return_statement,
+                $.function_call,
+            ),
+            ';',
+        ),
+        function_call: $ => seq(
+            $.identifier,
+            $.argument_list,
+        ),
+        return_statement: $ => seq(
+            'return',
+            $.expression,
         ),
         import_statement: $ => seq(
             'import',
             $.identifier,
             repeat(
-              seq(
-                '.',
-                $.identifier,
-              ),
+                seq(
+                    '.',
+                    $.identifier,
+                ),
             ),
-            ';',
         ),
         function_definition: $ => seq(
             'func',
             $.identifier,
             '::',
             $.parameter_list,
-            // $.block,
+            $.block,
+        ),
+        block: $ => choice(
+            seq(
+                '{',
+                repeat($.statement),
+                '}',
+            ),
+            $.statement,
         ),
         parameter_list: $ => seq(
             '(',
@@ -38,8 +58,14 @@ module.exports = grammar({
             ),
             ')',
         ),
+        argument_list: $ => seq(
+            '(',
+            repeat($.expression),
+            ')',
+        ),
         type: $ => choice(
             $.primative_type,
+            $.identifier,
             seq(
                 '[',
                     optional(
@@ -48,13 +74,21 @@ module.exports = grammar({
                 ']',
                 $.primative_type,
             ),
+            seq(
+                '@',
+                $.type,
+            ),
         ),
         primative_type: $ => choice(
             'void',
             'int',
             'char',
         ),
-        identifier: $ => /[a-zA-Z][a-zA-Z0-9]*/,
+        expression: $ => choice(
+            $.number,
+            $.identifier,
+        ),
+        identifier: $ => /[_a-zA-Z][_a-zA-Z0-9]*/,
         number: $ => /\d+/,
     }
 });
