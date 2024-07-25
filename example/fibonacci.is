@@ -4,7 +4,6 @@ func fibonacci_loop :: (int, n: int) {
     if (n < 2) {
         return n;
     }
-
     let prev: int = 0;
     let curr: int = 1;
     let temp: int = 0;
@@ -33,5 +32,5 @@ func main :: (int) {
     let rec: int = fibonacci_recursive(index);
     let looped: int = fibonacci_loop(index);
     
-    return rec - looped; // should be 0
+    return 2 * rec - looped; // should be 13
 }

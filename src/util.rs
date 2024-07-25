@@ -130,22 +130,15 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
     let _typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
-        AST::VariableCall { name } => Ok(scope.get_variable_offset(name) as i64),
+        AST::VariableCall { name } => {
+            let res = -scope.get_variable_offset(name.clone());
+            Ok(-scope.get_variable_offset(name) as i64)
+        }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
-            let base_addr = resolve_address(scope, accessed)? - get_type_size(struct_typing.clone())? as i64;
+            let base_addr = resolve_address(scope, accessed.clone())?;
             let offset = match *struct_typing {
-                Type::Struct(name, _) => {
-                    let member_types = scope.get_struct_data(name);
-                    let mut inner = 0;
-                    for (member_name, member_type) in member_types {
-                        inner += get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap()).unwrap() as i64;
-                        if member_name.to_string() == member {
-                            break;
-                        }
-                    }
-                    inner
-                }
+                Type::Struct(name, _) => -scope.get_struct_member_offset(name, member.clone()).unwrap(),
                 _ => {
                     eprintln!(
                         "Failure to resolve: {:?}\n\tgoes with {:?}",
@@ -171,7 +164,7 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
 
     let type_size = get_type_size(moved_type.clone()).unwrap() as i64;
     if type_size > 8 {
-        // unimplemented!("Small type relocation");
+        // unimplemented!("Large type relocation");
         // has to be a struct
         let struct_name = if let Type::Struct(name, _) = *moved_type { name } else {
             eprintln!("Cannot move type `{:?}` on stack with size {type_size} (>8) ", moved_type);
@@ -184,11 +177,17 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
     } else {
         let register = asm_size_to_register(type_size, "a");
         let prefix = asm_size_prefix(type_size);
-        asm.push_str(format!("\tmov {register}, {prefix} [{}]\n\tmov {prefix} [{}], {register}\n", from, to).as_str());
+        asm.push_str(format!("\tmov {register}, {prefix} [{from}]\n\tmov {prefix} [{to}], {register}\n").as_str());
     }
 
     asm
 }
+
+// pub fn push_struct(scope: &mut ScopeContext, type_name: String, location: i64) -> String {
+//     unimplemented!("Push Struct");
+//     // eprintln!("{location}");
+//     let members = scope.get_struct_data(type_name);
+// }
 
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
     scope.structs.iter().find(|x| x.0 == type_name).is_some()

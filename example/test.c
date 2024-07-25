@@ -78,8 +78,9 @@ void runTests(Tests *tests) {
 int main() {
     Tests tests = initTests();
 
-    addTest(&tests, "fibonacci", "", 0);
-    addTest(&tests, "person", "", 14);
+    addTest(&tests, "fibonacci", "", 13);
+    addTest(&tests, "person", "", 17);
+    addTest(&tests, "return", "", 19);
 
     runTests(&tests);
     

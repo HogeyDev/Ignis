@@ -1,14 +1,13 @@
-import example.stdio;
-import example.stdlib;
+import stdio;
 
-func math_func: int = (a: int, b: int) {
-  return a + b * 3;
+func math_func :: (int, a: int, b: int) {
+    return a + b * 3;
 }
 
-func main: int = () {
-  let a: int = math_func(4, 5);
+func main :: (int) {
+    let a: int = math_func(4, 5);
 
-  printnum(a);
+    printnum(a);
 
-  return 0;
+    return a;
 }

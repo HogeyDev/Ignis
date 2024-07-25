@@ -86,7 +86,7 @@ lbl0:
 	cmp rax, 0
 	je lbl1
 	sub rsp, 1
-	mov byte [rbp-17], 0 ; initialized `c`
+	mov byte [rbp-24], 0 ; initialized `c`
 	mov rax, qword [rbp+16]
 	push rax ; recalled `str`
 	mov rax, qword [rbp-16]
@@ -97,8 +97,8 @@ lbl0:
 	movzx rax, byte [rax + rbx]
 	push rax
 	pop rax
-	mov byte [rbp-17], al ; assigned `c`
-	mov al, byte [rbp-17]
+	mov byte [rbp-24], al ; assigned `c`
+	mov al, byte [rbp-24]
 	movzx rax, al
 	push rax ; recalled `c`
 	call _putchar
@@ -249,7 +249,9 @@ _print_person:
 	push rax
 	call _print
 	add rsp, 8
-	mov rax, qword [rbp+24] ; member `name`
+	lea rax, qword [rbp+16] ; starting to access `name`
+	mov rax, qword [rax]
+	mov rax, qword [rax+0] ; finished accessing `name`
 	push rax
 	call _print
 	add rsp, 8
@@ -257,7 +259,9 @@ _print_person:
 	push rax
 	call _print
 	add rsp, 8
-	mov rax, qword [rbp+16] ; member `age`
+	lea rax, qword [rbp+16] ; starting to access `age`
+	mov rax, qword [rax]
+	mov rax, qword [rax-8] ; finished accessing `age`
 	push rax
 	call _printnum
 	add rsp, 8
@@ -275,7 +279,7 @@ _main:
 	sub rsp, 16
 	mov qword [rbp-8], 0
 	mov qword [rbp-16], 0
-	mov rdx, 14
+	mov rdx, 17
 	push rdx
 	mov rax, qword [rsp]
 	mov qword [rbp-16], rax
@@ -283,11 +287,12 @@ _main:
 	push rax
 	mov rax, qword [rsp]
 	mov qword [rbp-8], rax
-	lea rax, [rbp+0]
+	lea rax, qword [rbp-8]
 	push rax
 	call _print_person
 	add rsp, 8
-	mov rax, qword [rbp-16] ; member `age`
+	lea rax, qword [rbp-8] ; starting to access `age`
+	mov rax, qword [rax-8] ; finished accessing `age`
 	push rax
 	pop rax
 	mov rsp, rbp

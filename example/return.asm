@@ -241,152 +241,19 @@ _printintpointer:
 	mov rsp, rbp
 	pop rbp
 	ret
-global _fibonacci_loop
-_fibonacci_loop:
+global _math_func
+_math_func:
 	push rbp
 	mov rbp, rsp
+	mov rax, qword [rbp+24]
+	push rax ; recalled `a`
 	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	mov rdx, 2
+	push rax ; recalled `b`
+	mov rdx, 3
 	push rdx
 	pop rbx
 	pop rax
-	cmp rax, rbx
-	setl al
-	movzx rax, al
-	push rax
-	pop rax
-	cmp rax, 0
-	je lbl4
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	pop rax
-	mov rsp, rbp
-	pop rbp
-	ret
-lbl4:
-	sub rsp, 8
-	mov qword [rbp-8], 0 ; initialized `prev`
-	mov rdx, 0
-	push rdx
-	pop rax
-	mov qword [rbp-8], rax ; assigned `prev`
-	sub rsp, 8
-	mov qword [rbp-16], 0 ; initialized `curr`
-	mov rdx, 1
-	push rdx
-	pop rax
-	mov qword [rbp-16], rax ; assigned `curr`
-	sub rsp, 8
-	mov qword [rbp-24], 0 ; initialized `temp`
-	mov rdx, 0
-	push rdx
-	pop rax
-	mov qword [rbp-24], rax ; assigned `temp`
-	sub rsp, 8
-	mov qword [rbp-32], 0 ; initialized `i`
-	mov rdx, 2
-	push rdx
-	pop rax
-	mov qword [rbp-32], rax ; assigned `i`
-lbl5:
-	mov rax, qword [rbp-32]
-	push rax ; recalled `i`
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	pop rbx
-	pop rax
-	cmp rax, rbx
-	setle al
-	movzx rax, al
-	push rax
-	pop rax
-	cmp rax, 0
-	je lbl6
-	mov rax, qword [rbp-16]
-	push rax ; recalled `curr`
-	mov rax, qword [rsp]
-	mov qword [rbp-24], rax
-	mov rax, qword [rbp-8]
-	push rax ; recalled `prev`
-	mov rax, qword [rbp-16]
-	push rax ; recalled `curr`
-	pop rbx
-	pop rax
-	add rax, rbx
-	push rax
-	mov rax, qword [rsp]
-	mov qword [rbp-16], rax
-	mov rax, qword [rbp-24]
-	push rax ; recalled `temp`
-	mov rax, qword [rsp]
-	mov qword [rbp-8], rax
-	mov rax, qword [rbp-32]
-	push rax ; recalled `i`
-	mov rdx, 1
-	push rdx
-	pop rbx
-	pop rax
-	add rax, rbx
-	push rax
-	mov rax, qword [rsp]
-	mov qword [rbp-32], rax
-	jmp lbl5
-lbl6:
-	mov rax, qword [rbp-16]
-	push rax ; recalled `curr`
-	pop rax
-	mov rsp, rbp
-	pop rbp
-	ret
-	mov rsp, rbp
-	pop rbp
-	ret
-global _fibonacci_recursive
-_fibonacci_recursive:
-	push rbp
-	mov rbp, rsp
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	mov rdx, 2
-	push rdx
-	pop rbx
-	pop rax
-	cmp rax, rbx
-	setl al
-	movzx rax, al
-	push rax
-	pop rax
-	cmp rax, 0
-	je lbl7
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	pop rax
-	mov rsp, rbp
-	pop rbp
-	ret
-lbl7:
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	mov rdx, 1
-	push rdx
-	pop rbx
-	pop rax
-	sub rax, rbx
-	push rax
-	call _fibonacci_recursive
-	add rsp, 8
-	push rax
-	mov rax, qword [rbp+16]
-	push rax ; recalled `n`
-	mov rdx, 2
-	push rdx
-	pop rbx
-	pop rax
-	sub rax, rbx
-	push rax
-	call _fibonacci_recursive
-	add rsp, 8
+	imul rax, rbx
 	push rax
 	pop rbx
 	pop rax
@@ -404,43 +271,22 @@ _main:
 	push rbp
 	mov rbp, rsp
 	sub rsp, 8
-	mov qword [rbp-8], 0 ; initialized `index`
-	mov rdx, 7
+	mov qword [rbp-8], 0 ; initialized `a`
+	mov rdx, 4
 	push rdx
-	pop rax
-	mov qword [rbp-8], rax ; assigned `index`
-	sub rsp, 8
-	mov qword [rbp-16], 0 ; initialized `rec`
-	mov rax, qword [rbp-8]
-	push rax ; recalled `index`
-	call _fibonacci_recursive
-	add rsp, 8
-	push rax
-	pop rax
-	mov qword [rbp-16], rax ; assigned `rec`
-	sub rsp, 8
-	mov qword [rbp-24], 0 ; initialized `looped`
-	mov rax, qword [rbp-8]
-	push rax ; recalled `index`
-	call _fibonacci_loop
-	add rsp, 8
-	push rax
-	pop rax
-	mov qword [rbp-24], rax ; assigned `looped`
-	mov rdx, 2
+	mov rdx, 5
 	push rdx
-	mov rax, qword [rbp-16]
-	push rax ; recalled `rec`
-	pop rbx
-	pop rax
-	imul rax, rbx
+	call _math_func
+	add rsp, 16
 	push rax
-	mov rax, qword [rbp-24]
-	push rax ; recalled `looped`
-	pop rbx
 	pop rax
-	sub rax, rbx
-	push rax
+	mov qword [rbp-8], rax ; assigned `a`
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
+	call _printnum
+	add rsp, 8
+	mov rax, qword [rbp-8]
+	push rax ; recalled `a`
 	pop rax
 	mov rsp, rbp
 	pop rbp

@@ -54,14 +54,9 @@ impl ScopeContext {
             eprintln!("[BlockScope] Variable `{}` already exists", name);
             process::exit(1);
         }
-        // println!("{:#?}", self.variables);
-        // println!(
-        //     "Size before: {}\t|\tnew var: {name}: {width}",
-        //     self.stack_size
-        // );
         self.stack_size += width;
         self.variables
-            .push((name.clone(), variable_type.clone(), self.stack_size));
+            .push((name.clone(), variable_type.clone(), self.stack_size - (width - 8)));
         self.get_variable_offset(name)
     }
     pub fn get_variable_data(&self, name: String) -> (String, i64) {
