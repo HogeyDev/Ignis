@@ -1,3 +1,5 @@
+[ ] Readme file explaining how to at least compile a program
+
 [ ] Add ability to move structs in memory
     [ ] Should be able to move not just structs, but any data type
 
@@ -22,7 +24,7 @@
              - Ex:
 
 
-[-] Structs
+[X] Structs
              - Ex:
                           - `struct Person {
                                        name: []char;

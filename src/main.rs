@@ -21,7 +21,7 @@ fn main() {
     let cli_parser = CliParser::from(std::env::args().collect());
     if cli_parser.arguments.len() == 0 || cli_parser.arguments.len() > 1 {
         let reason = if cli_parser.arguments.len() > 1 { "More than one" } else { "No" };
-        eprintln!("Error: {} input file found\n\tUsage: {} main.is -o output.is", reason, cli_parser.args.first().unwrap());
+        eprintln!("Error: {} main file found\n\tUsage: {} main.is -o output", reason, cli_parser.args.first().unwrap());
         process::exit(1);
     }
     let input_file_path = String::from(cli_parser.arguments.first().unwrap());
