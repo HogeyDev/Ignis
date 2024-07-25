@@ -1,3 +1,5 @@
+[ ] Enums
+
 [ ] Readme file explaining how to at least compile a program
 
 [ ] Add ability to move structs in memory
