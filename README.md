@@ -38,3 +38,7 @@
         ```c
         addTest(&tests, "my_cool_new_test", "", 42);
         ```
+
+### Versioning
+ - Currently the scheme is MAJOR.MINOR.BUGFIX
+    - Ex: `1.8.5` means that there is one major feature release, eight minor feature updates, and five bugfixes
