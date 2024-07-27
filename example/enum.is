@@ -1,0 +1,34 @@
+enum Class {
+    English,
+    History,
+    Science,
+    Math,
+}
+
+enum Club [ noprefix ] {
+    Compilers,
+    Chinese,
+    French,
+    Band,
+}
+
+struct Student {
+    name: []char;
+    favorite_class: Class;
+    club: Club;
+}
+
+func main :: (int) {
+    let person: Student;
+    person.name = "Kourtet";
+    person.favorite_class = Class::Math;
+    person.club = Compilers;
+
+    if (person.favorite_class == Class::History) {
+        print(person.name);
+        println(" is a nerd.");
+        return 1;
+    }
+
+    return 0;
+}

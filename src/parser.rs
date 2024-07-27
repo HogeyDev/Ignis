@@ -98,6 +98,11 @@ pub enum AST {
         name: String,
         members: Vec<(String, String)>, // [NAME, TYPE]
     },
+    Enum {
+        name: String,
+        values: Vec<String>, // [NAME]
+        attributes: Vec<String>, // [NAME]
+    },
     StructInitializer {
         spreads: bool,
         name: String,
@@ -205,8 +210,7 @@ impl Parser {
                 let name = self.current_token.value.clone();
                 self.eat(TokenType::Identifier);
 
-                self.eat(TokenType::Colon);
-                self.eat(TokenType::Colon);
+                self.eat(TokenType::BlockSeparator);
 
                 self.eat(TokenType::LeftParenthesis);
                 let mut return_type = String::new();
@@ -362,6 +366,38 @@ impl Parser {
                 self.eat(TokenType::RightBrace);
 
                 stmt = Some(Box::new(AST::Struct { name, members }));
+            } else if self.current_token.token_type == TokenType::Enum {
+                self.eat(TokenType::Enum);
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+
+                let mut attributes = Vec::new();
+                if self.current_token.token_type == TokenType::LeftBracket {
+                    // these cool new things called attributes
+                    self.eat(TokenType::LeftBracket);
+                    while self.current_token.token_type != TokenType::RightBracket {
+                        let name = self.current_token.value.clone();
+                        attributes.push(name);
+                        self.eat(TokenType::Identifier);
+                        if self.current_token.token_type == TokenType::Comma {
+                            self.eat(TokenType::Comma);
+                        } else { break; }
+                    }
+                    self.eat(TokenType::RightBracket);
+                }
+
+                self.eat(TokenType::LeftBrace);
+                let mut values = Vec::new();
+                while self.current_token.token_type != TokenType::RightBrace {
+                    values.push(self.current_token.value.clone());
+                    self.eat(TokenType::Identifier);
+                    if self.current_token.token_type == TokenType::Comma {
+                        self.eat(TokenType::Comma);
+                    } else { break; }
+                }
+                self.eat(TokenType::RightBrace);
+
+                stmt = Some(Box::new(AST::Enum { name, values, attributes, }));
             } else if self.current_token.token_type == TokenType::Identifier {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
                     // function call
@@ -623,7 +659,7 @@ impl Parser {
         self.accessor()
     }
     fn accessor(&mut self) -> Result<Box<AST>, String> {
-        // should be used for '->', '[]', '.' type operators
+        // should be used for '->', '[]', '.', '::' style operators
         let mut lhs = self.primary()?;
 
         if self.current_token.token_type == TokenType::Period {
@@ -633,6 +669,15 @@ impl Parser {
                 member: self.current_token.value.clone(),
             });
             self.eat(TokenType::Identifier);
+        } else if self.current_token.token_type == TokenType::BlockSeparator {
+            self.eat(TokenType::BlockSeparator);
+            let parent = match *lhs {
+                AST::VariableCall { name } => name,
+                _ => unreachable!(),
+            };
+            let child = self.current_token.value.clone();
+            self.eat(TokenType::Identifier);
+            lhs = Box::new(AST::VariableCall { name: format!("{parent}::{child}") });
         } else {
             while self.current_token.token_type == TokenType::LeftBracket
                 || self.current_token.token_type == TokenType::Period

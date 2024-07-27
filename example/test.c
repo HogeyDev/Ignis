@@ -81,6 +81,7 @@ int main() {
     addTest(&tests, "fibonacci", "", 13);
     addTest(&tests, "person", "", 17);
     addTest(&tests, "return", "", 19);
+    addTest(&tests, "enum", "", 0);
 
     runTests(&tests);
     

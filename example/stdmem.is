@@ -1,0 +1,7 @@
+func malloc :: (@void, bytes: usize) {
+    // TODO: ummmm
+}
+
+func free :: (void, ptr: @void) {
+    // TODO: so, about that
+}

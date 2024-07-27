@@ -1,21 +1,22 @@
+use io::{read_file, write_file, SourceFile};
 use std::process::{self, Command};
 use codegen::compile_to_asm;
-use cli::CliParser;
+use scope::ScopeContext;
 use compile::parse_file;
 use config::get_config;
-use io::{read_file, write_file, SourceFile};
-use scope::ScopeContext;
+use cli::CliParser;
 
+pub mod preprocessor;
 pub mod codegen;
 pub mod compile;
 pub mod config;
-pub mod io;
-pub mod lexer;
 pub mod parser;
+pub mod lexer;
 pub mod scope;
 pub mod types;
 pub mod util;
 pub mod cli;
+pub mod io;
 
 fn main() {
     let cli_parser = CliParser::from(std::env::args().collect());

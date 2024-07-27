@@ -1,4 +1,9 @@
-[ ] Enums
+[ ] Definitions
+    [ ] Maybe this will extend into some form of macro system?
+     - Ex: `def PI 3.141592653f
+            let x: float = 3 * PI;`
+
+[-] Enums
 
 [ ] Readme file explaining how to at least compile a program
 
@@ -21,7 +26,7 @@
                           - `let x: float = 4.0;
                              let b: int = <!int> x`
                           - Only changes type, not binary.
-                          - converts float 4.0 to int 1082130432 (yes actually).
+                          - converts floating point 4.0f to integer 1082130432 (yes actually).
                           - binary stays the same, so the value represented will change.
              - Ex:
 
@@ -34,13 +39,14 @@
                              }`
 
 [ ] Namespaces
+             - Separator: '#'
              - Ex:
                           - `namespace cool_spot {
-                                          fn add: int = (a: int, b: int) {
+                                          func add :: (int, a: int, b: int) {
                                                        return a + b;
                                           }
                              }
-                             let x: int = cool_spot::add(3, 4); // x = 7`
+                             let x: int = cool_spot#add(3, 4); // x = 7`
 
 [X] Variables should use rbp, not rsp
              - Ex:

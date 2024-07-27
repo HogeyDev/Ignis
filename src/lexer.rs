@@ -11,6 +11,7 @@ pub enum TokenType {
     Asm,
     For,
     Else,
+    Enum,
     While,
     Return,
     Import,
@@ -27,9 +28,9 @@ pub enum TokenType {
     Colon,
     SemiColon,
     Comma,
+    BlockSeparator,
 
     Equals,
-
     NotEqualsTo,
     EqualsTo,
     LessThan,
@@ -134,6 +135,7 @@ impl Tokenizer {
             "asm" => TokenType::Asm,
             "for" => TokenType::For,
             "else" => TokenType::Else,
+            "enum" => TokenType::Enum,
             "while" => TokenType::While,
             "return" => TokenType::Return,
             "import" => TokenType::Import,
@@ -209,11 +211,15 @@ impl Tokenizer {
         token
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
-        let token: Token = if token_type == TokenType::Increment
-            || token_type == TokenType::Decrement
-            || token_type == TokenType::EqualsTo
-            || token_type == TokenType::LessThanEqualsTo
-            || token_type == TokenType::MoreThanEqualsTo
+        let token: Token = if
+            [
+                TokenType::Increment,
+                TokenType::Decrement,
+                TokenType::EqualsTo,
+                TokenType::LessThanEqualsTo,
+                TokenType::MoreThanEqualsTo,
+                TokenType::BlockSeparator,
+            ].contains(&token_type)
         {
             let mut name = String::from(self.current_character);
             self.next();
@@ -261,7 +267,13 @@ impl Tokenizer {
             '[' => TokenType::LeftBracket,
             ']' => TokenType::RightBracket,
             '.' => TokenType::Period,
-            ':' => TokenType::Colon,
+            ':' => {
+                if self.peek(1) == ':' {
+                    TokenType::BlockSeparator
+                } else {
+                    TokenType::Colon
+                }
+            }
             ';' => TokenType::SemiColon,
             ',' => TokenType::Comma,
             '=' => {

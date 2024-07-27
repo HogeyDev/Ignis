@@ -2,7 +2,7 @@ use crate::{
     config::Configuration,
     io::SourceFile,
     lexer::{Token, TokenType, Tokenizer},
-    parser::{Parser, AST},
+    parser::{Parser, AST}, preprocessor::PreProcessor,
 };
 
 pub fn parse_file(program_config: &Configuration, file: SourceFile) -> Box<AST> {
@@ -31,7 +31,9 @@ pub fn parse_file(program_config: &Configuration, file: SourceFile) -> Box<AST> 
     let mut parser = Parser::new(token_list);
     let parsed = parser.parse();
     if program_config.debug_ast {
-        println!("{:#?}", parsed);
+        println!("{:#?}", &parsed);
     }
-    parsed
+    let mut preprocessor = PreProcessor::new(parsed);
+    let preprocessed = preprocessor.preprocess();
+    preprocessed
 }

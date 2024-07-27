@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, process};
 
 #[derive(Debug)]
 pub struct CliParser {
@@ -24,8 +24,12 @@ impl CliParser {
                 } else {
                     // this is an option and will have a value specified after
                     let option = arg[1..].to_string();
-                    let value = iter.next().unwrap().to_string();
-                    options.insert(option, value);
+                    if let Some(value) = iter.next() {
+                        options.insert(option, value.to_string());
+                    } else {
+                        eprintln!("Expected argument after `{option}`");
+                        process::exit(1);
+                    }
                 }
             } else {
                 // this is an input file, which is the only argument
