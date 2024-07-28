@@ -131,7 +131,6 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            let res = -scope.get_variable_offset(name.clone());
             Ok(-scope.get_variable_offset(name) as i64)
         }
         AST::MemberAccess { accessed, member } => {

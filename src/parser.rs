@@ -112,6 +112,10 @@ pub enum AST {
         accessed: Box<AST>,
         member: String,
     },
+    Definition {
+
+    },
+    TypeDef {},
 }
 
 pub struct Parser {

@@ -33,7 +33,7 @@ pub fn parse_file(program_config: &Configuration, file: SourceFile) -> Box<AST> 
     if program_config.debug_ast {
         println!("{:#?}", &parsed);
     }
-    let mut preprocessor = PreProcessor::new(parsed);
-    let preprocessed = preprocessor.preprocess();
+    let mut preprocessor = PreProcessor::new();
+    let preprocessed = preprocessor.preprocess(parsed).0;
     preprocessed
 }
