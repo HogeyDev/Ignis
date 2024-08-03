@@ -125,11 +125,16 @@ impl PreProcessor {
                         (format!("{prefix}{value}"), Box::new(AST::Integer(i as i64)))
                     );
                 }
-                (Box::new(AST::TypeDef { name, type_string: "int".to_string() }), true)
+                (Box::new(AST::TypeDefinition { name, type_string: "int".to_string() }), true)
             }
             // AST::StructInitializer { spreads, name, members } => {}
             AST::MemberAccess { .. } => (ast, false),
-            AST::TypeDef { .. } => (ast, false),
+            AST::TypeDefinition { .. } => (ast, false),
+            AST::Definition { name, value } => {
+                let reproc = self.preprocess(value);
+                self.definitions.push((name, reproc.0));
+                (Box::new(AST::Null), true)
+            }
             _ => todo!("{:#?}", ast),
         };
         if result.1 {

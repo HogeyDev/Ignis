@@ -35,7 +35,8 @@ void addTest(Tests *tests, const char *binary_path, const char *output, int retu
     }
     Test test = { 0 };
     test.output = output;
-    test.binary_path = binary_path;
+    test.binary_path = (char *)malloc((strlen(binary_path) + strlen(".bin")) * sizeof(char));
+    sprintf((char *)test.binary_path, "%s.bin", binary_path);
     char *source_path = (char *)malloc((strlen(binary_path) + strlen(FILE_ENDING)) * sizeof(char));
     strcpy(source_path, binary_path);
     strcat(source_path, FILE_ENDING);
@@ -52,7 +53,8 @@ void runTests(Tests *tests) {
 
         {
             char *compile_command = (char *)malloc((strlen("RUST_BACKTRACE=1 ") + strlen(IGNIS_PATH) + strlen(" -o ") + strlen(test.binary_path) + strlen(" ") + strlen(test.source_path) + strlen(" --debug-asm") + strlen(" --debug-ast")) * sizeof(char));
-            sprintf(compile_command, "RUST_BACKTRACE=1 %s -o %s %s --debug-asm --debug-asr", IGNIS_PATH, test.binary_path, test.source_path);
+            // sprintf(compile_command, "RUST_BACKTRACE=1 %s -o %s %s --debug-asm --debug-ast", IGNIS_PATH, test.binary_path, test.source_path);
+            sprintf(compile_command, "%s -o %s %s", IGNIS_PATH, test.binary_path, test.source_path);
             printf("COMPILING: %s\n", compile_command);
             unsigned int code = WEXITSTATUS(system(compile_command));
             if (code != 0) {
@@ -71,6 +73,17 @@ void runTests(Tests *tests) {
                 exit(1);
             }
         }
+
+        {
+            char *clean_command = (char *)malloc((strlen("rm ") + strlen(test.binary_path)) * sizeof(char));
+            sprintf(clean_command, "rm %s", test.binary_path);
+            printf("CLEANING: %s\n", clean_command);
+            unsigned int code = WEXITSTATUS(system(clean_command));
+            if (code != 0) {
+                printf("Test `%s` failed to clean\n", test.binary_path);
+                exit(1);
+            }
+        }
     }
     printf("\nAll tests passed successfully!\n");
 }
@@ -82,6 +95,7 @@ int main() {
     addTest(&tests, "person", "", 17);
     addTest(&tests, "return", "", 19);
     addTest(&tests, "enum", "", 0);
+    addTest(&tests, "preprocessing", "", 123);
 
     runTests(&tests);
     

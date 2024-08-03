@@ -380,13 +380,16 @@ impl TypeParser {
                     // 1. get the full type string
                     // 2. parse the type string
                     // 3. return the type
-                    let type_string = scope
+                    let type_string = match scope
                         .defined_types
                         .iter()
-                        .find(|x| x.0 == id)
-                        .unwrap()
-                        .1
-                        .clone();
+                        .find(|x| x.0 == id) {
+                            Some(value) => value.1.clone(),
+                            None => {
+                                eprintln!("Cannot resolve type: `{id}`");
+                                process::exit(1);
+                            },
+                        };
                     let collapsed = string_to_collapsed_type_tree(type_string, scope)?;
                     // could be a to be a struct
                     let new_full_type = match *collapsed {

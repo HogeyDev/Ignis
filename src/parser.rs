@@ -114,9 +114,10 @@ pub enum AST {
         member: String,
     },
     Definition {
-        // WARNING: 
+        name: String,
+        value: Box<AST>,
     },
-    TypeDef {
+    TypeDefinition {
         name: String,
         type_string: String,
     },
@@ -406,6 +407,32 @@ impl Parser {
                 self.eat(TokenType::RightBrace);
 
                 stmt = Some(Box::new(AST::Enum { name, values, attributes, }));
+            } else if self.current_token.token_type == TokenType::Def {
+                // definition
+                self.eat(TokenType::Def);
+
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+
+                let value = self.expression().unwrap();
+                self.eat(TokenType::SemiColon);
+
+                stmt = Some(Box::new(AST::Definition { name, value }));
+            } else if self.current_token.token_type == TokenType::TypeDef {
+                // type definition
+                self.eat(TokenType::TypeDef);
+
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+
+                let mut type_string = String::new();
+                while self.current_token.token_type != TokenType::SemiColon {
+                    type_string.push_str(self.current_token.value.as_str());
+                    self.advance();
+                }
+                self.eat(TokenType::SemiColon);
+
+                stmt = Some(Box::new(AST::TypeDefinition { name, type_string }))
             } else if self.current_token.token_type == TokenType::Identifier {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
                     // function call

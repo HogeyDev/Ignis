@@ -1,0 +1,46 @@
+import stdio;
+import stdlib;
+
+typedef i64 int;
+typedef str []char;
+
+enum Level [ noprefix ] {
+    Junior,
+    Middle,
+    Senior,
+}
+
+func level_to_string :: (str, level: Level) {
+    if (level == Junior) return "junior";
+    else if (level == Middle) return "middle";
+    else if (level == Senior) return "senior";
+    
+    print("Cannot stringify level `");
+    printnum(level);
+    println("`");
+    exit(1);
+}
+
+def Name "Kourtet";
+def Level Middle;
+
+struct Person {
+    name: str;
+    level: Level;
+}
+
+func main :: (i64) {
+    let kourtet: Person;
+
+    kourtet.name = Name;
+    kourtet.level = Level;
+
+    let experience_string: str = level_to_string(kourtet.level);
+    print("Hi, I'm ");
+    print(kourtet.name);
+    print(" and I have ");
+    print(experience_string);
+    println(" experience");
+    
+    return 123;
+}

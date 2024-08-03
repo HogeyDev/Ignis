@@ -617,7 +617,7 @@ pub fn compile_to_asm(
 
             asm
         }
-        AST::TypeDef { name, type_string } => {
+        AST::TypeDefinition { name, type_string } => {
             scope.defined_types.push((name, type_string));
 
             String::new()

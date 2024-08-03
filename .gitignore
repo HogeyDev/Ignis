@@ -2,6 +2,5 @@
 
 /gf
 /.vscode
-/example
-!example/*.is
-!example/test.c
+/example/*.bin
+/example/*.asm

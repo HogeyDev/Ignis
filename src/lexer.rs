@@ -17,6 +17,9 @@ pub enum TokenType {
     Import,
     Struct,
 
+    Def,
+    TypeDef,
+
     LeftParenthesis,
     RightParenthesis,
     LeftBrace,
@@ -140,6 +143,10 @@ impl Tokenizer {
             "return" => TokenType::Return,
             "import" => TokenType::Import,
             "struct" => TokenType::Struct,
+
+            "def" => TokenType::Def,
+            "typedef" => TokenType::TypeDef,
+
             _ => TokenType::Identifier,
         };
         token
