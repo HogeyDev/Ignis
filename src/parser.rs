@@ -35,6 +35,7 @@ pub enum Operation {
 
 #[derive(Debug, Clone)]
 pub enum AST {
+    Null,
     Integer(i64),
     String(String),
     Character(char),
@@ -113,9 +114,12 @@ pub enum AST {
         member: String,
     },
     Definition {
-
+        // WARNING: 
     },
-    TypeDef {},
+    TypeDef {
+        name: String,
+        type_string: String,
+    },
 }
 
 pub struct Parser {

@@ -17,7 +17,8 @@ impl PreProcessor {
             1. keep iterating over the ast until no changes have been made
             2. return final ast
         */
-        match *ast.clone() {
+        let result = match *ast.clone() {
+            AST::Null => (Box::new(AST::Null), false),
             AST::Integer(value) => (Box::new(AST::Integer(value)), false),
             AST::String(value) => (Box::new(AST::String(value)), false),
             AST::Character(value) => (Box::new(AST::Character(value)), false),
@@ -72,10 +73,9 @@ impl PreProcessor {
                 }), value.1)
             }
             AST::VariableCall { name } => {
-                eprintln!("Looking for definition: name");
+                // eprintln!("Looking for definition: {name}");
                 if let Some(def) = self.definitions.iter().find(|x| x.0 == name) {
-                    eprintln!("{:#?}", def);
-                    (Box::new(AST::Integer(42)), true)
+                    (def.1.clone(), true)
                 } else {
                     (Box::new(AST::VariableCall { name }), false)
                 }
@@ -118,11 +118,24 @@ impl PreProcessor {
             AST::Import { module } => (Box::new(AST::Import { module }), false),
             AST::Struct { name, members } => (Box::new(AST::Struct { name, members }), false),
             AST::Enum { name, values, attributes } => {
-                let statements = 
+                // TODO: Attributes
+                let prefix = if attributes.iter().any(|x| x == "noprefix") { "".to_string() } else { format!("{name}::") };
+                for (i, value) in values.iter().enumerate() {
+                    self.definitions.push(
+                        (format!("{prefix}{value}"), Box::new(AST::Integer(i as i64)))
+                    );
+                }
+                (Box::new(AST::TypeDef { name, type_string: "int".to_string() }), true)
             }
-            AST::StructInitializer { spreads, name, members } => {}
-            AST::MemberAccess { accessed, member } => {}
-            _ => todo!(),
+            // AST::StructInitializer { spreads, name, members } => {}
+            AST::MemberAccess { .. } => (ast, false),
+            AST::TypeDef { .. } => (ast, false),
+            _ => todo!("{:#?}", ast),
+        };
+        if result.1 {
+            self.preprocess(result.0)
+        } else {
+            result
         }
     }
 }

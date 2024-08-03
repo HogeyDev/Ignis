@@ -12,6 +12,7 @@ pub fn compile_to_asm(
     scope: &mut ScopeContext,
 ) -> String {
     match *root.clone() {
+        AST::Null => String::new(),
         AST::Block(statements) => {
             let mut asm = String::new();
 
@@ -615,6 +616,11 @@ pub fn compile_to_asm(
             asm.push_str(scope.push("rax".to_string(), member_type_size).as_str());
 
             asm
+        }
+        AST::TypeDef { name, type_string } => {
+            scope.defined_types.push((name, type_string));
+
+            String::new()
         }
         _ => {
             eprintln!(

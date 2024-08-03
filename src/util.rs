@@ -3,7 +3,7 @@ use std::{backtrace::Backtrace, process};
 use crate::{
     parser::{Operation, AST},
     scope::ScopeContext,
-    types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type},
+    types::{calculate_ast_type, get_type_size, Type},
 };
 
 pub fn asm_size_prefix(width: i64) -> String {

@@ -1,4 +1,6 @@
-enum Class {
+import stdio;
+
+enum Subject {
     English,
     History,
     Science,
@@ -14,17 +16,17 @@ enum Club [ noprefix ] {
 
 struct Student {
     name: []char;
-    favorite_class: Class;
+    favorite_class: Subject;
     club: Club;
 }
 
 func main :: (int) {
     let person: Student;
     person.name = "Kourtet";
-    person.favorite_class = Class::Math;
+    person.favorite_class = Subject::Math;
     person.club = Compilers;
 
-    if (person.favorite_class == Class::History) {
+    if (person.favorite_class == Subject::History) {
         print(person.name);
         println(" is a nerd.");
         return 1;

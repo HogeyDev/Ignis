@@ -387,13 +387,13 @@ impl TypeParser {
                         .unwrap()
                         .1
                         .clone();
-                    // print!("Type: `{}` -> ", type_string);
                     let collapsed = string_to_collapsed_type_tree(type_string, scope)?;
-                    let full_struct = match *collapsed {
+                    // could be a to be a struct
+                    let new_full_type = match *collapsed {
                         Type::Struct(_, members) => Type::Struct(id, members),
-                        _ => unreachable!(),
+                        _ => *collapsed,
                     };
-                    Ok(Box::new(full_struct))
+                    Ok(Box::new(new_full_type))
                     // Ok(Box::new(Type::Struct(id, collapsed)))
 
                     // eprintln!(
