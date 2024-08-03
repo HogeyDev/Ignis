@@ -29,12 +29,12 @@
  - To add a file to debug:
     1. It must be located in the `example` directory
     2. In the main function, append 
-       > *Note that the third argument is left as an empty string*
+       > *Note that the third argument should be left as an empty string*
     ```c
     addTest(&tests, "[TEST_NAME]", "", [EXPECTED_RETURN_VALUE]);
     ```
      - Ex:
-        - We want to test: `example/my_cool_new_test.is`, which returns `42`
+        - We want to test: `example/my_cool_new_test.is`, which exits with the code `42`
         ```c
         addTest(&tests, "my_cool_new_test", "", 42);
         ```
