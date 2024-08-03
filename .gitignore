@@ -1,3 +1,7 @@
 /target
-gf/
-.vscode/
+
+/gf
+/.vscode
+/example
+!example/*.is
+!example/test.c
