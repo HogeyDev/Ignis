@@ -1,0 +1,9 @@
+import stdio;
+
+macro call(fp, arg) fp(arg);
+
+func main :: (int) {
+    call(println, "Hello, World!");
+
+    return 42;
+}

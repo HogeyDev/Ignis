@@ -191,3 +191,27 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
     scope.structs.iter().find(|x| x.0 == type_name).is_some()
 }
+
+pub fn parse_expansion_string(exp: String) -> Vec<(bool, String)> {
+    let mut res = Vec::new();
+
+    let mut i = 0;
+    let mut buf = String::new();
+    while let Some(c) = exp.chars().nth(i) {
+        if c == '\\' {
+            if buf.len() > 0 { res.push((true, buf.clone())); }
+            buf.clear();
+            let mut num_buf = String::new();
+            while c.is_ascii_digit() {
+                num_buf.push(c);
+                i += 1;
+            }
+            res.push((false, num_buf));
+        } else {
+            buf.push(c);
+            i += 1;
+        }
+    }
+
+    return res;
+}

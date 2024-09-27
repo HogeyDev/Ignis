@@ -1,6 +1,6 @@
 use std::{process, usize};
 
-use crate::lexer::{Token, TokenType};
+use crate::{io::SourceFile, lexer::{Token, TokenType, Tokenizer}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
@@ -117,10 +117,82 @@ pub enum AST {
         name: String,
         value: Box<AST>,
     },
+    Macro { // this is very similar to a function call lmao
+        name: String,
+        parameters: Vec<String>,
+        expansion: Vec<(bool, String)>,
+    },
     TypeDefinition {
         name: String,
         type_string: String,
     },
+}
+
+impl AST {
+    pub fn to_string(&self) -> String {
+        match self {
+            AST::Null => "".to_string(),
+            AST::Integer(x) => x.to_string(),
+            AST::String(v) => format!("\"{v}\""),
+            AST::Character(c) => format!("\'{c}\'"),
+            AST::UnaryExpression { op, child } => match op {
+                Operation::Inv => format!("!{}", child.to_string()),
+                Operation::Neg => format!("-{}", child.to_string()),
+                Operation::Inc => format!("++{}", child.to_string()),
+                Operation::Dec => format!("--{}", child.to_string()),
+                Operation::Ref => format!("&{}", child.to_string()),
+                Operation::Deref => format!("@{}", child.to_string()),
+                _ => {
+                    eprintln!("{:?} is not a unary operation and therefore the full expression cannot be converted to a string", op);
+                    process::exit(1);
+                }
+            }
+            AST::BinaryExpression { op, lhs, rhs } => match op {
+                Operation::Add => format!("{} + {}", lhs.to_string(), rhs.to_string()),
+                Operation::Sub => format!("{} - {}", lhs.to_string(), rhs.to_string()),
+                Operation::Mul => format!("{} * {}", lhs.to_string(), rhs.to_string()),
+                Operation::Div => format!("{} / {}", lhs.to_string(), rhs.to_string()),
+                Operation::Mod => format!("{} % {}", lhs.to_string(), rhs.to_string()),
+                Operation::Or => format!("{} || {}", lhs.to_string(), rhs.to_string()),
+                Operation::And => format!("{} && {}", lhs.to_string(), rhs.to_string()),
+                Operation::Eq => format!("{} == {}", lhs.to_string(), rhs.to_string()),
+                Operation::Neq => format!("{} != {}", lhs.to_string(), rhs.to_string()),
+                Operation::LT => format!("{} < {}", lhs.to_string(), rhs.to_string()),
+                Operation::GT => format!("{} > {}", lhs.to_string(), rhs.to_string()),
+                Operation::GTE => format!("{} >= {}", lhs.to_string(), rhs.to_string()),
+                Operation::LTE => format!("{} <= {}", lhs.to_string(), rhs.to_string()),
+                _ => {
+                    eprintln!("{:?} is not a binary operation and therefore the full expression cannot be converted to a string", op);
+                    process::exit(1);
+                }
+            }
+            AST::Argument(v) => v.to_string(),
+            AST::Parameter { param_type, name } => format!("{name}: {param_type}"),
+            // AST::FunctionDeclaration { name, return_type, prototype, body } => {
+            //     let p_str = String::from("THIS A FUNCTION P_STR");
+            //     
+            //     format!("func {name} :: ({p_str}) {}", body.to_string())
+            // }
+            AST::FunctionCall { name, arguments } => {
+                let mut a_str = String::new();
+                if arguments.len() > 0 {
+                    a_str.push_str(arguments.first().unwrap().to_string().as_str());
+                }
+                for arg in arguments.iter().skip(1) {
+                    a_str.push_str(", ");
+                    a_str.push_str(arg.to_string().as_str());
+                }
+                format!("{name}({a_str})")
+            }
+            AST::Block(statements) => {
+                let mut b_str = String::from("{\n");
+                statements.iter().for_each(|x| b_str.push_str(format!("\t{};\n", x.to_string()).as_str()));
+                format!("{b_str}}}")
+            }
+            AST::VariableCall { name } => name.to_string(),
+            _ => todo!("{:#?}", self),
+        }
+    }
 }
 
 pub struct Parser {
@@ -179,9 +251,9 @@ impl Parser {
         }
         while i < self.token_list.len() && i <= self.index + radius {
             if i == self.index {
-                eprintln!(" > {:?}", self.token_list[i]);
+                eprintln!(" -> {:?}", self.token_list[i]);
             } else {
-                eprintln!("   {:?}", self.token_list[i]);
+                eprintln!("    {:?}", self.token_list[i]);
             }
             i += 1;
         }
@@ -191,17 +263,19 @@ impl Parser {
         self.scope()
     }
     fn scope(&mut self) -> Box<AST> {
-        let mut scope = Box::new(AST::Block(Vec::new()));
+        let mut scope = Box::new(AST::Null);
 
         let brace_delim: bool = self.current_token.token_type == TokenType::LeftBrace;
         if brace_delim {
             self.eat(TokenType::LeftBrace);
+            scope = Box::new(AST::Block(Vec::new()));
         }
         while self.current_token.token_type != TokenType::EndOfFile
             && self.current_token.token_type != TokenType::RightBrace
         {
             // println!("whiling");
             let mut stmt: Option<Box<AST>> = None;
+            if self.current_token.token_type == TokenType::SemiColon { continue; }
             if self.current_token.token_type == TokenType::Import {
                 self.eat(TokenType::Import);
 
@@ -433,6 +507,40 @@ impl Parser {
                 self.eat(TokenType::SemiColon);
 
                 stmt = Some(Box::new(AST::TypeDefinition { name, type_string }))
+            } else if self.current_token.token_type == TokenType::Macro {
+                // macro
+                self.eat(TokenType::Macro);
+
+                let name = self.current_token.value.clone();
+                self.eat(TokenType::Identifier);
+
+                self.eat(TokenType::LeftParenthesis);
+                let mut parameters = Vec::new();
+                while self.current_token.token_type != TokenType::RightParenthesis {
+                    parameters.push(self.current_token.value.clone());
+                    self.advance();
+                    if self.current_token.token_type == TokenType::Comma { self.eat(TokenType::Comma); } else { break; }
+                }
+                self.eat(TokenType::RightParenthesis);
+
+                eprintln!("BABA: {}", self.scope().to_string());
+
+                let tokens = Tokenizer::new(SourceFile { path: "".to_string(), contents: "".to_string() }).tokenize();
+                let mut expansion = Vec::new(); // (IS_TEMPLATE, VALUE)
+                let mut string_buffer = String::new();
+                for token in tokens {
+                    if token.token_type == TokenType::Identifier && parameters.contains(&token.value) {
+                        if string_buffer.len() > 0 { expansion.push((false, string_buffer.clone())); }
+                        string_buffer.clear();
+
+                        expansion.push((true, token.value));
+                    } else {
+                        string_buffer.push_str(token.value.as_str());
+                    }
+                }
+                if string_buffer.len() > 0 { expansion.push((false, string_buffer)); }
+
+                stmt = Some(Box::new(AST::Macro { name, parameters, expansion }));
             } else if self.current_token.token_type == TokenType::Identifier {
                 if self.peek(1).token_type == TokenType::LeftParenthesis {
                     // function call
@@ -471,6 +579,9 @@ impl Parser {
                 match *scope {
                     AST::Block(ref mut statements) => {
                         statements.push(s);
+                    }
+                    AST::Null => {
+                        scope = s;
                     }
                     _ => unreachable!(),
                 }

@@ -1,8 +1,11 @@
-use crate::parser::AST;
+use std::process;
+
+use crate::{io::SourceFile, lexer::Tokenizer, parser::{Parser, AST}};
 
 pub struct PreProcessor {
     pub typedef: Vec<()>, // [TYPE, VALUE]
     pub definitions: Vec<(String, Box<AST>)>, // [NAME, VALUE]
+    pub macros: Vec<(String, AST)>, // [NAME, MACRO]
 }
 
 impl PreProcessor {
@@ -10,6 +13,7 @@ impl PreProcessor {
         PreProcessor {
             typedef: Vec::new(),
             definitions: Vec::new(),
+            macros: Vec::new(),
         }
     }
     pub fn preprocess(&mut self, ast: Box<AST>) -> (Box<AST>, bool) { // [AST, MODIFIED?]
@@ -56,13 +60,35 @@ impl PreProcessor {
                 }), prototype_mod || body.1)
             }
             AST::FunctionCall { name, arguments } => {
-                let arguments: Vec<(Box<AST>, bool)> = arguments.iter().map(|x| self.preprocess(x.clone())).collect();
-                let arguments_values = arguments.iter().map(|x| x.0.clone()).collect();
-                let arguments_mod = arguments.iter().any(|x| x.1);
-                (Box::new(AST::FunctionCall {
-                    name,
-                    arguments: arguments_values,
-                }), arguments_mod)
+                if self.macros.iter().any(|x| x.0 == name) {
+                    // this is actually a macro lmao
+                    let mut arguments = arguments.iter().map(|x| self.preprocess(x.clone()).0.to_string()).collect::<Vec<String>>();
+                    let macro_value = self.macros.iter().find(|x| x.0 == name).unwrap().1.clone();
+                    let mut expansion = match macro_value {
+                        AST::Macro { expansion, .. } => expansion,
+                        _ => unreachable!(),
+                    };
+                    for exp in &mut expansion {
+                        if exp.0 {
+                            exp.1 = arguments[0].clone();
+                            arguments.remove(0);
+                        }
+                    }
+                    let new_plaintext = expansion.iter().map(|x| x.1.clone()).collect::<Vec<String>>().join("");
+                    let tokens = Tokenizer::new(SourceFile { contents: new_plaintext, path: "".to_string() }).tokenize();
+                    let ast = Parser::new(tokens).parse();
+                    eprintln!("{:#?}", ast);
+                    process::exit(1);
+                } else {
+                    // normal function call
+                    let arguments: Vec<(Box<AST>, bool)> = arguments.iter().map(|x| self.preprocess(x.clone())).collect();
+                    let arguments_values = arguments.iter().map(|x| x.0.clone()).collect();
+                    let arguments_mod = arguments.iter().any(|x| x.1);
+                    (Box::new(AST::FunctionCall {
+                        name,
+                        arguments: arguments_values,
+                    }), arguments_mod)
+                }
             }
             AST::VariableDeclaration { variable_type, name } => (Box::new(AST::VariableDeclaration { variable_type, name }), false),
             AST::VariableAssignment { name, value } => {
@@ -134,6 +160,10 @@ impl PreProcessor {
                 let reproc = self.preprocess(value);
                 self.definitions.push((name, reproc.0));
                 (Box::new(AST::Null), true)
+            }
+            AST::Macro { name, parameters, expansion } => {
+                self.macros.push((name.clone(), AST::Macro { name, parameters, expansion }));
+                (Box::new(AST::Null), false)
             }
             _ => todo!("{:#?}", ast),
         };

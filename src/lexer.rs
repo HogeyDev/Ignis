@@ -4,17 +4,20 @@ use crate::io::SourceFile;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
+    Null,
+
     Identifier,
     Function,
     If,
-    Let,
     Asm,
     For,
+    Let,
     Else,
     Enum,
+    Macro,
     While,
-    Return,
     Import,
+    Return,
     Struct,
 
     Def,
@@ -76,16 +79,16 @@ pub struct Tokenizer {
 
 impl Tokenizer {
     pub fn new(source_file: SourceFile) -> Tokenizer {
-        let mut t = Tokenizer {
+        let mut token = Tokenizer {
             index: 0,
             source_file: source_file.clone(),
             source: source_file.clone().contents,
             current_character: '\0',
         };
-        if !t.source.is_empty() {
-            t.current_character = source_file.contents.as_bytes()[0] as char;
+        if !token.source.is_empty() {
+            token.current_character = source_file.contents.as_bytes()[0] as char;
         }
-        t
+        token
     }
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
@@ -134,14 +137,15 @@ impl Tokenizer {
         token.token_type = match token.value.as_str() {
             "func" => TokenType::Function,
             "if" => TokenType::If,
-            "let" => TokenType::Let,
             "asm" => TokenType::Asm,
             "for" => TokenType::For,
+            "let" => TokenType::Let,
             "else" => TokenType::Else,
             "enum" => TokenType::Enum,
+            "macro" => TokenType::Macro,
             "while" => TokenType::While,
-            "return" => TokenType::Return,
             "import" => TokenType::Import,
+            "return" => TokenType::Return,
             "struct" => TokenType::Struct,
 
             "def" => TokenType::Def,
@@ -218,15 +222,15 @@ impl Tokenizer {
         token
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
-        let token: Token = if
-            [
-                TokenType::Increment,
-                TokenType::Decrement,
-                TokenType::EqualsTo,
-                TokenType::LessThanEqualsTo,
-                TokenType::MoreThanEqualsTo,
-                TokenType::BlockSeparator,
-            ].contains(&token_type)
+        let token: Token = if [
+            TokenType::Increment,
+            TokenType::Decrement,
+            TokenType::EqualsTo,
+            TokenType::LessThanEqualsTo,
+            TokenType::MoreThanEqualsTo,
+            TokenType::BlockSeparator,
+        ]
+        .contains(&token_type)
         {
             let mut name = String::from(self.current_character);
             self.next();
