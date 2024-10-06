@@ -526,9 +526,8 @@ impl Parser {
                 }
                 self.eat(TokenType::RightParenthesis);
 
-                eprintln!("BABA: {}", self.scope().to_string());
-
-                let tokens = Tokenizer::new(SourceFile { path: "".to_string(), contents: "".to_string() }).tokenize();
+                let plaintext_expansion = self.scope().to_string();
+                let tokens = Tokenizer::new(SourceFile { path: "".to_string(), contents: plaintext_expansion }).tokenize();
                 let mut expansion = Vec::new(); // (IS_TEMPLATE, VALUE)
                 let mut string_buffer = String::new();
                 for token in tokens {

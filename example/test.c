@@ -55,7 +55,7 @@ void runTests(Tests *tests) {
             char *compile_command = (char *)malloc((strlen("RUST_BACKTRACE=1 ") + strlen(IGNIS_PATH) + strlen(" -o ") + strlen(test.binary_path) + strlen(" ") + strlen(test.source_path) + strlen(" --debug-asm") + strlen(" --debug-ast")) * sizeof(char));
             // sprintf(compile_command, "RUST_BACKTRACE=1 %s -o %s %s --debug-asm --debug-ast", IGNIS_PATH, test.binary_path, test.source_path);
             sprintf(compile_command, "%s -o %s %s", IGNIS_PATH, test.binary_path, test.source_path);
-            printf("COMPILING: %s\n", compile_command);
+            // printf("COMPILING: %s\n", compile_command);
             unsigned int code = WEXITSTATUS(system(compile_command));
             if (code != 0) {
                 printf("Test `%s` failed to compile\n", test.binary_path);
@@ -66,7 +66,7 @@ void runTests(Tests *tests) {
         {
             char *run_command = (char *)malloc((strlen("./") + strlen(test.binary_path)) * sizeof(char));
             sprintf(run_command, "./%s", test.binary_path);
-            printf("RUNNING: %s\n", run_command);
+            // printf("RUNNING: %s\n", run_command);
             unsigned int code = WEXITSTATUS(system(run_command));
             if (code != test.return_code) {
                 printf("Test `%s` failed\n\t`%s` expected exit code `%d`, but exited `%d` instead\n", test.binary_path, test.binary_path, test.return_code, code);
@@ -77,7 +77,7 @@ void runTests(Tests *tests) {
         {
             char *clean_command = (char *)malloc((strlen("rm ") + strlen(test.binary_path)) * sizeof(char));
             sprintf(clean_command, "rm %s", test.binary_path);
-            printf("CLEANING: %s\n", clean_command);
+            // printf("CLEANING: %s\n", clean_command);
             unsigned int code = WEXITSTATUS(system(clean_command));
             if (code != 0) {
                 printf("Test `%s` failed to clean\n", test.binary_path);

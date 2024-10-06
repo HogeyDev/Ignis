@@ -8,6 +8,7 @@ func main :: (int) {
     let a: int = math_func(4, 5);
 
     printnum(a);
+    putchar('\n');
 
     return a;
 }

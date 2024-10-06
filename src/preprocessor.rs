@@ -1,5 +1,3 @@
-use std::process;
-
 use crate::{io::SourceFile, lexer::Tokenizer, parser::{Parser, AST}};
 
 pub struct PreProcessor {
@@ -77,8 +75,9 @@ impl PreProcessor {
                     let new_plaintext = expansion.iter().map(|x| x.1.clone()).collect::<Vec<String>>().join("");
                     let tokens = Tokenizer::new(SourceFile { contents: new_plaintext.clone(), path: "".to_string() }).tokenize();
                     let ast = Parser::new(tokens.clone()).parse();
-                    eprintln!("Globulus: `{new_plaintext}`\nFleeb: {tokens:#?}\nVlorp: {ast:#?}");
-                    process::exit(1);
+                    // eprintln!("Globulus: `{new_plaintext}`\nFleeb: {tokens:#?}\nVlorp: {ast:#?}");
+                    // process::exit(1);
+                    (ast, true)
                 } else {
                     // normal function call
                     let arguments: Vec<(Box<AST>, bool)> = arguments.iter().map(|x| self.preprocess(x.clone())).collect();
