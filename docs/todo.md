@@ -58,6 +58,8 @@
                              }
                              let x: int = cool_spot#add(3, 4); // x = 7`
 
+[X] Macros
+
 [X] Variables should use rbp, not rsp
              - Ex:
                           - `sub rsp, 8
