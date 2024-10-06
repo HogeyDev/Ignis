@@ -75,9 +75,9 @@ impl PreProcessor {
                         }
                     }
                     let new_plaintext = expansion.iter().map(|x| x.1.clone()).collect::<Vec<String>>().join("");
-                    let tokens = Tokenizer::new(SourceFile { contents: new_plaintext, path: "".to_string() }).tokenize();
-                    let ast = Parser::new(tokens).parse();
-                    eprintln!("{:#?}", ast);
+                    let tokens = Tokenizer::new(SourceFile { contents: new_plaintext.clone(), path: "".to_string() }).tokenize();
+                    let ast = Parser::new(tokens.clone()).parse();
+                    eprintln!("Globulus: `{new_plaintext}`\nFleeb: {tokens:#?}\nVlorp: {ast:#?}");
                     process::exit(1);
                 } else {
                     // normal function call

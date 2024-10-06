@@ -2,5 +2,6 @@
 
 /gf
 /.vscode
+/.idea
 /example/*.bin
 /example/*.asm

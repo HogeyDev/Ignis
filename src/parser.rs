@@ -206,7 +206,10 @@ impl Parser {
         Parser {
             token_list: token_list.clone(),
             index: 0,
-            current_token: token_list[0].clone(),
+            current_token: token_list.get(0).unwrap_or(&Token {
+                token_type: TokenType::EndOfFile,
+                value: '\0'.to_string(),
+            }).clone(),
         }
     }
     fn advance(&mut self) {
