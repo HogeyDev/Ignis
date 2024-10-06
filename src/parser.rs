@@ -296,8 +296,6 @@ impl Parser {
                 let name = self.current_token.value.clone();
                 self.eat(TokenType::Identifier);
 
-                self.eat(TokenType::BlockSeparator);
-
                 self.eat(TokenType::LeftParenthesis);
                 let mut return_type = String::new();
                 while ![TokenType::Comma, TokenType::RightParenthesis].contains(&self.current_token.token_type) {

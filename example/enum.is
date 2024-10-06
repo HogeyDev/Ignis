@@ -20,7 +20,7 @@ struct Student {
     club: Club;
 }
 
-func main :: (int) {
+func main(int) {
     let person: Student;
     person.name = "Kourtet";
     person.favorite_class = Subject::Math;

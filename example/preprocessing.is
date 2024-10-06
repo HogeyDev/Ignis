@@ -10,7 +10,7 @@ enum Level [ noprefix ] {
     Senior,
 }
 
-func level_to_string :: (str, level: Level) {
+func level_to_string(str, level: Level) {
     if (level == Junior) return "junior";
     else if (level == Middle) return "middle";
     else if (level == Senior) return "senior";
@@ -29,7 +29,7 @@ struct Person {
     level: Level;
 }
 
-func main :: (i64) {
+func main(i64) {
     let kourtet: Person;
 
     kourtet.name = Name;
