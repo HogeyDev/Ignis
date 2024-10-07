@@ -52,9 +52,9 @@ void runTests(Tests *tests) {
         printf("[%d/%d] Testing `%s`\n", i+1, tests->size, test.binary_path);
 
         {
-            char *compile_command = (char *)malloc((strlen("RUST_BACKTRACE=1 ") + strlen(IGNIS_PATH) + strlen(" -o ") + strlen(test.binary_path) + strlen(" ") + strlen(test.source_path) + strlen(" --debug-asm") + strlen(" --debug-ast")) * sizeof(char));
+            char *compile_command = (char *)malloc((strlen("RUST_BACKTRACE=1 ") + strlen(IGNIS_PATH) + strlen(" -o ") + strlen(test.binary_path) + strlen(" ") + strlen(test.source_path) + strlen(" --stdlib .") + strlen(" --debug-asm") + strlen(" --debug-ast")) * sizeof(char));
             // sprintf(compile_command, "RUST_BACKTRACE=1 %s -o %s %s --debug-asm --debug-ast", IGNIS_PATH, test.binary_path, test.source_path);
-            sprintf(compile_command, "%s -o %s %s", IGNIS_PATH, test.binary_path, test.source_path);
+            sprintf(compile_command, "%s -o %s %s -stdlib ../std/", IGNIS_PATH, test.binary_path, test.source_path);
             // printf("COMPILING: %s\n", compile_command);
             unsigned int code = WEXITSTATUS(system(compile_command));
             if (code != 0) {

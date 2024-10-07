@@ -3,6 +3,8 @@
      - Ex: `def PI 3.141592653f
             let x: float = 3 * PI;`
 
+[-] Standard Library
+
 [-] Enums
 
 [X] Readme file explaining how to at least compile a program

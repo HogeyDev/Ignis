@@ -33,6 +33,6 @@ debug:
 
 .PHONY: test
 test:
-	gcc -o example/test example/test.c -g
-	cd example && ./test
-	rm example/test
+	gcc -o example/_test example/test.c -g
+	cd example && ./_test
+	rm example/_test

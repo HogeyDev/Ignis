@@ -1,7 +1,7 @@
-use std::process;
+use std::{path::Path, process::{self, exit}};
 
 use crate::{
-    compile::parse_file, config::Configuration, io::read_file, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
+    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
         asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_type_on_stack, resolve_address, type_is_struct
     }
 };
@@ -27,13 +27,30 @@ pub fn compile_to_asm(
         }
         AST::Import { module } => {
             let path_with_ending = module.replace('.', "/") + ".is";
-            let full_path = program_config.root_path.clone() + "/" + path_with_ending.as_str();
-            let file = read_file(full_path.clone());
+            let mut paths = Vec::new();
+            paths.push(program_config.root_path.clone() + "/" + path_with_ending.as_str());
+            paths.push(program_config.std_path.clone() + "/" + path_with_ending.as_str());
+            let mut file = SourceFile {
+                path: String::new(),
+                contents: String::new(),
+            };
+            let mut path_exists = false;
+            for path in paths {
+                if Path::new(&path).exists() {
+                    file = read_file(path.clone());
 
-            if program_config.imported_files.contains(&full_path) {
-                return "".to_string();
+                    if program_config.imported_files.contains(&path) {
+                        return "".to_string();
+                    }
+                    program_config.imported_files.push(path);
+                    path_exists = true;
+                    break;
+                }
             }
-            program_config.imported_files.push(full_path);
+            if !path_exists {
+                eprintln!("Could not resolve import `{module}`");
+                exit(1);
+            }
 
             compile_to_asm(program_config, parse_file(program_config, file), scope)
         }
