@@ -15,10 +15,6 @@ impl PreProcessor {
         }
     }
     pub fn preprocess(&mut self, ast: Box<AST>) -> (Box<AST>, bool) { // [AST, MODIFIED?]
-        /* TODO: Implement preprocessing (duh)
-            1. keep iterating over the ast until no changes have been made
-            2. return final ast
-        */
         let result = match *ast.clone() {
             AST::Null => (Box::new(AST::Null), false),
             AST::Integer(value) => (Box::new(AST::Integer(value)), false),

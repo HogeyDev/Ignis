@@ -36,6 +36,7 @@ pub fn compile_to_asm(
             };
             let mut path_exists = false;
             for path in paths {
+                // eprintln!("CHECKING: {path}\n\tFROM: {}", program_config.root_path);
                 if Path::new(&path).exists() {
                     file = read_file(path.clone());
 
@@ -51,6 +52,7 @@ pub fn compile_to_asm(
                 eprintln!("Could not resolve import `{module}`");
                 exit(1);
             }
+            // eprintln!("{}\n{}", file.path, file.contents);
 
             compile_to_asm(program_config, parse_file(program_config, file), scope)
         }

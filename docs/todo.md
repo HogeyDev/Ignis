@@ -3,6 +3,13 @@
      - Ex: `def PI 3.141592653f
             let x: float = 3 * PI;`
 
+[ ] Module system
+    - Should solve circular import issue
+    [ ] Get export overview before attempting to compiling anything
+    [ ] Collect all exports into global `file: Map<String, Vec<String>>` variable
+        - String: filename
+        - Vec<String>: all exports in file
+
 [-] Standard Library
 
 [-] Enums

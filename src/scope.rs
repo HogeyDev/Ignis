@@ -88,6 +88,7 @@ impl ScopeContext {
                 value.2.iter().map(|x| x.1.clone()).collect(),
             ),
             None => {
+                eprintln!("AHHH: {:?}", self.functions);
                 eprintln!("[BlockScope] Could not find function named `{}`", name);
                 process::exit(1);
             }
