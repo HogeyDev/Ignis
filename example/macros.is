@@ -5,7 +5,7 @@ macro call(fp, arg) {
 }
 
 func main(int) {
-    call(println, "Hello, World!");
+    call(println, "Macro? Never heard of her...");
 
     return 42;
 }

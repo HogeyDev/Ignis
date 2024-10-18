@@ -1,0 +1,23 @@
+import stdlib; // tests
+import stdio;  // overlapping
+import string; // imports
+
+func test_output(void) { // unfortunately it is impossible to know if this worked other than checking stdout somehow
+    print("PR");
+    print_int(1);
+    print("NT");
+    print_char('-');
+    println("LN");
+    println("| || |+-println");
+    println("| || +--print_char");
+    println("| |+----print");
+    println("| +-----print_int");
+    println("+-------print");
+}
+
+func main(int) {
+    test_output();
+    // test_input(); // Not real... yet.
+
+    return 37;
+}

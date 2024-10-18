@@ -1,7 +1,7 @@
 import stdlib;
 import string;
 
-func putchar(void, c: char) {
+func print_char(void, c: char) {
 	asm "	push QWORD [rbp+16]
 	mov rax, 1
 	mov rdi, 1
@@ -17,7 +17,7 @@ func print(void, str: []char) {
 	let i: int = 0;
 	while (i < string_length) {
 		let c: char = str[i];
-	 	putchar(c);
+	 	print_char(c);
 
 	 	i = i + 1;
 	}
@@ -25,26 +25,26 @@ func print(void, str: []char) {
 
 func println(void, str: []char) {
 	print(str);
-	putchar('\n');
+	print_char('\n');
 }
 
-func printnum(void, num: int) {
+func print_int(void, num: int) {
 	let a: int = num;
 
 	if (a < 0) {
-		putchar(int_to_char(45)); // -
+		print_char(int_to_char(45)); // -
 		a = -a;
 	}
 	if (a > 9) {	
-		printnum(a / 10);
+		print_int(a / 10);
 	}
 
-	putchar(int_to_char(48 + a % 10));
+	print_char(int_to_char(48 + a % 10));
 }
 
-func printintpointer(void, ptr: @int) {
+func print_int_pointer(void, ptr: @int) {
 	let as_int: int = 0;
 	asm "	mov rax, qword [rbp+16]"; // move `ptr` into rax
 	asm "	mov qword [rbp-8], rax"; // move rax into `as_int`
-	printnum(as_int);
+	print_int(as_int);
 }

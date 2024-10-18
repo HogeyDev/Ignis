@@ -97,6 +97,7 @@ int main() {
     addTest(&tests, "enum", "", 0);
     addTest(&tests, "preprocessing", "", 123);
     addTest(&tests, "macros", "", 42);
+    addTest(&tests, "stdtest", "", 37);
 
     runTests(&tests);
     

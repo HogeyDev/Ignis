@@ -7,8 +7,8 @@ func math_func(int, a: int, b: int) {
 func main(int) {
     let a: int = math_func(4, 5);
 
-    printnum(a);
-    putchar('\n');
+    print_int(a);
+    print_char('\n');
 
     return a;
 }

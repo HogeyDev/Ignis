@@ -11,7 +11,7 @@ func print_person(void, person: @Person) {
     print((@person).name);
     // print(person.name);
     print(" and I'm ");
-    printnum((@person).age);
+    print_int((@person).age);
     // printnum(person.age);
     println(" years old.");
 }

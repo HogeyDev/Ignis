@@ -16,7 +16,7 @@ func level_to_string(str, level: Level) {
     else if (level == Senior) return "senior";
     
     print("Cannot stringify level `");
-    printnum(level);
+    print_int(level);
     println("`");
     exit(1);
 }
