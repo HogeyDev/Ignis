@@ -7,6 +7,7 @@ use config::get_config;
 use cli::CliParser;
 
 pub mod preprocessor;
+pub mod modulizer;
 pub mod codegen;
 pub mod compile;
 pub mod config;
