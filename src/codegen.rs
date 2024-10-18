@@ -1,7 +1,7 @@
 use std::{path::Path, process::{self, exit}};
 
 use crate::{
-    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
+    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::{self, Modulizer}, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
         asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_type_on_stack, resolve_address, type_is_struct
     }
 };
@@ -54,7 +54,13 @@ pub fn compile_to_asm(
             }
             // eprintln!("{}\n{}", file.path, file.contents);
 
-            compile_to_asm(program_config, parse_file(program_config, file), scope)
+            let ast = parse_file(program_config, file);
+            let modulizer = Modulizer::new(ast.clone());
+            let functions = modulizer.functions;
+            for function in functions {
+                scope.add_function(function.0, function.1, function.2);
+            }
+            compile_to_asm(program_config, ast, scope)
         }
         AST::FunctionCall { name, arguments } => {
             let mut asm = String::new();
