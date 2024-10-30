@@ -250,9 +250,9 @@ pub fn compile_to_asm(
                         // 2. calculate rhs
                         // 3. move result to address
 
-                        let to_addr = resolve_address(scope, lhs.clone()).unwrap();
+                        asm.push_str(resolve_address(scope, lhs.clone()).unwrap().as_str());
                         // let from_addr = -resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
-                        asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), format!("rbp{:+}", to_addr)).as_str());
+                        asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
 
                         asm
                     }
