@@ -344,7 +344,7 @@ impl TypeParser {
             StrTokType::LeftBracket => {
                 self.advance();
                 let mut is_dynamic = false;
-                let mut size = 0;
+                let mut length = 0;
                 match self.current_token {
                     StrTokType::RightBracket => {
                         self.advance();
@@ -352,7 +352,8 @@ impl TypeParser {
                     }
                     StrTokType::Integer(value) => {
                         self.advance();
-                        size = value;
+                        self.advance();
+                        length = value;
                     }
                     _ => {
                         eprintln!(
@@ -365,7 +366,7 @@ impl TypeParser {
                 if is_dynamic {
                     Ok(Box::new(Type::DynamicArray(self.parse(scope).unwrap())))
                 } else {
-                    Ok(Box::new(Type::FixedArray(size, self.parse(scope).unwrap())))
+                    Ok(Box::new(Type::FixedArray(length, self.parse(scope).unwrap())))
                 }
             }
             StrTokType::RightBracket => {

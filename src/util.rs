@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, process};
+use std::{backtrace::Backtrace, process::{self, exit}};
 
 use crate::{
     parser::{Operation, AST},
@@ -126,12 +126,12 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>) -> String 
     asm
 }
 
-pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, String> {
+pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<String, String> {
     let _typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            Ok(-scope.get_variable_offset(name) as i64)
+            Ok((-scope.get_variable_offset(name) as i64).to_string())
         }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
@@ -146,11 +146,34 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<i64, Strin
                     process::exit(1);
                 }
             };
-            Ok(base_addr + offset)
+            Ok(format!("{base_addr}+{offset}"))
         }
         AST::UnaryExpression { op, child } => {
             match op {
                 Operation::Deref => resolve_address(scope, child),
+                _ => Err(format!("Cannot resolve address of: {:?}", ast)),
+            }
+        }
+        AST::BinaryExpression { op, lhs, rhs } => {
+            eprintln!("{op:?}\n{lhs:#?}\n{rhs:#?}");
+            match op {
+                Operation::ArrAcc => {
+                    let lhs_type = calculate_ast_type(lhs.to_owned(), scope)?;
+                    let child_type = match *lhs_type {
+                        Type::FixedArray(_, child) => child,
+                        _ => {
+                            eprintln!("Attempting to calculate resulting memory address from indexing a non array type");
+                            exit(1);
+                        }
+                    };
+                    let array_name = match *lhs {
+                        AST::VariableCall { name } => name,
+                        _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
+                    };
+                    let array_base = scope.get_variable_offset(array_name);
+                    let child_size = get_type_size(child_type)?;
+                    Ok(format!("{child_size}*{}"))
+                }
                 _ => Err(format!("Cannot resolve address of: {:?}", ast)),
             }
         }

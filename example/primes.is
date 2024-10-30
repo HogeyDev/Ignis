@@ -1,0 +1,14 @@
+def CAP 50;
+
+func main(int) {
+    let sieve: [10]int;
+
+    let i: int = 0;
+    while (i < 10) {
+        sieve[i] = i;
+
+        i = i + 1;
+    }
+    
+    return 0;
+}

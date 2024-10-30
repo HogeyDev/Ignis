@@ -408,8 +408,14 @@ pub fn compile_to_asm(
                             .as_str(),
                         );
                     }
+                    Type::FixedArray(length, child_type) => {
+                        asm.push_str(format!("\tsub [rsp], {}\n", width).as_str());
+                        // for i in 0..length {
+                        //     asm.push_str("\tmov [rsp-], ");
+                        // }
+                    }
                     _ => {
-                        eprintln!("[ASM] Cannot zero out type `{}` because its size is {} (>8) and it's not a struct", collapsed.to_string(), width);
+                        eprintln!("[ASM] Cannot set variable to zero with type `{}` because its size is {} (>8) and it's not a struct or a fixed-size array", collapsed.to_string(), width);
                         process::exit(1);
                     }
                 }
@@ -626,10 +632,7 @@ pub fn compile_to_asm(
                 mov rax, qword [rax+0]  ; load name into rax
             */
             asm.push_str(
-                format!(
-                    "\tlea {register}, {size_prefix} [rbp{:+}] ; starting to access `{member}`\n",
-                    external_offset,
-                )
+                format!("\tlea {register}, {size_prefix} [rbp+{external_offset}] ; starting to access `{member}`\n")
                 .as_str(),
             );
             let mut scoping_accessed = accessed.clone();
