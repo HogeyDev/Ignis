@@ -297,7 +297,7 @@ pub fn compile_to_asm(
                                 // this is good!
                                 let stack_offset = scope.get_variable_offset(name);
                                 // eprintln!("{:#?}", variable_type_size);
-                                format!("\tmov rax, qword [rbp{:+}]\n", -stack_offset)
+                                format!("\tlea rax, qword [rbp{:+}]\n", -stack_offset)
                                 // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -346,10 +346,12 @@ pub fn compile_to_asm(
             let variable_type = scope.get_variable_data(name.clone()).0;
             let offset = scope.get_variable_offset(name.clone());
             if type_is_struct(scope, variable_type.clone()) {
-                unreachable!("Nah");
+                unreachable!("Expected a variable but recieved a struct instead");
                 // asm.push_str(push_struct(scope, variable_type, offset).as_str());
             } else {
-                let type_size = get_type_size(string_to_collapsed_type_tree(variable_type, scope).unwrap()).unwrap() as i64;
+                let variable_type = string_to_collapsed_type_tree(variable_type, scope).unwrap();
+                eprintln!("{variable_type:#?}");
+                let type_size = get_type_size(variable_type).unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
                 let asm_sizing = asm_size_prefix(type_size);
 
@@ -409,7 +411,7 @@ pub fn compile_to_asm(
                         );
                     }
                     Type::FixedArray(length, child_type) => {
-                        asm.push_str(format!("\tsub [rsp], {}\n", width).as_str());
+                        asm.push_str(format!("\tsub rsp, {}\n", width).as_str());
                         // for i in 0..length {
                         //     asm.push_str("\tmov [rsp-], ");
                         // }

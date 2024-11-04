@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, process::{self, exit}};
+use std::{backtrace::Backtrace, fmt::write, process::{self, exit}};
 
 use crate::{
     codegen::{self, compile_to_asm}, config::Configuration, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, Type}
@@ -145,9 +145,9 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                 }
             };
             if offset < 0 {
-                Ok(format!("{base_addr}\tsub rdx, {}\n", -offset))
+                Ok(format!("{base_addr}\tsub rdx, {} ; `{member}`\n", -offset))
             } else {
-                Ok(format!("{base_addr}\tadd rdx, {offset}\n"))
+                Ok(format!("{base_addr}\tadd rdx, {offset} ; `{member}`\n"))
             }
         }
         AST::UnaryExpression { op, child } => {
@@ -177,8 +177,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    Err("stfu".to_owned())
-                    // Ok(format!("\tlea rdx, [rbp{array_base:+}]\n"))
+                    Ok(format!("{rhs_resolution}\tpop rcx\nimul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n"))
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
