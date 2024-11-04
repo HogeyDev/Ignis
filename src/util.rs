@@ -1,9 +1,7 @@
 use std::{backtrace::Backtrace, process::{self, exit}};
 
 use crate::{
-    parser::{Operation, AST},
-    scope::ScopeContext,
-    types::{calculate_ast_type, get_type_size, Type},
+    codegen::{self, compile_to_asm}, config::Configuration, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, Type}
 };
 
 pub fn asm_size_prefix(width: i64) -> String {
@@ -126,16 +124,16 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>) -> String 
     asm
 }
 
-pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<String, String> {
+pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeContext, ast: Box<AST>) -> Result<String, String> {
     let _typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            Ok((-scope.get_variable_offset(name) as i64).to_string())
+            Ok(format!("\tlea rdx, [rbp{:+}]\n", -scope.get_variable_offset(name)))
         }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
-            let base_addr = resolve_address(scope, accessed.clone())?;
+            let base_addr = resolve_address(program_config, scope, accessed.clone())?;
             let offset = match *struct_typing {
                 Type::Struct(name, _) => -scope.get_struct_member_offset(name, member.clone()).unwrap(),
                 _ => {
@@ -146,16 +144,20 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<String, St
                     process::exit(1);
                 }
             };
-            Ok(format!("{base_addr}+{offset}"))
+            if offset < 0 {
+                Ok(format!("{base_addr}\tsub rdx, {}\n", -offset))
+            } else {
+                Ok(format!("{base_addr}\tadd rdx, {offset}\n"))
+            }
         }
         AST::UnaryExpression { op, child } => {
             match op {
-                Operation::Deref => resolve_address(scope, child),
-                _ => Err(format!("Cannot resolve address of: {:?}", ast)),
+                Operation::Deref => resolve_address(program_config, scope, child),
+                _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown UnaryOperation`", ast)),
             }
         }
         AST::BinaryExpression { op, lhs, rhs } => {
-            eprintln!("{op:?}\n{lhs:#?}\n{rhs:#?}");
+            // eprintln!("{op:?}\n{lhs:#?}\n{rhs:#?}");
             match op {
                 Operation::ArrAcc => {
                     let lhs_type = calculate_ast_type(lhs.to_owned(), scope)?;
@@ -170,14 +172,19 @@ pub fn resolve_address(scope: &ScopeContext, ast: Box<AST>) -> Result<String, St
                         AST::VariableCall { name } => name,
                         _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
                     };
-                    let array_base = scope.get_variable_offset(array_name);
+                    let array_base = -scope.get_variable_offset(array_name);
                     let child_size = get_type_size(child_type)?;
-                    Ok(format!("{child_size}*{}"))
+
+                    let rhs_resolution = compile_to_asm(program_config, rhs, scope);
+
+                    Err("stfu".to_owned())
+                    // Ok(format!("\tlea rdx, [rbp{array_base:+}]\n"))
+                    // Ok(format!("{child_size}*{}"))
                 }
-                _ => Err(format!("Cannot resolve address of: {:?}", ast)),
+                _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
             }
         }
-        _ => Err(format!("Cannot resolve address of: {:?}", ast)),
+        _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown AST`", ast)),
     }
 }
 

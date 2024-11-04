@@ -250,7 +250,7 @@ pub fn compile_to_asm(
                         // 2. calculate rhs
                         // 3. move result to address
 
-                        asm.push_str(resolve_address(scope, lhs.clone()).unwrap().as_str());
+                        asm.push_str(resolve_address(program_config, scope, lhs.clone()).unwrap().as_str());
                         // let from_addr = -resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
 
@@ -297,7 +297,7 @@ pub fn compile_to_asm(
                                 // this is good!
                                 let stack_offset = scope.get_variable_offset(name);
                                 // eprintln!("{:#?}", variable_type_size);
-                                format!("\tlea rax, qword [rbp{:+}]\n", -stack_offset)
+                                format!("\tmov rax, qword [rbp{:+}]\n", -stack_offset)
                                 // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -598,7 +598,7 @@ pub fn compile_to_asm(
                 }
             };
             let member_types = scope.get_struct_data(struct_name.clone());
-            let external_offset = resolve_address(scope, accessed.clone()).unwrap();
+            let external_offset = resolve_address(program_config, scope, accessed.clone()).unwrap();
             let internal_offset = -scope.get_struct_member_offset(struct_name, member.clone()).unwrap();
             // eprintln!("{:?}.{:?} @ {} + {}", accessed, member, external_offset, internal_offset);
             // let mut member_type_size = -1;
@@ -632,9 +632,13 @@ pub fn compile_to_asm(
                 mov rax, qword [rax+0]  ; load name into rax
             */
             asm.push_str(
-                format!("\tlea {register}, {size_prefix} [rbp+{external_offset}] ; starting to access `{member}`\n")
-                .as_str(),
+                format!("{external_offset}\tlea {register}, {size_prefix} [rdx] ; started to access `{member}`\n")
+                .as_str()
             );
+            // asm.push_str(
+            //     format!("\tlea {register}, {size_prefix} [rbp+{external_offset}] ; starting to access `{member}`\n")
+            //     .as_str(),
+            // );
             let mut scoping_accessed = accessed.clone();
             while let AST::UnaryExpression { op: Operation::Deref, child: sub_type } = *scoping_accessed.clone() {
                 scoping_accessed = sub_type;
