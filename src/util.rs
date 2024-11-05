@@ -1,7 +1,7 @@
-use std::{backtrace::Backtrace, fmt::write, process::{self, exit}};
+use std::{backtrace::Backtrace, process::{self, exit}};
 
 use crate::{
-    codegen::{self, compile_to_asm}, config::Configuration, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, Type}
+    codegen::compile_to_asm, config::Configuration, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, is_primative_type, string_to_collapsed_type_tree, Type}
 };
 
 pub fn asm_size_prefix(width: i64) -> String {
@@ -177,7 +177,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    Ok(format!("{rhs_resolution}\tpop rcx\nimul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n"))
+                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n"))
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
@@ -200,8 +200,9 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
         };
         let members = scope.get_struct_data(struct_name);
         for (member_name, member_type) in members {
-            println!("{member_name}: {member_type}");
+            println!("MEM: {member_name}: {member_type}");
         }
+        process::exit(99);
     } else {
         let register = asm_size_to_register(type_size, "a");
         let prefix = asm_size_prefix(type_size);
@@ -211,11 +212,46 @@ pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from:
     asm
 }
 
-// pub fn push_struct(scope: &mut ScopeContext, type_name: String, location: i64) -> String {
-//     unimplemented!("Push Struct");
-//     // eprintln!("{location}");
-//     let members = scope.get_struct_data(type_name);
-// }
+pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_top: i64, to_top: i64) -> String {
+    let mut asm = String::new();
+
+    match *collapsed.clone() {
+        Type::Primative(prim) => {
+            if !is_primative_type(prim.clone()) { 
+                eprintln!("`{prim}` is an imposter primative");
+                exit(1);
+            }
+            let prim_size = get_type_size(string_to_collapsed_type_tree(prim.clone(), scope).unwrap()).unwrap().try_into().unwrap();
+            let register = asm_size_to_register(prim_size, "a");
+            let prefix = asm_size_prefix(prim_size);
+            asm.push_str(&format!("\tmov {register}, {prefix} [rbp{:+}]\n\tmov {prefix} [rbp{:+}], {register}\n", -(from_top + prim_size), -(to_top + prim_size)));
+        }
+        // Type::DynamicArray(sub) => {
+        //     asm.push_str();
+        // },
+        Type::FixedArray(size, sub) => {
+            // let sub_size = get_type_size(sub.clone()).unwrap();
+            for _ in 0..size {
+                move_on_stack(scope, sub.clone(), from_top, to_top);
+            }
+        },
+        // Type::Pointer(child) => {},
+        // Type::Struct(_, members) => {},
+        _ => {
+            eprintln!("Cannot move type of {collapsed:#?}");
+            exit(1);
+        },
+    }
+
+    asm
+}
+
+pub fn push_variable(scope: &mut ScopeContext, collapsed: Box<Type>, location: i64) -> String {
+    let type_size = get_type_size(collapsed.clone()).unwrap();
+    let top = -scope.stack_size;
+    let movement = move_on_stack(scope, collapsed, location, top);
+    format!("\tsub rsp, {type_size}\n{movement}")
+}
 
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
     scope.structs.iter().find(|x| x.0 == type_name).is_some()

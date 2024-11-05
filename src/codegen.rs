@@ -1,8 +1,8 @@
-use std::{path::Path, process::{self, exit}};
+use std::{path::Path, process};
 
 use crate::{
-    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::{self, Modulizer}, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
-        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_type_on_stack, resolve_address, type_is_struct
+    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
+        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_type_on_stack, push_variable, resolve_address
     }
 };
 
@@ -50,7 +50,7 @@ pub fn compile_to_asm(
             }
             if !path_exists {
                 eprintln!("Could not resolve import `{module}`");
-                exit(1);
+                process::exit(1);
             }
             // eprintln!("{}\n{}", file.path, file.contents);
 
@@ -228,7 +228,7 @@ pub fn compile_to_asm(
                         };
                         if element_size == 4 {
                             format!(
-                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n",
+                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
                                 element_size
                             )
                         } else if element_size == 8 {
@@ -251,7 +251,7 @@ pub fn compile_to_asm(
                         // 3. move result to address
 
                         asm.push_str(resolve_address(program_config, scope, lhs.clone()).unwrap().as_str());
-                        // let from_addr = -resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
+                        // let from_addr = resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
 
                         asm
@@ -330,12 +330,10 @@ pub fn compile_to_asm(
             );
 
             asm.push_str(
-                scope
-                    .push(
+                scope.push(
                         "rax".to_string(),
                         get_type_size(typing).unwrap().try_into().unwrap(),
-                    )
-                    .as_str(),
+                    ).as_str(),
             );
 
             asm
@@ -343,14 +341,12 @@ pub fn compile_to_asm(
         AST::VariableCall { name } => {
             let mut asm = String::new();
 
-            let variable_type = scope.get_variable_data(name.clone()).0;
+            let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
             let offset = scope.get_variable_offset(name.clone());
-            if type_is_struct(scope, variable_type.clone()) {
-                unreachable!("Expected a variable but recieved a struct instead");
-                // asm.push_str(push_struct(scope, variable_type, offset).as_str());
+            if get_type_size(variable_type.clone()).unwrap() > 8 {
+                asm.push_str(push_variable(scope, variable_type, offset).as_str());
+                // todo!("Variable type too large");
             } else {
-                let variable_type = string_to_collapsed_type_tree(variable_type, scope).unwrap();
-                eprintln!("{variable_type:#?}");
                 let type_size = get_type_size(variable_type).unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
                 let asm_sizing = asm_size_prefix(type_size);
