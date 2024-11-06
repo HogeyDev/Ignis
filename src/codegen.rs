@@ -182,10 +182,10 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
-            let is_assignment = op == Operation::Assign;
-            if !is_assignment { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
+            let is_memory_operation = [Operation::Assign, Operation::ArrAcc].contains(&op);
+            if !is_memory_operation { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
-            if !is_assignment {
+            if !is_memory_operation {
                 asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
                 asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
             }
@@ -218,31 +218,32 @@ pub fn compile_to_asm(
                     Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
                     Operation::GTE => "\tcmp rax, rbx\n\tsetge al\n\tmovzx rax, al\n".to_string(),
                     Operation::ArrAcc => {
-                        let element_size = match *lhs_typing.clone() {
-                            Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
-                            Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
-                            _ => {
-                                eprintln!("[ASM] Array access on non array type");
-                                process::exit(1);
-                            }
-                        };
-                        if element_size == 4 {
-                            format!(
-                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
-                                element_size
-                            )
-                        } else if element_size == 8 {
-                            format!(
-                                "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
-                                element_size,
-                            )
-                        } else {
-                            format!(
-                                "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
-                                element_size,
-                                asm_size_prefix(element_size.try_into().unwrap_or(0))
-                            )
-                        }
+                        // let element_size = match *lhs_typing.clone() {
+                        //     Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
+                        //     Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
+                        //     _ => {
+                        //         eprintln!("[ASM] Array access on non array type");
+                        //         process::exit(1);
+                        //     }
+                        // };
+                        // if element_size == 4 {
+                        //     format!(
+                        //         "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
+                        //         element_size
+                        //     )
+                        // } else if element_size == 8 {
+                        //     format!(
+                        //         "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
+                        //         element_size,
+                        //     )
+                        // } else {
+                        //     format!(
+                        //         "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
+                        //         element_size,
+                        //         asm_size_prefix(element_size.try_into().unwrap_or(0))
+                        //     )
+                        // }
+                        format!()
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
@@ -253,6 +254,7 @@ pub fn compile_to_asm(
                         asm.push_str(resolve_address(program_config, scope, lhs.clone()).unwrap().as_str());
                         // let from_addr = resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
+                        asm.push_str("");
 
                         asm
                     }
@@ -264,7 +266,7 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            if !is_assignment {
+            if !is_memory_operation {
                 asm.push_str(
                     scope
                         .push("rax".to_string(), lhs_size.try_into().unwrap())
@@ -536,8 +538,8 @@ pub fn compile_to_asm(
         AST::String(value) => {
             let mut asm = String::new();
             let id = scope.add_string(value);
-            asm.push_str(format!("\tmov rax, STR{}\n", id).as_str());
-            asm.push_str(scope.push("rax".to_string(), 8).as_str());
+            asm.push_str(format!("\tmov rdx, STR{}\n", id).as_str());
+            asm.push_str(scope.push("rdx".to_string(), 8).as_str());
             asm
         }
         AST::Character(value) => {

@@ -177,7 +177,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n"))
+                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
