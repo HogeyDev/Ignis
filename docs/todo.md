@@ -10,6 +10,9 @@
         - String: filename
         - Vec<String>: all exports in file
 
+[ ] Arrays
+    - arrays are stored backwards in memory, so do that
+
 [-] Standard Library
 
 [-] Enums

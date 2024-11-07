@@ -1,11 +1,13 @@
-    section .text
+section .text
 global _start
 _start:
-    push 14 ; 0x0E
-    push 18 ; 0x12
-    add QWORD [rbp-8], QWORD [rbp-16] ; 32
-    pop rax
+    mov rax, STR0
+    mov al, byte [rax+1]
+    movzx rax, al
 
-    mov rdi, rax
     mov rax, 60
+    mov rdi, 0
     syscall
+    
+section .data
+STR0: db "Hello, World!", 0

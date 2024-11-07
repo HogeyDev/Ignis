@@ -243,7 +243,7 @@ pub fn compile_to_asm(
                         //         asm_size_prefix(element_size.try_into().unwrap_or(0))
                         //     )
                         // }
-                        format!()
+                        format!("")
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
