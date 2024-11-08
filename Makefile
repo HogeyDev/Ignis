@@ -5,7 +5,7 @@
 # 	# RUST_BACKTRACE=1 cargo run
 # 	# RUST_BACKTRACE=full cargo run
 
-asmfile = person
+asmfile = primes
 
 all: compile test
 
@@ -26,7 +26,7 @@ run_asm:
 	./example/$(asmfile)
 
 debug_asm:
-	gdb ./example/$(asmfile)
+	gdb ./example/$(asmfile).bin
 
 debug:
 	gdb --args ./target/debug/ignis -o ./example/$(asmfile).bin ./example/$(asmfile).is

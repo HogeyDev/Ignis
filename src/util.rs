@@ -162,7 +162,9 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                 Operation::ArrAcc => {
                     let lhs_type = calculate_ast_type(lhs.to_owned(), scope)?;
                     let child_type = match *lhs_type {
-                        Type::FixedArray(_, child) => child,
+                        Type::FixedArray(_, child) => {
+                            child
+                        }
                         _ => {
                             eprintln!("Attempting to calculate resulting memory address from indexing a non array type");
                             exit(1);
@@ -172,12 +174,13 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                         AST::VariableCall { name } => name,
                         _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
                     };
-                    let array_base = -scope.get_variable_offset(array_name);
+                    let array_base = -scope.get_variable_offset(array_name.clone());
                     let child_size = get_type_size(child_type)?;
+                    eprintln!("{array_name}: {array_base}");
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tsub rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
+                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tadd rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),

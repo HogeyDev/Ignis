@@ -56,7 +56,7 @@ impl ScopeContext {
         }
         self.stack_size += width;
         self.variables
-            .push((name.clone(), variable_type.clone(), self.stack_size - (width - 8)));
+            .push((name.clone(), variable_type.clone(), self.stack_size));
         self.get_variable_offset(name)
     }
     pub fn get_variable_data(&self, name: String) -> (String, i64) {

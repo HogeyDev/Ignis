@@ -65,8 +65,7 @@ pub fn compile_to_asm(
         AST::FunctionCall { name, arguments } => {
             let mut asm = String::new();
 
-            let function_data = scope.get_function_data(name.clone()); // also checks if function
-                                                                       // exists
+            let function_data = scope.get_function_data(name.clone()); // also checks if function exists
             if function_data.1.len() != arguments.len() {
                 eprintln!(
                     "[ASM] Function `{}` expected `{}` arguments, but recieved `{}`",
@@ -218,32 +217,31 @@ pub fn compile_to_asm(
                     Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
                     Operation::GTE => "\tcmp rax, rbx\n\tsetge al\n\tmovzx rax, al\n".to_string(),
                     Operation::ArrAcc => {
-                        // let element_size = match *lhs_typing.clone() {
-                        //     Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
-                        //     Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
-                        //     _ => {
-                        //         eprintln!("[ASM] Array access on non array type");
-                        //         process::exit(1);
-                        //     }
-                        // };
-                        // if element_size == 4 {
-                        //     format!(
-                        //         "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
-                        //         element_size
-                        //     )
-                        // } else if element_size == 8 {
-                        //     format!(
-                        //         "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
-                        //         element_size,
-                        //     )
-                        // } else {
-                        //     format!(
-                        //         "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
-                        //         element_size,
-                        //         asm_size_prefix(element_size.try_into().unwrap_or(0))
-                        //     )
-                        // }
-                        format!("")
+                        let element_size = match *lhs_typing.clone() {
+                            Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
+                            Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
+                            _ => {
+                                eprintln!("[ASM] Array access on non array type");
+                                process::exit(1);
+                            }
+                        };
+                        if element_size == 4 {
+                            format!(
+                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
+                                element_size
+                            )
+                        } else if element_size == 8 {
+                            format!(
+                                "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
+                                element_size,
+                            )
+                        } else {
+                            format!(
+                                "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
+                                element_size,
+                                asm_size_prefix(element_size.try_into().unwrap_or(0))
+                            )
+                        }
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
@@ -254,7 +252,7 @@ pub fn compile_to_asm(
                         asm.push_str(resolve_address(program_config, scope, lhs.clone()).unwrap().as_str());
                         // let from_addr = resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
-                        asm.push_str("");
+                        // asm.push_str("");
 
                         asm
                     }
@@ -394,6 +392,7 @@ pub fn compile_to_asm(
                 .unwrap();
             let offset = scope.stack_size;
             let offsets = scope.add_variable(name.clone(), variable_type, width);
+            // eprintln!("{name}: {width}");
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
             if width > 8 {
                 match *collapsed.clone() {

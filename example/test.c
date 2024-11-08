@@ -92,12 +92,12 @@ int main() {
     Tests tests = initTests();
 
     addTest(&tests, "fibonacci", "", 13);
+    addTest(&tests, "primes", "", 42);
     addTest(&tests, "person", "", 17);
     addTest(&tests, "return", "", 19);
     addTest(&tests, "enum", "", 0);
     addTest(&tests, "preprocessing", "", 123);
     addTest(&tests, "macros", "", 42);
-    addTest(&tests, "primes", "", 0);
     // addTest(&tests, "stdtest", "", 37);
 
     runTests(&tests);
