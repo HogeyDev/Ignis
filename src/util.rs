@@ -176,7 +176,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                     };
                     let array_base = -scope.get_variable_offset(array_name.clone());
                     let child_size = get_type_size(child_type)?;
-                    eprintln!("{array_name}: {array_base}");
+                    // eprintln!("{array_name}: {array_base}");
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 

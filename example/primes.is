@@ -11,10 +11,10 @@ func main(int) {
     }
 
     let j: int = 0;
-    while (j < 10) {
+    while (j < 9) {
         print_int(j);
         print(": ");
-        print_int(sieve[j]);
+        print_int(sieve[j + 1]);
         println("");
 
         j = j + 1;

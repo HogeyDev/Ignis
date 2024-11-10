@@ -1,4 +1,4 @@
-use std::{path::Path, process};
+use std::{path::Path, process::{self, exit}};
 
 use crate::{
     compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
@@ -181,12 +181,15 @@ pub fn compile_to_asm(
         AST::BinaryExpression { op, lhs, rhs } => {
             let mut asm = String::new();
 
-            let is_memory_operation = [Operation::Assign, Operation::ArrAcc].contains(&op);
-            if !is_memory_operation { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
+            let is_assignment = op == Operation::Assign;
+            let is_access = op == Operation::ArrAcc;
+            if !is_assignment && !is_access { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
-            if !is_memory_operation {
+            if !is_assignment {
                 asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
-                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+                if !is_access {
+                    asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+                }
             }
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             let rhs_typing = calculate_ast_type(rhs.clone(), scope).unwrap();
@@ -217,31 +220,46 @@ pub fn compile_to_asm(
                     Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
                     Operation::GTE => "\tcmp rax, rbx\n\tsetge al\n\tmovzx rax, al\n".to_string(),
                     Operation::ArrAcc => {
-                        let element_size = match *lhs_typing.clone() {
-                            Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
-                            Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
+                        let pop_rbx = scope.pop(String::from("rbx"), 8); // rhs
+
+                        let array_name = match *lhs.clone() {
+                            AST::VariableCall { name } => name,
                             _ => {
-                                eprintln!("[ASM] Array access on non array type");
-                                process::exit(1);
+                                eprintln!("Cannot get name of array, since it's not a variable\n\t{lhs:#?}");
+                                exit(1);
                             }
                         };
-                        if element_size == 4 {
-                            format!(
-                                "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
-                                element_size
-                            )
-                        } else if element_size == 8 {
-                            format!(
-                                "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
-                                element_size,
-                            )
-                        } else {
-                            format!(
-                                "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
-                                element_size,
-                                asm_size_prefix(element_size.try_into().unwrap_or(0))
-                            )
-                        }
+                        let variable_offset = -scope.get_variable_offset(array_name);
+                        let lea_rax = format!("\tlea rax, qword [rbp{variable_offset:+}]\n");
+
+                        let ending_string = {
+                            let element_size = match *lhs_typing.clone() {
+                                Type::DynamicArray(sub) => get_type_size(sub).unwrap(),
+                                Type::FixedArray(_, sub) => get_type_size(sub).unwrap(),
+                                _ => {
+                                    eprintln!("[ASM] Array access on non array type");
+                                    process::exit(1);
+                                }
+                            };
+                            if element_size == 4 {
+                                format!(
+                                    "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
+                                    element_size
+                                )
+                            } else if element_size == 8 {
+                                format!(
+                                    "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
+                                    element_size,
+                                )
+                            } else {
+                                format!(
+                                    "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
+                                    element_size,
+                                    asm_size_prefix(element_size.try_into().unwrap_or(0))
+                                )
+                            }
+                        };
+                        format!("{lea_rax}{pop_rbx}{ending_string}")
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
@@ -264,7 +282,7 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            if !is_memory_operation {
+            if !is_assignment {
                 asm.push_str(
                     scope
                         .push("rax".to_string(), lhs_size.try_into().unwrap())

@@ -19,11 +19,11 @@ compile:
 compile_asm:
 	nasm -f elf64 example/$(asmfile).bin.asm -o example/$(asmfile).o -g
 	@# ld -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 example/fibonacci.o -o example/fibonacci -lc # link with libc
-	ld -m elf_x86_64 example/$(asmfile).o -o example/$(asmfile)
+	ld -m elf_x86_64 example/$(asmfile).o -o example/$(asmfile).bin
 	rm example/$(asmfile).o
 
 run_asm:
-	./example/$(asmfile)
+	./example/$(asmfile).bin
 
 debug_asm:
 	gdb ./example/$(asmfile).bin
