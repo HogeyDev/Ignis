@@ -97,7 +97,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
         AST::Character(_) => Ok(Box::new(Type::Primative("char".to_string()))),
-        AST::String(_) => string_to_collapsed_type_tree("[]char".to_string(), scope),
+        AST::String(_) => string_to_collapsed_type_tree("@[]char".to_string(), scope),
         AST::UnaryExpression { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             match op {

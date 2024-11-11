@@ -1,4 +1,4 @@
-func strlen(int, str: []char) {
+func strlen(int, str: @[]char) {
 	asm "	mov rsi, qword [rbp+16]
 	mov rax, -1
 .looper:

@@ -190,32 +190,32 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
     }
 }
 
-pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from: String, to: String) -> String {
-    let mut asm = String::new();
+// pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from: String, to: String) -> String {
+//     let mut asm = String::new();
+// 
+//     let type_size = get_type_size(moved_type.clone()).unwrap() as i64;
+//     if type_size > 8 {
+//         // unimplemented!("Large type relocation");
+//         // has to be a struct
+//         let struct_name = if let Type::Struct(name, _) = *moved_type { name } else {
+//             eprintln!("Cannot move type `{:?}` on stack with size {type_size} (>8) ", moved_type);
+//             process::exit(1);
+//         };
+//         let members = scope.get_struct_data(struct_name);
+//         for (member_name, member_type) in members {
+//             println!("MEM: {member_name}: {member_type}");
+//         }
+//         process::exit(99);
+//     } else {
+//         let register = asm_size_to_register(type_size, "a");
+//         let prefix = asm_size_prefix(type_size);
+//         asm.push_str(format!("\tmov {register}, {prefix} [{from}]\n\tmov {prefix} [{to}], {register}\n").as_str());
+//     }
+// 
+//     asm
+// }
 
-    let type_size = get_type_size(moved_type.clone()).unwrap() as i64;
-    if type_size > 8 {
-        // unimplemented!("Large type relocation");
-        // has to be a struct
-        let struct_name = if let Type::Struct(name, _) = *moved_type { name } else {
-            eprintln!("Cannot move type `{:?}` on stack with size {type_size} (>8) ", moved_type);
-            process::exit(1);
-        };
-        let members = scope.get_struct_data(struct_name);
-        for (member_name, member_type) in members {
-            println!("MEM: {member_name}: {member_type}");
-        }
-        process::exit(99);
-    } else {
-        let register = asm_size_to_register(type_size, "a");
-        let prefix = asm_size_prefix(type_size);
-        asm.push_str(format!("\tmov {register}, {prefix} [{from}]\n\tmov {prefix} [{to}], {register}\n").as_str());
-    }
-
-    asm
-}
-
-pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_top: i64, to_top: i64) -> String {
+pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom: (&str, i64), to_bottom: (&str, i64)) -> String {
     let mut asm = String::new();
 
     match *collapsed.clone() {
@@ -227,15 +227,20 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_top: i
             let prim_size = get_type_size(string_to_collapsed_type_tree(prim.clone(), scope).unwrap()).unwrap().try_into().unwrap();
             let register = asm_size_to_register(prim_size, "a");
             let prefix = asm_size_prefix(prim_size);
-            asm.push_str(&format!("\tmov {register}, {prefix} [rbp{:+}]\n\tmov {prefix} [rbp{:+}], {register}\n", -(from_top + prim_size), -(to_top + prim_size)));
+            asm.push_str(&format!("\tmov {register}, {prefix} [{}{:+}]\n\tmov {prefix} [{}{:+}], {register}\n",
+                    from_bottom.0,
+                    from_bottom.1,
+                    to_bottom.0,
+                    -to_bottom.1
+                    ));
         }
         // Type::DynamicArray(sub) => {
         //     asm.push_str();
         // },
         Type::FixedArray(size, sub) => {
-            // let sub_size = get_type_size(sub.clone()).unwrap();
-            for _ in 0..size {
-                move_on_stack(scope, sub.clone(), from_top, to_top);
+            let sub_size = get_type_size(sub.clone()).unwrap();
+            for i in (0..size).rev() {
+                move_on_stack(scope, sub.clone(), (from_bottom.0, from_bottom.1 + ((i * sub_size) as i64)), (to_bottom.0, to_bottom.1 + ((i * sub_size) as i64)));
             }
         },
         // Type::Pointer(child) => {},
@@ -249,10 +254,9 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_top: i
     asm
 }
 
-pub fn push_variable(scope: &mut ScopeContext, collapsed: Box<Type>, location: i64) -> String {
+pub fn push_variable(scope: &mut ScopeContext, collapsed: Box<Type>, location: (&str, i64)) -> String {
     let type_size = get_type_size(collapsed.clone()).unwrap();
-    let top = -scope.stack_size;
-    let movement = move_on_stack(scope, collapsed, location, top);
+    let movement = move_on_stack(scope, collapsed, location, ("rsp", 0));
     format!("\tsub rsp, {type_size}\n{movement}")
 }
 
