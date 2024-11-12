@@ -90,23 +90,23 @@ pub fn initialize_struct(
     asm
 }
 
-pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>) -> String {
+pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str, i64)) -> String {
     let mut asm = String::new();
     match *val_type {
         Type::Struct(_, members) => {
+            let mut size_accumulator = 0;
             for member_type in members {
-                asm.push_str(initialize_type(scope, member_type).as_str());
+                let member_size = get_type_size(member_type.clone()).unwrap();
+                asm.push_str(initialize_type(scope, member_type.clone(), (loc.0, loc.1 + size_accumulator)).as_str());
+                size_accumulator += member_size as i64;
             }
         }
         Type::Primative(_) => {
             let size = get_type_size(val_type).unwrap() as i64;
-            asm.push_str(
-                scope
-                    .push("0 ; zero-initialize primative".to_string(), size)
-                    .as_str(),
-            )
+            let prefix = asm_size_prefix(size);
+            asm.push_str(&format!("\tmov {prefix} [{}{:+}], 0", loc.0, loc.1))
         }
-        Type::DynamicArray(_) => {
+        Type::Slice(_) => {
             asm.push_str(
                 scope
                     .push("0 ; zero-initialize dynamic array".to_string(), 8)
@@ -129,7 +129,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            Ok(format!("\tlea rdx, [rbp{:+}]\n", -scope.get_variable_offset(name)))
+            Ok(format!("\tlea rdx, [rbp{:+}]\n", scope.get_variable_offset(name)))
         }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
@@ -174,7 +174,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                         AST::VariableCall { name } => name,
                         _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
                     };
-                    let array_base = -scope.get_variable_offset(array_name.clone());
+                    let array_base = scope.get_variable_offset(array_name.clone());
                     let child_size = get_type_size(child_type)?;
                     // eprintln!("{array_name}: {array_base}");
 
@@ -255,8 +255,9 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
 }
 
 pub fn push_variable(scope: &mut ScopeContext, collapsed: Box<Type>, location: (&str, i64)) -> String {
-    let type_size = get_type_size(collapsed.clone()).unwrap();
+    let type_size = get_type_size(collapsed.clone()).unwrap() as i64;
     let movement = move_on_stack(scope, collapsed, location, ("rsp", 0));
+    scope.stack_size += type_size;
     format!("\tsub rsp, {type_size}\n{movement}")
 }
 

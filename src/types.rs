@@ -8,7 +8,7 @@ use crate::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Primative(String),
-    DynamicArray(Box<Type>),
+    Slice(Box<Type>),
     FixedArray(usize, Box<Type>),
     Pointer(Box<Type>),
     UnaryOperation(Operation, Box<Type>),
@@ -21,7 +21,7 @@ impl Type {
         match self.clone() {
             Self::Primative(id) => id,
             Self::FixedArray(size, sub) => format!("[{}]{}", size, sub.to_string()),
-            Self::DynamicArray(sub) => format!("[]{}", sub.to_string()),
+            Self::Slice(sub) => format!("[]{}", sub.to_string()),
             Self::Pointer(sub) => format!("@{}", sub.to_string()),
             Self::Struct(_, members) => {
                 let mut stringified = format!("{{");
@@ -75,7 +75,7 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
         Type::UnaryOperation(_, sub) => get_type_size(sub),
         Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
         Type::FixedArray(size, sub) => Ok(get_type_size(sub).unwrap() * size),
-        Type::DynamicArray(_) => get_primative_type_size("usize".to_string()),
+        Type::Slice(_) => get_primative_type_size("usize".to_string()), // adding the size of the array onto the end of the space in memory, and since the size is a usize, then we add 8 bytes
         Type::Struct(_, members) => {
             let mut size = 0usize;
             for member in members {
@@ -97,7 +97,10 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
         AST::Character(_) => Ok(Box::new(Type::Primative("char".to_string()))),
-        AST::String(_) => string_to_collapsed_type_tree("@[]char".to_string(), scope),
+        AST::String(value) => {
+            // let length = value.len();
+            string_to_collapsed_type_tree(format!("@[]char"), scope)
+        }
         AST::UnaryExpression { op, child } => {
             let child_type = ast_to_type_tree(child, scope)?;
             match op {
@@ -176,7 +179,7 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
             if op == Operation::ArrAcc {
                 return match *lhs {
                     Type::FixedArray(_, sub) => Ok(sub),
-                    Type::DynamicArray(sub) => Ok(sub),
+                    Type::Slice(sub) => Ok(sub),
                     _ => Err("Tried to do array access on non array type"),
                 };
             } else if collapsed_lhs != collapsed_rhs {
@@ -185,8 +188,8 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
             Ok(collapsed_lhs)
         }
         Type::Pointer(sub_type) => Ok(Box::new(Type::Pointer(collapse_type_tree(sub_type)?))),
-        Type::DynamicArray(sub_type) => {
-            Ok(Box::new(Type::DynamicArray(collapse_type_tree(sub_type)?)))
+        Type::Slice(sub_type) => {
+            Ok(Box::new(Type::Slice(collapse_type_tree(sub_type)?)))
         }
         Type::FixedArray(size, sub_type) => Ok(Box::new(Type::FixedArray(
             size,
@@ -364,7 +367,7 @@ impl TypeParser {
                     }
                 }
                 if is_dynamic {
-                    Ok(Box::new(Type::DynamicArray(self.parse(scope).unwrap())))
+                    Ok(Box::new(Type::Slice(self.parse(scope).unwrap())))
                 } else {
                     Ok(Box::new(Type::FixedArray(length, self.parse(scope).unwrap())))
                 }

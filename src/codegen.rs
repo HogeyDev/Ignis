@@ -187,9 +187,9 @@ pub fn compile_to_asm(
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
             if !is_assignment {
                 asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
-                if !is_access { // this pretty much has to be a number
+                // if !is_access { // this pretty much has to be a number
                     asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-                }
+                // }
             }
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             let rhs_typing = calculate_ast_type(rhs.clone(), scope).unwrap();
@@ -220,21 +220,23 @@ pub fn compile_to_asm(
                     Operation::LTE => "\tcmp rax, rbx\n\tsetle al\n\tmovzx rax, al\n".to_string(),
                     Operation::GTE => "\tcmp rax, rbx\n\tsetge al\n\tmovzx rax, al\n".to_string(),
                     Operation::ArrAcc => {
-                        let pop_rbx = scope.pop(String::from("rbx"), 8); // rhs
+                        let calc_index = scope.pop(String::from("rbx"), 8); // rhs
 
-                        let array_name = match *lhs.clone() {
-                            AST::VariableCall { name } => name,
-                            _ => {
-                                eprintln!("Cannot get name of array, since it's not a variable\n{lhs:#?}");
-                                exit(1);
-                            }
+                        let error_finding_address = || {
+                            eprintln!("Cannot resolve address of accessed array\n{lhs:#?}");
+                            exit(1);
                         };
-                        let variable_offset = -scope.get_variable_offset(array_name);
-                        let lea_rax = format!("\tlea rax, qword [rbp{variable_offset:+}]\n");
+                        let find_address = match *lhs.clone() {
+                            AST::VariableCall { name } => {
+                                let offset = scope.get_variable_offset(name);
+                                format!("\tlea rax, qword [rbp{offset:+}]\n")
+                            }
+                            _ => error_finding_address(),
+                        };
 
-                        let ending_string = {
+                        let get_element = {
                             let sub_type = match *lhs_typing.clone() {
-                                Type::DynamicArray(sub) => sub,
+                                Type::Slice(sub) => sub,
                                 Type::FixedArray(_, sub) => sub,
                                 _ => {
                                     eprintln!("[ASM] Array access on non array type");
@@ -242,27 +244,9 @@ pub fn compile_to_asm(
                                 }
                             };
                             let sub_size = get_type_size(sub_type).unwrap();
-                            // if element_size == 4 {
-                            //     format!(
-                            //         "\timul rbx, {}\n\txor ecx, ecx\n\tmov ecx, dword [rax + rbx]\n\tmov eax, ecx\n",
-                            //         element_size
-                            //     )
-                            // } else if element_size == 8 {
-                            //     format!(
-                            //         "\timul rbx, {}\n\tmov rax, qword [rax + rbx]\n",
-                            //         element_size,
-                            //     )
-                            // } else {
-                            //     format!(
-                            //         "\timul rbx, {}\n\tmovzx rax, {} [rax + rbx]\n",
-                            //         element_size,
-                            //         asm_size_prefix(element_size.try_into().unwrap_or(0))
-                            //     )
-                            // }
-                            
                             format!("\timul rbx, {sub_size}\n\tadd rax, rbx\n{}", push_variable(scope, lhs_typing, ("rax", 0)))
                         };
-                        format!("{lea_rax}{pop_rbx}{ending_string}")
+                        format!("{find_address}{calc_index}{get_element}")
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
@@ -315,7 +299,7 @@ pub fn compile_to_asm(
                                 // this is good!
                                 let stack_offset = scope.get_variable_offset(name);
                                 // eprintln!("{:#?}", variable_type_size);
-                                format!("\tlea rax, qword [rbp{:+}]\n", -stack_offset)
+                                format!("\tlea rax, qword [rbp{:+}]\n", stack_offset)
                                 // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -360,7 +344,7 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
-            let offset = -scope.get_variable_offset(name.clone());
+            let offset = scope.get_variable_offset(name.clone());
             if get_type_size(variable_type.clone()).unwrap() > 8 {
                 asm.push_str(&push_variable(scope, variable_type, ("rbp", offset)));
                 // todo!("Variable type too large");
@@ -412,42 +396,45 @@ pub fn compile_to_asm(
             let offsets = scope.add_variable(name.clone(), variable_type, width);
             // eprintln!("{name}: {width}");
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
-            if width > 8 {
-                match *collapsed.clone() {
-                    Type::Struct(_, members) => {
-                        asm.push_str(
-                            initialize_struct(
-                                scope.to_owned(),
-                                offset,
-                                collapsed,
-                                members.iter().map(|_| "0".to_string()).collect(),
-                            )
-                            .as_str(),
-                        );
-                    }
-                    Type::FixedArray(length, child_type) => {
-                        asm.push_str(format!("\tsub rsp, {}\n", width).as_str());
-                        // for i in 0..length {
-                        //     asm.push_str("\tmov [rsp-], ");
-                        // }
-                    }
-                    _ => {
-                        eprintln!("[ASM] Cannot set variable to zero with type `{}` because its size is {} (>8) and it's not a struct or a fixed-size array", collapsed.to_string(), width);
-                        process::exit(1);
-                    }
-                }
-            } else {
-                asm.push_str(
-                    format!(
-                        "\tsub rsp, {}\n\tmov {} [rbp{:+}], 0 ; initialized `{}`\n",
-                        width,
-                        asm_size_prefix(width),
-                        -offsets,
-                        name
-                    )
-                    .as_str(),
-                );
-            }
+            asm.push_str(&format!("\tsub rsp, {width}\n"));
+            asm.push_str(&initialize_type(scope, collapsed, ("rsp", 0)));
+            // if width > 8 {
+            //     match *collapsed.clone() {
+            //         Type::Struct(_, members) => {
+            //             asm.push_str(
+            //                 initialize_struct(
+            //                     scope.to_owned(),
+            //                     offset,
+            //                     collapsed,
+            //                     members.iter().map(|_| "0".to_string()).collect(),
+            //                 )
+            //                 .as_str(),
+            //             );
+            //         }
+            //         Type::FixedArray(length, child_type) => {
+            //             let child_size = get_type_size(child_type).unwrap();
+            //             asm.push_str(format!("\tsub rsp, {}\n", child_size * length).as_str());
+            //             scope.stack_size += (child_size * length) as i64;
+            //             for i in (0..length).rev() {
+            //                 asm.push_str(&format!("\tmov [rsp+{}], 0\n", i * child_size));
+            //             }
+            //         }
+            //         _ => {
+            //             // eprintln!("[ASM] Cannot set variable to zero with type `{}` because its size is {} (>8) and it's not a struct or a fixed-size array", collapsed.to_string(), width);
+            //             // process::exit(1);
+            //             asm.push_str(
+            //                 format!(
+            //                     "\tsub rsp, {}\n\tmov {} [rbp{:+}], 0 ; initialized `{}`\n",
+            //                     width,
+            //                     asm_size_prefix(width),
+            //                     -offsets,
+            //                     name
+            //                 )
+            //                 .as_str(),
+            //             );
+            //         }
+            //     }
+            // }
 
             asm
         }
@@ -473,7 +460,7 @@ pub fn compile_to_asm(
             if lhs_type_size > 8 {
                 match *lhs_typing.clone() {
                     Type::Struct(_, members) => {
-                        let offset = -scope.get_variable_offset(name);
+                        let offset = scope.get_variable_offset(name);
                         let temporary_start = -scope.stack_size;
                         let mut internal_offset = 0;
                         for member in members {
@@ -587,7 +574,7 @@ pub fn compile_to_asm(
                         _ => false,
                     } {
                         let struct_type = calculate_ast_type(root.clone(), scope).unwrap();
-                        asm.push_str(initialize_type(scope, struct_type).as_str());
+                        asm.push_str(&initialize_type(scope, struct_type, ("rsp", 0)));
                     } else if expected != recieved {
                         eprintln!("[ASM] Cannot initialize struct `{}` because member `{}` expects type `{:?}`, but recieved type `{:?}`", name, member_name, expected, recieved);
                         process::exit(1);

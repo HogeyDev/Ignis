@@ -57,7 +57,7 @@ impl ScopeContext {
         self.stack_size += width;
         self.variables
             .push((name.clone(), variable_type.clone(), self.stack_size));
-        self.get_variable_offset(name)
+        -self.get_variable_offset(name)
     }
     pub fn get_variable_data(&self, name: String) -> (String, i64) {
         match self.variables.iter().find(|x| x.0 == name) {
@@ -71,7 +71,7 @@ impl ScopeContext {
         }
     }
     pub fn get_variable_offset(&self, name: String) -> i64 {
-        self.get_variable_data(name).1
+        -self.get_variable_data(name).1
     }
     pub fn add_function(
         &mut self,
