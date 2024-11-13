@@ -107,11 +107,7 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str
             asm.push_str(&format!("\tmov {prefix} [{}{:+}], 0", loc.0, loc.1))
         }
         Type::Slice(_) => {
-            asm.push_str(
-                scope
-                    .push("0 ; zero-initialize dynamic array".to_string(), 8)
-                    .as_str(),
-            );
+            asm.push_str(&format!("\tmov qword [{}], 0\n", loc.0));
         }
         _ => {
             eprintln!(
@@ -234,9 +230,12 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
                     -to_bottom.1
                     ));
         }
-        // Type::DynamicArray(sub) => {
-        //     asm.push_str();
-        // },
+        Type::Slice(sub) => {
+            let loop_label_start = scope.add_label();
+            let loop_label_end = scope.add_label();
+            let move_inner =  
+            asm.push_str(&format!("\tmov rcx, qword [{}]\nlbl{loop_label_start}:\n\tcmp rcx, 0\nje lbl{loop_label_end}\n{move_inner}\tlbl{loop_label_end}\n", from_bottom.0));
+        },
         Type::FixedArray(size, sub) => {
             let sub_size = get_type_size(sub.clone()).unwrap();
             for i in (0..size).rev() {

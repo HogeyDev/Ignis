@@ -1,4 +1,4 @@
-use std::{path::Path, process::{self, exit}};
+use std::{fmt::write, path::Path, process::{self, exit}};
 
 use crate::{
     compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
@@ -230,6 +230,11 @@ pub fn compile_to_asm(
                             AST::VariableCall { name } => {
                                 let offset = scope.get_variable_offset(name);
                                 format!("\tlea rax, qword [rbp{offset:+}]\n")
+                            }
+                            AST::UnaryExpression { .. } |
+                            AST::BinaryExpression { .. } => {
+                                let compiled = compile_to_asm(program_config, lhs, scope);
+                                format!("{compiled}")
                             }
                             _ => error_finding_address(),
                         };
