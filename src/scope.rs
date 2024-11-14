@@ -125,12 +125,12 @@ impl ScopeContext {
         let struct_data = self.get_struct_data(name.clone());
         let mut tot_off = 0;
         let mut found_result = false;
-        for mem in struct_data {
+        for mem in struct_data.iter().rev() {
             if mem.0 == member {
                 found_result = true;
                 break;
             }
-            tot_off += get_type_size(string_to_collapsed_type_tree(mem.1, self)?)? as i64;
+            tot_off += get_type_size(string_to_collapsed_type_tree(mem.1.clone(), self)?)? as i64;
         }
         if found_result {
             Ok(tot_off)

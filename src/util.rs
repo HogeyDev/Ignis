@@ -41,54 +41,54 @@ pub fn asm_size_to_register(width: i64, reg: &str) -> String {
     }
 }
 
-pub fn initialize_struct(
-    _scope: ScopeContext,
-    offset: i64,
-    struct_type: Box<Type>,
-    values: Vec<String>,
-) -> String {
-    let mut asm = format!(
-        "\tsub rsp, {}\n",
-        get_type_size(struct_type.clone()).unwrap()
-    );
-
-    let members = match *struct_type {
-        Type::Struct(_, members) => members,
-        _ => {
-            eprintln!(
-                "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
-                struct_type
-            );
-            process::exit(1);
-        }
-    };
-    if values.len() < members.len() {
-        eprintln!(
-            "[ASM] Struct initialization expected a minimum of {} values, but only recieved {}",
-            members.len(),
-            values.len()
-        );
-        process::exit(1);
-    }
-
-    let mut total_offset = 0;
-    for (i, member) in members.iter().enumerate() {
-        total_offset += get_type_size(member.to_owned()).unwrap() as i64;
-        let size = get_type_size(member.to_owned()).unwrap() as i64;
-        let asm_size = asm_size_prefix(size);
-        asm.push_str(
-            format!(
-                "\tmov {} [rbp{:+}], {}\n",
-                asm_size,
-                -offset - total_offset,
-                values[i]
-            )
-            .as_str(),
-        );
-    }
-
-    asm
-}
+// pub fn initialize_struct(
+//     _scope: ScopeContext,
+//     offset: i64,
+//     struct_type: Box<Type>,
+//     values: Vec<String>,
+// ) -> String {
+//     let mut asm = format!(
+//         "\tsub rsp, {}\n",
+//         get_type_size(struct_type.clone()).unwrap()
+//     );
+// 
+//     let members = match *struct_type {
+//         Type::Struct(_, members) => members,
+//         _ => {
+//             eprintln!(
+//                 "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
+//                 struct_type
+//             );
+//             process::exit(1);
+//         }
+//     };
+//     if values.len() < members.len() {
+//         eprintln!(
+//             "[ASM] Struct initialization expected a minimum of {} values, but only recieved {}",
+//             members.len(),
+//             values.len()
+//         );
+//         process::exit(1);
+//     }
+// 
+//     let mut total_offset = 0;
+//     for (i, member) in members.iter().enumerate() {
+//         total_offset += get_type_size(member.to_owned()).unwrap() as i64;
+//         let size = get_type_size(member.to_owned()).unwrap() as i64;
+//         let asm_size = asm_size_prefix(size);
+//         asm.push_str(
+//             format!(
+//                 "\tmov {} [rbp{:+}], {}\n",
+//                 asm_size,
+//                 -offset - total_offset,
+//                 values[i]
+//             )
+//             .as_str(),
+//         );
+//     }
+// 
+//     asm
+// }
 
 pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str, i64)) -> String {
     let mut asm = String::new();
@@ -97,14 +97,20 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str
             let mut size_accumulator = 0;
             for member_type in members {
                 let member_size = get_type_size(member_type.clone()).unwrap();
-                asm.push_str(initialize_type(scope, member_type.clone(), (loc.0, loc.1 + size_accumulator)).as_str());
+                asm.push_str(&initialize_type(scope, member_type.clone(), (loc.0, loc.1 + size_accumulator)));
                 size_accumulator += member_size as i64;
             }
         }
         Type::Primative(_) => {
             let size = get_type_size(val_type).unwrap() as i64;
             let prefix = asm_size_prefix(size);
-            asm.push_str(&format!("\tmov {prefix} [{}{:+}], 0", loc.0, loc.1))
+            asm.push_str(&format!("\tmov {prefix} [{}{:+}], 0\n", loc.0, loc.1))
+        }
+        Type::FixedArray(size, sub) => {
+            let sub_size = get_type_size(sub.clone()).unwrap();
+            for i in 0..size {
+                asm.push_str(&initialize_type(scope, sub.clone(), (loc.0, loc.1 + (sub_size * i) as i64)));
+            }
         }
         Type::Slice(_) => {
             asm.push_str(&format!("\tmov qword [{}], 0\n", loc.0));
@@ -125,13 +131,13 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            Ok(format!("\tlea rdx, [rbp{:+}]\n", scope.get_variable_offset(name)))
+            Ok(format!("\tlea rdx, qword [rbp{:+}]\n", scope.get_variable_offset(name)))
         }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
             let base_addr = resolve_address(program_config, scope, accessed.clone())?;
             let offset = match *struct_typing {
-                Type::Struct(name, _) => -scope.get_struct_member_offset(name, member.clone()).unwrap(),
+                Type::Struct(name, _) => scope.get_struct_member_offset(name, member.clone()).unwrap(),
                 _ => {
                     eprintln!(
                         "Failure to resolve: {:?}\n\tgoes with {:?}",
@@ -176,7 +182,8 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tadd rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
+                    // Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tadd rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
+                    Ok(format!("{rhs_resolution}\tpop rcx\n\tlea rdx, qword [rbp{array_base:+}+rcx*{child_size}] ; rcx is multiplied to adjust for type sizing\n"))
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
@@ -224,22 +231,22 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
             let register = asm_size_to_register(prim_size, "a");
             let prefix = asm_size_prefix(prim_size);
             asm.push_str(&format!("\tmov {register}, {prefix} [{}{:+}]\n\tmov {prefix} [{}{:+}], {register}\n",
-                    from_bottom.0,
-                    from_bottom.1,
-                    to_bottom.0,
-                    -to_bottom.1
-                    ));
+                            from_bottom.0,
+                            from_bottom.1,
+                            to_bottom.0,
+                            to_bottom.1
+                        ));
         }
-        Type::Slice(sub) => {
-            let loop_label_start = scope.add_label();
-            let loop_label_end = scope.add_label();
-            let move_inner =  
-            asm.push_str(&format!("\tmov rcx, qword [{}]\nlbl{loop_label_start}:\n\tcmp rcx, 0\nje lbl{loop_label_end}\n{move_inner}\tlbl{loop_label_end}\n", from_bottom.0));
+        Type::Slice(_) => {
+            // let loop_label_start = scope.add_label();
+            // let loop_label_end = scope.add_label();
+            // asm.push_str(&format!("\tmov rcx, qword [{}]\nlbl{loop_label_start}:\n\tcmp rcx, 0\nje lbl{loop_label_end}\n{move_inner}\tlbl{loop_label_end}\n", from_bottom.0));
+            asm.push_str(&format!("\tmov r10, qword [{}{:+}]\n\tmov qword [{}{:+}], r10\n", from_bottom.0, from_bottom.1, to_bottom.0, to_bottom.1));
         },
         Type::FixedArray(size, sub) => {
             let sub_size = get_type_size(sub.clone()).unwrap();
             for i in (0..size).rev() {
-                move_on_stack(scope, sub.clone(), (from_bottom.0, from_bottom.1 + ((i * sub_size) as i64)), (to_bottom.0, to_bottom.1 + ((i * sub_size) as i64)));
+                asm.push_str(&move_on_stack(scope, sub.clone(), (from_bottom.0, from_bottom.1 + ((i * sub_size) as i64)), (to_bottom.0, to_bottom.1 + ((i * sub_size) as i64))));
             }
         },
         // Type::Pointer(child) => {},
@@ -253,11 +260,11 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
     asm
 }
 
-pub fn push_variable(scope: &mut ScopeContext, collapsed: Box<Type>, location: (&str, i64)) -> String {
+pub fn push_from_stack(scope: &mut ScopeContext, collapsed: Box<Type>, location: (&str, i64)) -> String {
     let type_size = get_type_size(collapsed.clone()).unwrap() as i64;
     let movement = move_on_stack(scope, collapsed, location, ("rsp", 0));
     scope.stack_size += type_size;
-    format!("\tsub rsp, {type_size}\n{movement}")
+    format!("\tsub rsp, {type_size} ; allocated space to push into\n{movement}")
 }
 
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {

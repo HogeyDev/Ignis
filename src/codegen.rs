@@ -1,8 +1,8 @@
-use std::{fmt::write, path::Path, process::{self, exit}};
+use std::{path::Path, process::{self, exit}};
 
 use crate::{
     compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
-        asm_size_prefix, asm_size_to_register, initialize_struct, initialize_type, move_on_stack, push_variable, resolve_address
+        asm_size_prefix, asm_size_to_register, initialize_type, move_on_stack, push_from_stack, resolve_address
     }
 };
 
@@ -185,11 +185,9 @@ pub fn compile_to_asm(
             let is_access = op == Operation::ArrAcc;
             if !is_assignment && !is_access { asm.push_str(compile_to_asm(program_config, lhs.clone(), scope).as_str()); }
             asm.push_str(compile_to_asm(program_config, rhs.clone(), scope).as_str());
-            if !is_assignment {
+            if !is_assignment && !is_access {
                 asm.push_str(scope.pop(String::from("rbx"), 8).as_str()); // rhs
-                // if !is_access { // this pretty much has to be a number
-                    asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
-                // }
+                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
             }
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             let rhs_typing = calculate_ast_type(rhs.clone(), scope).unwrap();
@@ -222,6 +220,8 @@ pub fn compile_to_asm(
                     Operation::ArrAcc => {
                         let calc_index = scope.pop(String::from("rbx"), 8); // rhs
 
+                        let is_fixed = matches!(*lhs_typing, Type::FixedArray(_, _));
+
                         let error_finding_address = || {
                             eprintln!("Cannot resolve address of accessed array\n{lhs:#?}");
                             exit(1);
@@ -229,12 +229,12 @@ pub fn compile_to_asm(
                         let find_address = match *lhs.clone() {
                             AST::VariableCall { name } => {
                                 let offset = scope.get_variable_offset(name);
-                                format!("\tlea rax, qword [rbp{offset:+}]\n")
+                                format!("\t{} rax, qword [rbp{offset:+}]\n", if is_fixed { "lea" } else { "mov" })
                             }
                             AST::UnaryExpression { .. } |
                             AST::BinaryExpression { .. } => {
                                 let compiled = compile_to_asm(program_config, lhs, scope);
-                                format!("{compiled}")
+                                format!("{compiled}\tpop rax\n")
                             }
                             _ => error_finding_address(),
                         };
@@ -248,10 +248,10 @@ pub fn compile_to_asm(
                                     process::exit(1);
                                 }
                             };
-                            let sub_size = get_type_size(sub_type).unwrap();
-                            format!("\timul rbx, {sub_size}\n\tadd rax, rbx\n{}", push_variable(scope, lhs_typing, ("rax", 0)))
+                            let sub_size = get_type_size(sub_type.clone()).unwrap();
+                            format!("\timul rbx, {sub_size}\n\tadd rax, rbx\n{}", push_from_stack(scope, sub_type, ("rax", 0)))
                         };
-                        format!("{find_address}{calc_index}{get_element}")
+                        format!("{calc_index}{find_address}{get_element}")
                     }
                     Operation::Assign => {
                         let mut asm = String::new();
@@ -259,7 +259,10 @@ pub fn compile_to_asm(
                         asm.push_str(resolve_address(program_config, scope, lhs.clone()).unwrap().as_str());
                         // let from_addr = resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         // asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
-                        asm.push_str(&move_on_stack(scope, rhs_typing, ("rsp", 0), ("rdx", 0)));
+                        asm.push_str(&move_on_stack(scope, rhs_typing.clone(), ("rsp", 0), ("rdx", 0)));
+                        let rhs_type_size = get_type_size(rhs_typing).unwrap() as i64;
+                        asm.push_str(&format!("\tadd rsp, {rhs_type_size}\n"));
+                        scope.stack_size -= rhs_type_size;
 
                         asm
                     }
@@ -271,7 +274,7 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            if !is_assignment {
+            if !is_assignment && !is_access {
                 asm.push_str(
                     scope
                         .push("rax".to_string(), lhs_size.try_into().unwrap())
@@ -351,7 +354,7 @@ pub fn compile_to_asm(
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
             let offset = scope.get_variable_offset(name.clone());
             if get_type_size(variable_type.clone()).unwrap() > 8 {
-                asm.push_str(&push_variable(scope, variable_type, ("rbp", offset)));
+                asm.push_str(&push_from_stack(scope, variable_type, ("rbp", offset)));
                 // todo!("Variable type too large");
             } else {
                 let type_size = get_type_size(variable_type).unwrap() as i64;
@@ -393,15 +396,11 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             let collapsed = string_to_collapsed_type_tree(variable_type.clone(), scope).unwrap();
-            let width = get_type_size(collapsed.clone())
-                .unwrap()
-                .try_into()
-                .unwrap();
-            let offset = scope.stack_size;
-            let offsets = scope.add_variable(name.clone(), variable_type, width);
+            let width = get_type_size(collapsed.clone()).unwrap() as i64;
+            scope.add_variable(name.clone(), variable_type, width);
             // eprintln!("{name}: {width}");
             // TODO: Use some loop to fill stack with zeros when type is >8 bytes
-            asm.push_str(&format!("\tsub rsp, {width}\n"));
+            asm.push_str(&format!("\tsub rsp, {width} ; stack reserved for `{name}`\n"));
             asm.push_str(&initialize_type(scope, collapsed, ("rsp", 0)));
             // if width > 8 {
             //     match *collapsed.clone() {
@@ -461,7 +460,7 @@ pub fn compile_to_asm(
             }
 
             let lhs_type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
-            // println!("{:?}: {lhs_type_size}", lhs_typing);
+            // unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
             if lhs_type_size > 8 {
                 match *lhs_typing.clone() {
                     Type::Struct(_, members) => {
@@ -484,7 +483,7 @@ pub fn compile_to_asm(
 
                             internal_offset += member_size;
                         }
-                        asm.push_str(format!("\tadd rsp, {}\n", lhs_type_size).as_str());
+                        asm.push_str(&format!("\tadd rsp, {}\n", lhs_type_size));
                     }
                     _ => {
                         eprintln!(
@@ -499,14 +498,9 @@ pub fn compile_to_asm(
                 let register = asm_size_to_register(lhs_type_size, "a");
 
                 let offset = scope.get_variable_offset(name.clone());
-                asm.push_str(scope.pop("rax".to_string(), 8).as_str());
-                asm.push_str(
-                    format!(
-                        "\tmov {} [rbp{:+}], {} ; assigned `{}`\n",
-                        asm_sizing, -offset, register, name
-                    )
-                    .as_str(),
-                );
+                // asm.push_str(scope.pop(register.clone(), lhs_type_size).as_str());
+                scope.stack_size -= lhs_type_size;
+                asm.push_str(&format!("\tmov {register}, {asm_sizing} [rsp]\n\tadd rsp, {lhs_type_size}\n\tmov {asm_sizing} [rbp{offset:+}], {register} ; assigned `{name}`\n"));
             }
 
             asm
@@ -608,7 +602,7 @@ pub fn compile_to_asm(
             };
             let member_types = scope.get_struct_data(struct_name.clone());
             let external_offset = resolve_address(program_config, scope, accessed.clone()).unwrap();
-            let internal_offset = -scope.get_struct_member_offset(struct_name, member.clone()).unwrap();
+            let internal_offset = scope.get_struct_member_offset(struct_name, member.clone()).unwrap();
             // eprintln!("{:?}.{:?} @ {} + {}", accessed, member, external_offset, internal_offset);
             // let mut member_type_size = -1;
             let member_located = member_types
@@ -651,9 +645,9 @@ pub fn compile_to_asm(
             let mut scoping_accessed = accessed.clone();
             while let AST::UnaryExpression { op: Operation::Deref, child: sub_type } = *scoping_accessed.clone() {
                 scoping_accessed = sub_type;
-                asm.push_str(format!("\tmov {register}, qword [{register}]\n").as_str());
+                asm.push_str(&format!("\tmov {register}, qword [{register}]\n"));
             }
-            asm.push_str(format!("\tmov {register}, {size_prefix} [{register}{:+}] ; finished accessing `{member}`\n", internal_offset).as_str());
+            asm.push_str(&format!("\tmov {register}, {size_prefix} [{register}{internal_offset:+}] ; finished accessing `{member}`\n"));
             asm.push_str(scope.push("rax".to_string(), member_type_size).as_str());
 
             asm
