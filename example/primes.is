@@ -21,16 +21,15 @@ func main(int) {
         p = p + 1;
     }
 
+    let counter: int = 0;
     let j: int = 2;
     while (j < max) {
         if (sieve[j]) {
-            print_int(j);
-            print_char(' ');
+            counter = counter + 1;
         }
 
         j = j + 1;
     }
-    println("");
     
-    return sieve[99];
+    return counter;
 }
