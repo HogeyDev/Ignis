@@ -18,6 +18,7 @@ pub enum TokenType {
     While,
     Import,
     Return,
+    Static,
     Struct,
 
     Def,
@@ -146,6 +147,7 @@ impl Tokenizer {
             "while" => TokenType::While,
             "import" => TokenType::Import,
             "return" => TokenType::Return,
+            "static" => TokenType::Static,
             "struct" => TokenType::Struct,
 
             "def" => TokenType::Def,

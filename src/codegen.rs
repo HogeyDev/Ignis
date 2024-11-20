@@ -228,8 +228,8 @@ pub fn compile_to_asm(
                         };
                         let find_address = match *lhs.clone() {
                             AST::VariableCall { name } => {
-                                let offset = scope.get_variable_offset(name);
-                                format!("\t{} rax, qword [rbp{offset:+}]\n", if is_fixed { "lea" } else { "mov" })
+                                let offset = scope.get_variable_location(name);
+                                format!("\t{} rax, qword [{}{:+}]\n", if is_fixed { "lea" } else { "mov" }, offset.0, offset.1)
                             }
                             AST::UnaryExpression { .. } |
                             AST::BinaryExpression { .. } => {
@@ -261,7 +261,7 @@ pub fn compile_to_asm(
                         // asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
                         asm.push_str(&move_on_stack(scope, rhs_typing.clone(), ("rsp", 0), ("rdx", 0)));
                         let rhs_type_size = get_type_size(rhs_typing).unwrap() as i64;
-                        asm.push_str(&format!("\tadd rsp, {rhs_type_size}\n"));
+                        asm.push_str(&format!("\tadd rsp, {rhs_type_size} ; cleaned up stack\n"));
                         scope.stack_size -= rhs_type_size;
 
                         asm
@@ -305,9 +305,9 @@ pub fn compile_to_asm(
                         match *child {
                             AST::VariableCall { name } => {
                                 // this is good!
-                                let stack_offset = scope.get_variable_offset(name);
+                                let stack_offset = scope.get_variable_location(name);
                                 // eprintln!("{:#?}", variable_type_size);
-                                format!("\tlea rax, qword [rbp{:+}]\n", stack_offset)
+                                format!("\tlea rax, qword [{}{:+}]\n", stack_offset.0, stack_offset.1)
                                 // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
                             }
                             _ => {
@@ -352,16 +352,16 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
-            let offset = scope.get_variable_offset(name.clone());
+            let offset = scope.get_variable_location(name.clone());
             if get_type_size(variable_type.clone()).unwrap() > 8 {
-                asm.push_str(&push_from_stack(scope, variable_type, ("rbp", offset)));
+                asm.push_str(&push_from_stack(scope, variable_type, (&offset.0, offset.1)));
                 // todo!("Variable type too large");
             } else {
                 let type_size = get_type_size(variable_type).unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
                 let asm_sizing = asm_size_prefix(type_size);
 
-                asm.push_str(format!("\tmov {}, {} [rbp{:+}]\n", register, asm_sizing, offset).as_str());
+                asm.push_str(&format!("\tmov {}, {} [{}{:+}]\n", register, asm_sizing, offset.0, offset.1));
                 if type_size == 1 {
                     asm.push_str("\tmovzx rax, al\n");
                 } else if type_size == 2 {
@@ -392,53 +392,17 @@ pub fn compile_to_asm(
         AST::VariableDeclaration {
             variable_type,
             name,
+            is_static,
         } => {
             let mut asm = String::new();
 
             let collapsed = string_to_collapsed_type_tree(variable_type.clone(), scope).unwrap();
             let width = get_type_size(collapsed.clone()).unwrap() as i64;
-            scope.add_variable(name.clone(), variable_type, width);
-            // eprintln!("{name}: {width}");
-            // TODO: Use some loop to fill stack with zeros when type is >8 bytes
-            asm.push_str(&format!("\tsub rsp, {width} ; stack reserved for `{name}`\n"));
-            asm.push_str(&initialize_type(scope, collapsed, ("rsp", 0)));
-            // if width > 8 {
-            //     match *collapsed.clone() {
-            //         Type::Struct(_, members) => {
-            //             asm.push_str(
-            //                 initialize_struct(
-            //                     scope.to_owned(),
-            //                     offset,
-            //                     collapsed,
-            //                     members.iter().map(|_| "0".to_string()).collect(),
-            //                 )
-            //                 .as_str(),
-            //             );
-            //         }
-            //         Type::FixedArray(length, child_type) => {
-            //             let child_size = get_type_size(child_type).unwrap();
-            //             asm.push_str(format!("\tsub rsp, {}\n", child_size * length).as_str());
-            //             scope.stack_size += (child_size * length) as i64;
-            //             for i in (0..length).rev() {
-            //                 asm.push_str(&format!("\tmov [rsp+{}], 0\n", i * child_size));
-            //             }
-            //         }
-            //         _ => {
-            //             // eprintln!("[ASM] Cannot set variable to zero with type `{}` because its size is {} (>8) and it's not a struct or a fixed-size array", collapsed.to_string(), width);
-            //             // process::exit(1);
-            //             asm.push_str(
-            //                 format!(
-            //                     "\tsub rsp, {}\n\tmov {} [rbp{:+}], 0 ; initialized `{}`\n",
-            //                     width,
-            //                     asm_size_prefix(width),
-            //                     -offsets,
-            //                     name
-            //                 )
-            //                 .as_str(),
-            //             );
-            //         }
-            //     }
-            // }
+            scope.add_variable(name.clone(), variable_type, is_static, width);
+            if !is_static {
+                asm.push_str(&format!("\tsub rsp, {width} ; stack reserved for `{name}`\n"));
+                asm.push_str(&initialize_type(scope, collapsed, ("rsp", 0)));
+            }
 
             asm
         }
@@ -460,11 +424,11 @@ pub fn compile_to_asm(
             }
 
             let lhs_type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
-            // unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
             if lhs_type_size > 8 {
+                unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
                 match *lhs_typing.clone() {
                     Type::Struct(_, members) => {
-                        let offset = scope.get_variable_offset(name);
+                        let offset = scope.get_variable_location(name);
                         let temporary_start = -scope.stack_size;
                         let mut internal_offset = 0;
                         for member in members {
@@ -472,11 +436,12 @@ pub fn compile_to_asm(
 
                             asm.push_str(
                                 format!(
-                                    "\tmov rax, {} [rbp{:+}];FORK\n\tmov {} [rbp{:+}], rax\n",
+                                    "\tmov rax, {} [rbp{:+}] ; FORK\n\tmov {} [{}{:+}], rax\n",
                                     "qword",
                                     temporary_start - internal_offset,
                                     "qword",
-                                    offset - internal_offset
+                                    offset.0,
+                                    offset.1 - internal_offset
                                 )
                                 .as_str(),
                             );
@@ -497,10 +462,10 @@ pub fn compile_to_asm(
                 let asm_sizing = asm_size_prefix(lhs_type_size);
                 let register = asm_size_to_register(lhs_type_size, "a");
 
-                let offset = scope.get_variable_offset(name.clone());
+                let offset = scope.get_variable_location(name.clone());
                 // asm.push_str(scope.pop(register.clone(), lhs_type_size).as_str());
                 scope.stack_size -= lhs_type_size;
-                asm.push_str(&format!("\tmov {register}, {asm_sizing} [rsp]\n\tadd rsp, {lhs_type_size}\n\tmov {asm_sizing} [rbp{offset:+}], {register} ; assigned `{name}`\n"));
+                asm.push_str(&format!("\tmov {register}, {asm_sizing} [rsp]\n\tadd rsp, {lhs_type_size}\n\tmov {asm_sizing} [{}{:+}], {register} ; assigned `{name}`\n", offset.0, offset.1));
             }
 
             asm

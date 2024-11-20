@@ -1,25 +1,46 @@
 import stdio;
 // import stdlib;
 
-struct Person {     // 16 bytes
-    name: []char;   // 8 bytes
-    age: int;       // 8 bytes
+enum Job {
+    Teacher,
+    Programmer,
+    None,
 }
 
-func print_person :: (void, person: @Person) {
+struct Person {     // 24 bytes
+    name: []char;   // 8 bytes
+    age: int;       // 8 bytes
+    job: Job;       // 8 bytes
+    meaningless: int;
+}
+
+func print_person(void, person: @Person) {
     print("Hi, my name is ");
     print((@person).name);
     print(" and I'm ");
-    printnum((@person).age);
+    print_int((@person).age);
     println(" years old.");
 }
 
-func main :: (int) {
+func main(int) {
     let person: Person;
     person.age = 17;
     person.name = "Kourtet";
+    person.job = Job::None;
 
     print_person(&person);
+
+    let i: int = 0;
+    while (i < 20) {
+        print_int(i);
+        println("");
+
+        if (i <= 6) {
+            i = i * 2;
+        }
+
+        i = i + 1;
+    }
 
     return person.age;
 }

@@ -1,0 +1,24 @@
+import stdio;
+
+// yeah just kidding i ain't making a heap yet
+
+static cool: [1048576]int; // 1024 * 1024
+
+func main(int) {
+    let i: int = 0;
+    while (i < 1048575) {
+        cool[i] = i;
+
+        i = i + 1;
+    }
+
+    let sum: int = 0;
+    i = 0;
+    while (i < 1048575) {
+        sum = sum + cool[i];
+
+        i = i + 1;
+    }
+
+    return sum % 100;
+}

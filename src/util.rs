@@ -131,7 +131,8 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
-            Ok(format!("\tlea rdx, qword [rbp{:+}]\n", scope.get_variable_offset(name)))
+            let location = scope.get_variable_location(name);
+            Ok(format!("\tlea rdx, qword [{}{:+}]\n", location.0, location.1))
         }
         AST::MemberAccess { accessed, member } => {
             let struct_typing = calculate_ast_type(accessed.clone(), scope)?;
@@ -176,14 +177,13 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                         AST::VariableCall { name } => name,
                         _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
                     };
-                    let array_base = scope.get_variable_offset(array_name.clone());
+                    let array_base = scope.get_variable_location(array_name.clone());
                     let child_size = get_type_size(child_type)?;
                     // eprintln!("{array_name}: {array_base}");
 
                     let rhs_resolution = compile_to_asm(program_config, rhs, scope);
 
-                    // Ok(format!("{rhs_resolution}\tpop rcx\n\timul rcx, {child_size}\n\tlea rdx, qword [rbp{array_base:+}]\n\tadd rdx, rcx\n")) // TODO: maybe inline all of the multiplication and subtraction
-                    Ok(format!("{rhs_resolution}\tpop rcx\n\tlea rdx, qword [rbp{array_base:+}+rcx*{child_size}] ; rcx is multiplied to adjust for type sizing\n"))
+                    Ok(format!("{rhs_resolution}\tpop rcx\n\tlea rdx, qword [{}{:+}+rcx*{child_size}] ; rcx is multiplied to adjust for type sizing\n", array_base.0, array_base.1))
                     // Ok(format!("{child_size}*{}"))
                 }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),

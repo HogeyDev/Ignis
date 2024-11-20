@@ -6,7 +6,7 @@ use crate::types::{get_type_size, string_to_collapsed_type_tree, Type};
 pub struct ScopeContext {
     pub stack_size: i64, // in bytes
     pub label_counter: usize,
-    pub variables: Vec<(String, String, i64)>, // [NAME, TYPE, LOCATION]
+    pub variables: Vec<(String, String, i64, bool, String)>, // [NAME, TYPE, LOCATION, IS_STATIC, BASE]
     pub functions: Vec<(String, String, Vec<(String, String)>)>, // [NAME, TYPE, [[ARG0, TYPE], [ARG1, TYPE], ... [ARGN, TYPE]]]
     pub strings: Vec<(String, usize)>,                           // [VALUE, ID]
     pub structs: Vec<(String, Vec<(String, String)>)>,           // [NAME, [MEMBER, TYPE]]
@@ -35,10 +35,10 @@ impl ScopeContext {
         let first_offset = self
             .variables
             .first()
-            .unwrap_or(&("".to_string(), "".to_string(), 0))
+            .unwrap_or(&("".to_string(), "".to_string(), 0, false, "".to_owned()))
             .2;
         let new_offset = first_offset - width;
-        self.variables.insert(0, (name, param_type, new_offset));
+        self.variables.insert(0, (name, param_type, new_offset, false, "rbp".to_owned()));
         new_offset
     }
     pub fn variable_exists(&self, name: String) -> bool {
@@ -48,20 +48,22 @@ impl ScopeContext {
         &mut self,
         name: String,
         variable_type: String,
+        is_static: bool,
         width: i64,
-    ) -> i64 {
+    ) -> (String, i64) {
         if self.variable_exists(name.clone()) {
             eprintln!("[BlockScope] Variable `{}` already exists", name);
             process::exit(1);
         }
-        self.stack_size += width;
+        let label = if !is_static { self.stack_size += width; 0 } else { self.add_label() };
         self.variables
-            .push((name.clone(), variable_type.clone(), self.stack_size));
-        -self.get_variable_offset(name)
+            .push((name.clone(), variable_type.clone(), self.stack_size, is_static, if is_static { format!("GLO{}", label) } else { "rbp".to_owned() }));
+        let location = self.get_variable_location(name);
+        (location.0, -location.1)
     }
-    pub fn get_variable_data(&self, name: String) -> (String, i64) {
+    pub fn get_variable_data(&self, name: String) -> (String, i64, String) {
         match self.variables.iter().find(|x| x.0 == name) {
-            Some(value) => (value.clone().1, value.2),
+            Some(value) => (value.1.clone(), value.2, value.4.clone()),
             None => {
                 let bt = Backtrace::capture();
                 eprintln!("{}", bt);
@@ -70,8 +72,9 @@ impl ScopeContext {
             }
         }
     }
-    pub fn get_variable_offset(&self, name: String) -> i64 {
-        -self.get_variable_data(name).1
+    pub fn get_variable_location(&self, name: String) -> (String, i64) {
+        let data = self.get_variable_data(name);
+        (data.2, -data.1)
     }
     pub fn add_function(
         &mut self,
@@ -168,12 +171,18 @@ impl ScopeContext {
         self.stack_size -= width;
         format!("\tpop {}\n", destination)
     }
-    pub fn absorb_strings(&mut self, scope: ScopeContext) {
+    pub fn absorb_statics(&mut self, scope: ScopeContext) {
         for str in scope.strings {
             if self.strings.iter().any(|x| x.1 == str.1) {
                 continue;
             }
             self.strings.push(str);
+        }
+        for stat in scope.variables.iter().filter(|x| x.3).cloned().collect::<Vec<(String, String, i64, bool, String)>>() {
+            if self.variables.iter().any(|x| x.0 == stat.0) {
+                continue;
+            }
+            self.variables.push(stat);
         }
         self.strings.sort_by(|a, b| a.1.cmp(&b.1));
     }
@@ -182,14 +191,19 @@ impl ScopeContext {
         self.strings.push((value, id));
         id
     }
-    pub fn compile_strings(&self) -> String {
-        let mut strings = String::new();
+    pub fn compile_data(&self) -> String {
+        let mut data = String::new();
 
         for str in self.strings.clone() {
-            strings.push_str(format!("\tSTR{} db \"{}\", 0\n", str.1, str.0).as_str());
+            data.push_str(&format!("\tSTR{} db \"{}\", 0\n", str.1, str.0));
         }
 
-        strings
+        for stat in self.variables.iter().filter(|x| x.3).cloned().collect::<Vec<(String, String, i64, bool, String)>>() {
+            let collapsed = string_to_collapsed_type_tree(stat.1, self).unwrap();
+            data.push_str(&format!("\t{}: resb {}\n", stat.4, get_type_size(collapsed).unwrap()));
+        }
+
+        data
     }
     pub fn add_label(&mut self) -> usize {
         self.label_counter += 1;
@@ -200,21 +214,12 @@ impl ScopeContext {
     }
     pub fn sub_scope(&self) -> ScopeContext {
         self.clone()
-        // ScopeContext {
-        //     stack_size: self.stack_size,
-        //     label_counter: self.label_counter,
-        //     variables: self.variables.clone(),
-        //     functions: self.functions.clone(),
-        //     strings: self.strings.clone(),
-        //     structs: self.structs.clone(),
-        //     defined_types: self.defined_types.clone(),
-        // }
     }
     pub fn absorb_stack(&mut self, _scope: ScopeContext) {
         // self.stack_size = std::cmp::max(self.stack_size, scope.stack_size);
     }
     pub fn absorb_sub_scope_globals(&mut self, sub_scope: ScopeContext) {
-        self.absorb_strings(sub_scope.clone());
+        self.absorb_statics(sub_scope.clone());
         self.absorb_functions(sub_scope.clone());
         self.absorb_labels(sub_scope.clone());
         self.absorb_stack(sub_scope.clone());

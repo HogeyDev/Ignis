@@ -1,0 +1,24 @@
+import stdlib;
+
+enum bool [ noprefix ] {
+    false,
+    true,
+}
+
+struct Person {
+    name: []char;
+    age: int;
+    homeless: bool;
+    married: bool;
+}
+
+func main(int) {
+    let k: Person;
+
+    k.name = "Kourtet";
+    k.age = 18;
+    k.homeless = true;
+    k.married = false;
+
+    return 100 * k.homeless - k.married;
+}

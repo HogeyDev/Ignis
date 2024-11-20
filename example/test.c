@@ -100,6 +100,8 @@ int main() {
     addTest(&tests, "preprocessing", "", 123);
     addTest(&tests, "macros", "", 42);
     addTest(&tests, "primes", "", 168);
+    addTest(&tests, "boolean", "", 100);
+    addTest(&tests, "heap", "", 25);
     // addTest(&tests, "stdtest", "", 37);
 
     runTests(&tests);

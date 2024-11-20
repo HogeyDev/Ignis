@@ -66,6 +66,7 @@ pub enum AST {
     VariableDeclaration {
         variable_type: String,
         name: String,
+        is_static: bool,
     },
     VariableAssignment {
         name: String,
@@ -366,8 +367,9 @@ impl Parser {
                 let value = self.expression().unwrap();
                 self.eat(TokenType::SemiColon);
                 stmt = Some(Box::new(AST::Return(value)));
-            } else if self.current_token.token_type == TokenType::Let {
-                self.eat(TokenType::Let);
+            } else if [TokenType::Let, TokenType::Static].contains(&self.current_token.token_type) {
+                let is_static = self.current_token.token_type == TokenType::Static;
+                self.eat(if is_static { TokenType::Static } else { TokenType::Let });
                 let name = self.current_token.value.clone();
                 self.eat(TokenType::Identifier);
                 self.eat(TokenType::Colon);
@@ -386,6 +388,7 @@ impl Parser {
                             statements.push(Box::new(AST::VariableDeclaration {
                                 variable_type,
                                 name: name.clone(),
+                                is_static,
                             }));
                         }
                         _ => unreachable!(),
@@ -399,6 +402,7 @@ impl Parser {
                     stmt = Some(Box::new(AST::VariableDeclaration {
                         variable_type,
                         name: name.clone(),
+                        is_static,
                     }));
                 }
                 self.eat(TokenType::SemiColon);

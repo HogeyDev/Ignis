@@ -5,7 +5,7 @@
 # 	# RUST_BACKTRACE=1 cargo run
 # 	# RUST_BACKTRACE=full cargo run
 
-asmfile = preprocessing
+asmfile = heap
 
 all: compile test
 

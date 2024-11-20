@@ -33,7 +33,7 @@ fn main() {
     let mut scope = ScopeContext::new();
     let parsed_input_file = parse_file(&program_config, input_file);
     let section_text = compile_to_asm(&mut program_config, parsed_input_file, &mut scope);
-    let section_data = scope.compile_strings();
+    let section_data = scope.compile_data();
     
     let compiled = format!(
         "section .text\n{}\nglobal _start\n_start:\n\tpush rbp\n\tmov rbp, rsp\n\tcall _main\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n{}",

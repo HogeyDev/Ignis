@@ -85,7 +85,7 @@ impl PreProcessor {
                     }), arguments_mod)
                 }
             }
-            AST::VariableDeclaration { variable_type, name } => (Box::new(AST::VariableDeclaration { variable_type, name }), false),
+            AST::VariableDeclaration { variable_type, name, is_static } => (Box::new(AST::VariableDeclaration { variable_type, name, is_static }), false),
             AST::VariableAssignment { name, value } => {
                 let value = self.preprocess(value);
                 (Box::new(AST::VariableAssignment {
