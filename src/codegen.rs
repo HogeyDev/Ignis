@@ -426,38 +426,38 @@ pub fn compile_to_asm(
             let lhs_type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
             if lhs_type_size > 8 {
                 unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
-                match *lhs_typing.clone() {
-                    Type::Struct(_, members) => {
-                        let offset = scope.get_variable_location(name);
-                        let temporary_start = -scope.stack_size;
-                        let mut internal_offset = 0;
-                        for member in members {
-                            let member_size = get_type_size(member).unwrap() as i64;
+                // match *lhs_typing.clone() {
+                //     Type::Struct(_, members) => {
+                //         let offset = scope.get_variable_location(name);
+                //         let temporary_start = -scope.stack_size;
+                //         let mut internal_offset = 0;
+                //         for member in members {
+                //             let member_size = get_type_size(member).unwrap() as i64;
 
-                            asm.push_str(
-                                format!(
-                                    "\tmov rax, {} [rbp{:+}] ; FORK\n\tmov {} [{}{:+}], rax\n",
-                                    "qword",
-                                    temporary_start - internal_offset,
-                                    "qword",
-                                    offset.0,
-                                    offset.1 - internal_offset
-                                )
-                                .as_str(),
-                            );
+                //             asm.push_str(
+                //                 format!(
+                //                     "\tmov rax, {} [rbp{:+}] ; FORK\n\tmov {} [{}{:+}], rax\n",
+                //                     "qword",
+                //                     temporary_start - internal_offset,
+                //                     "qword",
+                //                     offset.0,
+                //                     offset.1 - internal_offset
+                //                 )
+                //                 .as_str(),
+                //             );
 
-                            internal_offset += member_size;
-                        }
-                        asm.push_str(&format!("\tadd rsp, {}\n", lhs_type_size));
-                    }
-                    _ => {
-                        eprintln!(
-                            "[ASM] type `{}` has size {} (>8), but isn't a struct",
-                            lhs_typing.to_string(),
-                            lhs_type_size
-                        );
-                    }
-                }
+                //             internal_offset += member_size;
+                //         }
+                //         asm.push_str(&format!("\tadd rsp, {}\n", lhs_type_size));
+                //     }
+                //     _ => {
+                //         eprintln!(
+                //             "[ASM] type `{}` has size {} (>8), but isn't a struct",
+                //             lhs_typing.to_string(),
+                //             lhs_type_size
+                //         );
+                //     }
+                // }
             } else {
                 let asm_sizing = asm_size_prefix(lhs_type_size);
                 let register = asm_size_to_register(lhs_type_size, "a");

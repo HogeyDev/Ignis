@@ -6,7 +6,7 @@ static cool: [1048576]int; // 1024 * 1024
 
 func main(int) {
     let i: int = 0;
-    while (i < 1048575) {
+    while (i < 1048576) {
         cool[i] = i;
 
         i = i + 1;
@@ -14,9 +14,9 @@ func main(int) {
 
     let sum: int = 0;
     i = 0;
-    while (i < 1048575) {
+    while (i < 1048576) {
         sum = sum + cool[i];
-
+        
         i = i + 1;
     }
 
