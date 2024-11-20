@@ -4,7 +4,7 @@
 
 ### Dependencies
  - rust
- - gcc
+ - gcc (only required for example/test.c)
  - nasm
  - ld
 
