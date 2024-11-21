@@ -113,7 +113,10 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str
             }
         }
         Type::Slice(_) => {
-            asm.push_str(&format!("\tmov qword [{}], 0\n", loc.0));
+            asm.push_str(&format!("\tmov qword [{}{:+}], 0\n", loc.0, loc.1));
+        }
+        Type::Pointer(_) => {
+            asm.push_str(&format!("\tmov qword [{}{:+}], 0\n", loc.0, loc.1));
         }
         _ => {
             eprintln!(

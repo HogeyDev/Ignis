@@ -291,9 +291,9 @@ pub fn compile_to_asm(
             let is_memory_operation = op == Operation::Ref;
             if !is_memory_operation {
                 asm.push_str(compile_to_asm(program_config, child.clone(), scope).as_str());
-                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // lhs
+                asm.push_str(scope.pop(String::from("rax"), 8).as_str()); // child
             }
-            let typing = calculate_ast_type(child.clone(), scope).unwrap();
+            let typing = calculate_ast_type(root.clone(), scope).unwrap();
 
             asm.push_str(
                 match op {
@@ -302,20 +302,21 @@ pub fn compile_to_asm(
                     Operation::Inv => "\tnot rax\n".to_string(),
                     Operation::Neg => "\tneg rax\n".to_string(),
                     Operation::Ref => {
-                        match *child {
-                            AST::VariableCall { name } => {
-                                // this is good!
-                                let stack_offset = scope.get_variable_location(name);
-                                // eprintln!("{:#?}", variable_type_size);
-                                format!("\tlea rax, qword [{}{:+}]\n", stack_offset.0, stack_offset.1)
-                                // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
-                            }
-                            _ => {
-                                // this is bad!
-                                eprintln!("[ASM] Cannot reference non variable value");
-                                process::exit(1);
-                            }
-                        }
+                        let stack_offset = resolve_address(program_config, scope, child).unwrap();
+                        format!("{stack_offset}\tmov rax, rdx\n")
+                        // match *child {
+                        //     AST::VariableCall { name } => {
+                        //         // this is good!
+                        //         // eprintln!("{:#?}", variable_type_size);
+                        //         format!("\tlea rax, qword [{}{:+}]\n", stack_offset.0, stack_offset.1)
+                        //         // format!("\tmov rax, rbp\n\tsub rax, {}\n", stack_offset)
+                        //     }
+                        //     _ => {
+                        //         // this is bad!
+                        //         eprintln!("[ASM] Cannot reference non variable value");
+                        //         process::exit(1);
+                        //     }
+                        // }
                     }
                     Operation::Deref => {
                         let size = get_type_size(typing.clone()).unwrap() as i64;
