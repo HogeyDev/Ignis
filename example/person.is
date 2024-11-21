@@ -24,9 +24,9 @@ func main(int) {
     let x: int = 0;
     while (x < 10) {
         print_int(x);
-        println("");
         x = x + 1;
     }
+    println("");
 
     return person.age;
 }
