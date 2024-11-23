@@ -1,9 +1,16 @@
 import stdio;
 // import stdlib;
 
+struct Car {
+    color: []char;
+    model: []char;
+    year: int;
+}
+
 struct Person {     // 16 bytes
     name: []char;   // 8 bytes
     age: int;       // 8 bytes
+    car: Car;
 }
 
 func print_person(void, person: @Person) {
@@ -11,13 +18,25 @@ func print_person(void, person: @Person) {
     print((@person).name);
     print(" and I'm ");
     print_int((@person).age);
-    println(" years old.");
+    print(" years old. I own a ");
+    print(person.car.color);
+    print(" ");
+    print_int(person.car.year);
+    print(" ");
+    print(person.car.model);
+    println(".");
 }
 
 func main(int) {
     let person: Person;
     person.age = 17;
     person.name = "Kourtet";
+
+    // let car: Car;
+    // car.color = "Yellow";
+    // car.model = "Acura TL";
+    // car.year = 2008;
+    // person.car = car;
 
     print_person(&person);
 

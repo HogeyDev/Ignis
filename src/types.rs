@@ -315,7 +315,7 @@ impl TypeParser {
                 current_token: tokens[0].clone(),
             }
         } else {
-            eprintln!("THJKDFLASJ");
+            eprintln!("No type to parse");
             process::exit(1);
         }
     }
@@ -414,6 +414,7 @@ impl TypeParser {
                     let mut buf_str = String::new();
                     while self.current_token != StrTokType::Comma
                         && self.current_token != StrTokType::RightBrace
+                        && self.current_token != StrTokType::Comma
                     {
                         buf_str.push_str(
                             match self.current_token.clone() {
@@ -425,7 +426,7 @@ impl TypeParser {
                                 StrTokType::RightBrace => "{".to_string(),
                                 StrTokType::Comma => ",".to_string(),
                                 StrTokType::Identifier(id) => id,
-                                StrTokType::EOS => panic!("Reached end of stream"),
+                                StrTokType::EOS => panic!("Reached end of stream\n{buf_str}"),
                             }
                             .as_str(),
                         );
