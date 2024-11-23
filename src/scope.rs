@@ -10,6 +10,7 @@ pub struct ScopeContext {
     pub functions: Vec<(String, String, Vec<(String, String)>)>, // [NAME, TYPE, [[ARG0, TYPE], [ARG1, TYPE], ... [ARGN, TYPE]]]
     pub strings: Vec<(String, usize)>,                           // [VALUE, ID]
     pub structs: Vec<(String, Vec<(String, String)>)>,           // [NAME, [MEMBER, TYPE]]
+    pub enums: Vec<String>,
     pub defined_types: Vec<(String, String)>,                    // [NAME, TYPE]
 }
 
@@ -28,6 +29,7 @@ impl ScopeContext {
             functions: Vec::new(),
             strings: Vec::new(),
             structs: Vec::new(),
+            enums: Vec::new(),
             defined_types: Vec::new(),
         }
     }

@@ -41,55 +41,6 @@ pub fn asm_size_to_register(width: i64, reg: &str) -> String {
     }
 }
 
-// pub fn initialize_struct(
-//     _scope: ScopeContext,
-//     offset: i64,
-//     struct_type: Box<Type>,
-//     values: Vec<String>,
-// ) -> String {
-//     let mut asm = format!(
-//         "\tsub rsp, {}\n",
-//         get_type_size(struct_type.clone()).unwrap()
-//     );
-// 
-//     let members = match *struct_type {
-//         Type::Struct(_, members) => members,
-//         _ => {
-//             eprintln!(
-//                 "[ASM] Cannot initialize struct, because it is not a struct lmao\n\t`{:?}`",
-//                 struct_type
-//             );
-//             process::exit(1);
-//         }
-//     };
-//     if values.len() < members.len() {
-//         eprintln!(
-//             "[ASM] Struct initialization expected a minimum of {} values, but only recieved {}",
-//             members.len(),
-//             values.len()
-//         );
-//         process::exit(1);
-//     }
-// 
-//     let mut total_offset = 0;
-//     for (i, member) in members.iter().enumerate() {
-//         total_offset += get_type_size(member.to_owned()).unwrap() as i64;
-//         let size = get_type_size(member.to_owned()).unwrap() as i64;
-//         let asm_size = asm_size_prefix(size);
-//         asm.push_str(
-//             format!(
-//                 "\tmov {} [rbp{:+}], {}\n",
-//                 asm_size,
-//                 -offset - total_offset,
-//                 values[i]
-//             )
-//             .as_str(),
-//         );
-//     }
-// 
-//     asm
-// }
-
 pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str, i64)) -> String {
     let mut asm = String::new();
     match *val_type {
@@ -196,31 +147,6 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
     }
 }
 
-// pub fn move_type_on_stack(scope: &mut ScopeContext, moved_type: Box<Type>, from: String, to: String) -> String {
-//     let mut asm = String::new();
-// 
-//     let type_size = get_type_size(moved_type.clone()).unwrap() as i64;
-//     if type_size > 8 {
-//         // unimplemented!("Large type relocation");
-//         // has to be a struct
-//         let struct_name = if let Type::Struct(name, _) = *moved_type { name } else {
-//             eprintln!("Cannot move type `{:?}` on stack with size {type_size} (>8) ", moved_type);
-//             process::exit(1);
-//         };
-//         let members = scope.get_struct_data(struct_name);
-//         for (member_name, member_type) in members {
-//             println!("MEM: {member_name}: {member_type}");
-//         }
-//         process::exit(99);
-//     } else {
-//         let register = asm_size_to_register(type_size, "a");
-//         let prefix = asm_size_prefix(type_size);
-//         asm.push_str(format!("\tmov {register}, {prefix} [{from}]\n\tmov {prefix} [{to}], {register}\n").as_str());
-//     }
-// 
-//     asm
-// }
-
 pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom: (&str, i64), to_bottom: (&str, i64)) -> String {
     let mut asm = String::new();
 
@@ -253,7 +179,14 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
             }
         },
         // Type::Pointer(child) => {},
-        // Type::Struct(_, members) => {},
+        Type::Struct(_, members) => {
+            let mut total_size = 0;
+            for member in members.iter().rev() {
+                let child_size = get_type_size(member.clone()).unwrap() as i64;
+                asm.push_str(&move_on_stack(scope, member.clone(), (from_bottom.0, from_bottom.1 + total_size), (to_bottom.0, to_bottom.1 + total_size)));
+                total_size += child_size;
+            }
+        },
         _ => {
             eprintln!("Cannot move type of {collapsed:#?}");
             exit(1);
@@ -272,6 +205,10 @@ pub fn push_from_stack(scope: &mut ScopeContext, collapsed: Box<Type>, location:
 
 pub fn type_is_struct(scope: &ScopeContext, type_name: String) -> bool {
     scope.structs.iter().find(|x| x.0 == type_name).is_some()
+}
+
+pub fn type_is_typedef(scope: &ScopeContext, type_name: String) -> bool {
+    scope.defined_types.iter().find(|x| x.0 == type_name).is_some()
 }
 
 pub fn parse_expansion_string(exp: String) -> Vec<(bool, String)> {

@@ -1,11 +1,4 @@
-# all: run compile_asm run_asm
-# 
-# run:
-# 	cargo run
-# 	# RUST_BACKTRACE=1 cargo run
-# 	# RUST_BACKTRACE=full cargo run
-
-asmfile = heap
+asmfile = person
 
 all: compile test
 

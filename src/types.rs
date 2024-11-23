@@ -2,7 +2,7 @@ use std::process;
 
 use crate::{
     parser::{Operation, AST},
-    scope::ScopeContext,
+    scope::ScopeContext, util::type_is_struct,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,6 +14,7 @@ pub enum Type {
     UnaryOperation(Operation, Box<Type>),
     BinaryOperation(Operation, Box<Type>, Box<Type>),
     Struct(String, Vec<Box<Type>>),
+    Enum(String),
 }
 
 impl Type {
@@ -23,24 +24,7 @@ impl Type {
             Self::FixedArray(size, sub) => format!("[{}]{}", size, sub.to_string()),
             Self::Slice(sub) => format!("[]{}", sub.to_string()),
             Self::Pointer(sub) => format!("@{}", sub.to_string()),
-            Self::Struct(_, members) => {
-                let mut stringified = format!("{{");
-
-                let num_members = members.len();
-                for (i, member) in members.iter().enumerate() {
-                    stringified.push_str(
-                        format!(
-                            "{}{}",
-                            member.to_string(),
-                            if i == num_members - 1 { "" } else { "," }
-                        )
-                        .as_str(),
-                    );
-                }
-
-                stringified.push('}');
-                stringified
-            }
+            Self::Struct(name, _) => name,
             _ => {
                 eprintln!("[TypeParser] Cannot stringify type `{:?}`", self);
                 process::exit(1);
@@ -49,7 +33,7 @@ impl Type {
     }
 }
 
-pub fn calculate_ast_type(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
+pub fn calculate_ast_type(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, String> {
     let tree = ast_to_type_tree(ast, scope)?;
     let collapsed = collapse_type_tree(tree)?;
     Ok(collapsed.clone())
@@ -71,11 +55,11 @@ pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
 pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
     match *comp {
         Type::Primative(prim) => get_primative_type_size(prim),
-        Type::Pointer(_) => get_primative_type_size("usize".to_string()),
+        Type::Pointer(_) => get_primative_type_size("usize".to_owned()),
         Type::UnaryOperation(_, sub) => get_type_size(sub),
         Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
         Type::FixedArray(size, sub) => Ok(get_type_size(sub).unwrap() * size),
-        Type::Slice(_) => get_primative_type_size("usize".to_string()), // adding the size of the array onto the end of the space in memory, and since the size is a usize, then we add 8 bytes
+        Type::Slice(_) => get_primative_type_size("usize".to_owned()), // adding the size of the array onto the end of the space in memory, and since the size is a usize, then we add 8 bytes
         Type::Struct(_, members) => {
             let mut size = 0usize;
             for member in members {
@@ -83,17 +67,11 @@ pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
             }
             Ok(size)
         }
-        // _ => {
-        //     eprintln!(
-        //         "[TypeParser] Size of type `{:?}` cannot be inferred at compile-time",
-        //         *comp
-        //     );
-        //     process::exit(1);
-        // }
+        Type::Enum(_) => get_primative_type_size("usize".to_owned()),
     }
 }
 
-pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
+pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>, String> {
     match *ast {
         AST::Integer(_) => Ok(Box::new(Type::Primative("int".to_string()))),
         AST::Character(_) => Ok(Box::new(Type::Primative("char".to_string()))),
@@ -146,8 +124,8 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
                     process::exit(1);
                 }
             };
-            let struct_name = scope.get_struct_data(struct_name);
-            let member_type_string = struct_name
+            let struct_data = scope.get_struct_data(struct_name);
+            let member_type_string = struct_data
                 .iter()
                 .find(|x| x.0 == member)
                 .unwrap()
@@ -157,12 +135,12 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
         }
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
-            Err("AST is not type-able")
+            Err("AST is not type-able".to_owned())
         }
     }
 }
 
-pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
+pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, String> {
     match *tree {
         Type::Primative(type_name) => Ok(Box::new(Type::Primative(type_name))),
         Type::UnaryOperation(op, child) => match op {
@@ -177,10 +155,10 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
                 return match *lhs {
                     Type::FixedArray(_, sub) => Ok(sub),
                     Type::Slice(sub) => Ok(sub),
-                    _ => Err("Tried to do array access on non array type"),
+                    _ => Err("Tried to do array access on non array type".to_owned()),
                 };
             } else if collapsed_lhs != collapsed_rhs {
-                return Err("Types do not match");
+                return Err("Types do not match".to_owned());
             }
             Ok(collapsed_lhs)
         }
@@ -199,13 +177,14 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, &'static str> {
             }
             Ok(Box::new(Type::Struct(name, collapsed)))
         }
+        Type::Enum(name) => Ok(Box::new(Type::Enum(name))),
     }
 }
 
 pub fn string_to_type_tree(
     type_str: String,
     scope: &ScopeContext,
-) -> Result<Box<Type>, &'static str> {
+) -> Result<Box<Type>, String> {
     let type_tokens = TypeLexer::new(type_str).tokenize();
     TypeParser::new(type_tokens).parse(scope)
 }
@@ -213,7 +192,7 @@ pub fn string_to_type_tree(
 pub fn string_to_collapsed_type_tree(
     type_str: String,
     scope: &ScopeContext,
-) -> Result<Box<Type>, &'static str> {
+) -> Result<Box<Type>, String> {
     collapse_type_tree(string_to_type_tree(type_str, scope)?)
 }
 
@@ -332,8 +311,7 @@ impl TypeParser {
         self.current_token = self.peek(1);
         self.index += 1;
     }
-    pub fn parse(&mut self, scope: &ScopeContext) -> Result<Box<Type>, &'static str> {
-        // eprintln!("BOR: {:?}", self.current_token);
+    pub fn parse(&mut self, scope: &ScopeContext) -> Result<Box<Type>, String> {
         match self.current_token.clone() {
             StrTokType::AtSign => {
                 self.advance();
@@ -378,33 +356,14 @@ impl TypeParser {
                 "char" => Ok(Box::new(Type::Primative("char".to_string()))),
                 "usize" => Ok(Box::new(Type::Primative("usize".to_string()))),
                 _ => {
-                    // 1. get the full type string
-                    // 2. parse the type string
-                    // 3. return the type
-                    let type_string = match scope
-                        .defined_types
-                        .iter()
-                        .find(|x| x.0 == id) {
-                            Some(value) => value.1.clone(),
-                            None => {
-                                eprintln!("Cannot resolve type: `{id}`");
-                                process::exit(1);
-                            },
-                        };
-                    let collapsed = string_to_collapsed_type_tree(type_string, scope)?;
-                    // could be a to be a struct
-                    let new_full_type = match *collapsed {
-                        Type::Struct(_, members) => Type::Struct(id, members),
-                        _ => *collapsed,
-                    };
-                    Ok(Box::new(new_full_type))
-                    // Ok(Box::new(Type::Struct(id, collapsed)))
-
-                    // eprintln!(
-                    //     "[TypeParser] Resolving complex types does not exist yet!\n\t{:#?}",
-                    //     id
-                    // );
-                    // process::exit(1);
+                    if type_is_struct(scope, id.clone()) {
+                        let members = scope.get_struct_data(id.clone());
+                        Ok(Box::new(Type::Struct(id, members.iter().map(|x| string_to_type_tree(x.1.clone(), scope).unwrap()).collect::<Vec<Box<Type>>>())))
+                    } else if let Some((_, alias)) = scope.defined_types.iter().find(|x| x.0 == id) {
+                        Ok(string_to_type_tree(alias.to_owned(), scope)?)
+                    } else {
+                        Err(format!("Could not find type {id}"))
+                    }
                 }
             },
             StrTokType::LeftBrace => {

@@ -622,7 +622,6 @@ impl Parser {
         scope
     }
     fn expression(&mut self) -> Result<Box<AST>, String> {
-        // println!("{:?}", self.current_token);
         let mut lhs = self.assignment()?;
 
         while self.current_token.token_type == TokenType::DoublePipe
@@ -813,12 +812,14 @@ impl Parser {
         let mut lhs = self.primary()?;
 
         if self.current_token.token_type == TokenType::Period {
-            self.eat(TokenType::Period);
-            lhs = Box::new(AST::MemberAccess {
-                accessed: lhs,
-                member: self.current_token.value.clone(),
-            });
-            self.eat(TokenType::Identifier);
+            while self.current_token.token_type == TokenType::Period {
+                self.eat(TokenType::Period);
+                lhs = Box::new(AST::MemberAccess {
+                    accessed: lhs,
+                    member: self.current_token.value.clone(),
+                });
+                self.eat(TokenType::Identifier);
+            }
         } else if self.current_token.token_type == TokenType::BlockSeparator {
             self.eat(TokenType::BlockSeparator);
             let parent = match *lhs {
