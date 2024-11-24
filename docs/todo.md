@@ -1,26 +1,13 @@
-[X] Definitions
-    [X] Maybe this will extend into some form of macro system?
-     - Ex: `def PI 3.141592653f
-            let x: float = 3 * PI;`
-
-[ ] Module system
-    - Should solve circular import issue
+[-] Module system
+    [X] Should solve circular import issue
     [ ] Get export overview before attempting to compiling anything
     [ ] Collect all exports into global `file: Map<String, Vec<String>>` variable
         - String: filename
         - Vec<String>: all exports in file
 
-[ ] Arrays
-    - arrays are stored backwards in memory, so do that
-
 [-] Standard Library
 
 [-] Enums
-
-[X] Readme file explaining how to at least compile a program
-
-[ ] Add ability to move structs in memory
-    [-] Should be able to move not just structs, but any data type
 
 [-] Buff out the Command Line Interface because it needs it and is necessary
     - "./ignis -o main main.is"
@@ -53,13 +40,6 @@
 
 
 
-[X] Structs
-             - Ex:
-                          - `struct Person {
-                                       name: []char;
-                                       phone_number: int;
-                             }`
-
 [ ] Namespaces
              - Separator: '#'
              - Ex:
@@ -70,6 +50,23 @@
                              }
                              let x: int = cool_spot#add(3, 4); // x = 7`
 
+[X] Add ability to move structs in memory
+    [X] Should be able to move not just structs, but any data type
+
+[X] Readme file explaining how to at least compile a program
+
+[X] Structs
+             - Ex:
+                          - `struct Person {
+                                       name: []char;
+                                       phone_number: int;
+                             }`
+
+[X] Definitions
+    [X] Maybe this will extend into some form of macro system?
+     - Ex: `def PI 3.141592653f
+            let x: float = 3 * PI;`
+
 [X] Macros
 
 [X] Variables should use rbp, not rsp
@@ -79,3 +76,6 @@
 
 [X] Finish implementing all operations
              [X] Still need a dereference operator (maybe use '@' sign for consistency?).
+
+[X] Arrays
+    - arrays are stored backwards in memory, so do that
