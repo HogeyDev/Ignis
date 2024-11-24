@@ -54,6 +54,7 @@ pub enum TokenType {
     Percent,
     DoublePipe,
     DoubleAmpersand,
+    Arrow,
 
     String,
     Integer,
@@ -231,6 +232,7 @@ impl Tokenizer {
             TokenType::LessThanEqualsTo,
             TokenType::MoreThanEqualsTo,
             TokenType::BlockSeparator,
+            TokenType::Arrow,
         ]
         .contains(&token_type)
         {
@@ -320,6 +322,8 @@ impl Tokenizer {
             '-' => {
                 if self.peek(1) == '-' {
                     TokenType::Decrement
+                } else if self.peek(1) == '>' {
+                    TokenType::Arrow
                 } else {
                     TokenType::Minus
                 }

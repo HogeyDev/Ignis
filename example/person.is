@@ -29,15 +29,15 @@ func print_person(void, person: Person) {
 
 func print_person_ref(void, person: @Person) {
     print("His name is ");
-    print((@person).name);
+    print(person->name);
     print(" and he's ");
-    print_int((@person).age);
+    print_int(person->age);
     print(" years old. He owns a ");
-    print((@person).car.color);
+    print(person->car.color);
     print(" ");
-    print_int((@person).car.year);
+    print_int(person->car.year);
     print(" ");
-    print((@person).car.model);
+    print(person->car.model);
     println(".");
 }
 

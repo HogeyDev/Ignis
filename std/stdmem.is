@@ -1,5 +1,11 @@
+static heap: [1048576]int;
+static heap_pointer: usize = int_to_usize(0);
+
 func malloc(@void, bytes: usize) {
-    // TODO: ummmm
+    let top: usize = heap_pointer;
+    heap_pointer = heap_pointer + bytes;
+
+    return top;
 }
 
 func free(void, ptr: @void) {

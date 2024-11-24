@@ -781,6 +781,7 @@ impl Parser {
             || self.current_token.token_type == TokenType::Decrement
             || self.current_token.token_type == TokenType::Ampersand
             || self.current_token.token_type == TokenType::At
+            || self.current_token.token_type == TokenType::LessThan
         {
             // println!("unary");
             let op = match self.current_token.token_type {
@@ -811,14 +812,23 @@ impl Parser {
         // should be used for '->', '[]', '.', '::' style operators
         let mut lhs = self.primary()?;
 
-        if self.current_token.token_type == TokenType::Period {
-            while self.current_token.token_type == TokenType::Period {
-                self.eat(TokenType::Period);
-                lhs = Box::new(AST::MemberAccess {
-                    accessed: lhs,
-                    member: self.current_token.value.clone(),
-                });
-                self.eat(TokenType::Identifier);
+        if [TokenType::Period, TokenType::Arrow].contains(&self.current_token.token_type) {
+            while [TokenType::Period, TokenType::Arrow].contains(&self.current_token.token_type) {
+                if self.current_token.token_type == TokenType::Period {
+                    self.eat(TokenType::Period);
+                    lhs = Box::new(AST::MemberAccess {
+                        accessed: lhs,
+                        member: self.current_token.value.clone(),
+                    });
+                    self.eat(TokenType::Identifier);
+                } else {
+                    self.eat(TokenType::Arrow);
+                    lhs = Box::new(AST::MemberAccess {
+                        accessed: Box::new(AST::UnaryExpression { op: Operation::Deref, child: lhs }),
+                        member: self.current_token.value.clone(),
+                    });
+                    self.eat(TokenType::Identifier);
+                }
             }
         } else if self.current_token.token_type == TokenType::BlockSeparator {
             self.eat(TokenType::BlockSeparator);

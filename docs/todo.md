@@ -31,7 +31,7 @@
                           - any data that doesn't fit in the new value is dropped, preserving the end of the value.
              - Ex:
                           - `namespace TypeConv {
-                                 func int_char :: (char, from: int) ...
+                                 func int_char(char, from: int) ...
                              }`
                           - Custom conversion methods can be defined in the TypeConv namespace
                              - Naming for conversion function is `[FROM]_[TO]`

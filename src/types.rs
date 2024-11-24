@@ -40,14 +40,15 @@ pub fn calculate_ast_type(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Typ
 }
 
 pub fn is_primative_type(potential: String) -> bool {
-    ["int", "char", "usize"].contains(&potential.as_str())
+    ["int", "char", "usize", "void"].contains(&potential.as_str())
 }
 
 pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     match prim.as_str() {
-        "char" => Ok(1),
         "int" => Ok(8),
+        "char" => Ok(1),
         "usize" => Ok(8),
+        "void" => Ok(0),
         _ => Err("Not a primative type"),
     }
 }
@@ -352,9 +353,10 @@ impl TypeParser {
                 process::exit(1);
             }
             StrTokType::Identifier(id) => match id.as_str() {
-                "int" => Ok(Box::new(Type::Primative("int".to_string()))),
-                "char" => Ok(Box::new(Type::Primative("char".to_string()))),
-                "usize" => Ok(Box::new(Type::Primative("usize".to_string()))),
+                "int" => Ok(Box::new(Type::Primative("int".to_owned()))),
+                "char" => Ok(Box::new(Type::Primative("char".to_owned()))),
+                "usize" => Ok(Box::new(Type::Primative("usize".to_owned()))),
+                "void" => Ok(Box::new(Type::Primative("void".to_owned()))),
                 _ => {
                     if type_is_struct(scope, id.clone()) {
                         let members = scope.get_struct_data(id.clone());

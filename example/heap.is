@@ -1,24 +1,14 @@
 import stdio;
+import stdmem;
 
-// yeah just kidding i ain't making a heap yet
-
-static cool: [1048576]int; // 1024 * 1024
+struct Person {
+    name: []char;
+    age: int;
+}
 
 func main(int) {
-    let i: int = 0;
-    while (i < 1048576) {
-        cool[i] = i;
+    let sizeof_person: usize = <!usize> 16;
+    let allocated: @Person = <!@Person> malloc(sizeof_person);
 
-        i = i + 1;
-    }
-
-    let sum: int = 0;
-    i = 0;
-    while (i < 1048576) {
-        sum = sum + cool[i];
-        
-        i = i + 1;
-    }
-
-    return sum % 100;
+    return 1;
 }
