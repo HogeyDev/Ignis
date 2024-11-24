@@ -45,8 +45,8 @@ pub fn is_primative_type(potential: String) -> bool {
 
 pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     match prim.as_str() {
-        "int" => Ok(8),
         "char" => Ok(1),
+        "int" => Ok(8),
         "usize" => Ok(8),
         _ => Err("Not a primative type"),
     }

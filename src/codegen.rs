@@ -99,7 +99,7 @@ pub fn compile_to_asm(
                     get_type_size(string_to_collapsed_type_tree(function_data.0, scope).unwrap())
                         .unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
-                if type_size < 8 {
+                if type_size <= 2 {
                     asm.push_str(format!("\tmovzx rax, {}\n", register).as_str());
                 }
                 asm.push_str(scope.push("rax".to_string(), type_size).as_str());
@@ -367,8 +367,6 @@ pub fn compile_to_asm(
                     asm.push_str("\tmovzx rax, al\n");
                 } else if type_size == 2 {
                     asm.push_str("\tmovzx rax, ax\n");
-                } else if type_size == 4 {
-                    asm.push_str("\tmovzx rax, eax\n");
                 }
                 asm.push_str(scope.push(format!("rax ; recalled `{}`", name), 8).as_str());
             }
@@ -555,8 +553,6 @@ pub fn compile_to_asm(
             asm
         }
         AST::MemberAccess { accessed, member } => {
-            let mut asm = String::new();
-
             let struct_type_name = match *ast_to_type_tree(accessed.clone(), scope).unwrap() {
                 Type::Struct(name, _) => name,
                 _ => {
@@ -572,70 +568,7 @@ pub fn compile_to_asm(
             let resolution = resolve_address(program_config, scope, root).unwrap();
             let push = push_from_stack(scope, member_type, ("rdx", 0));
 
-            asm.push_str(&format!("{resolution}{push}"));
-
-            return asm;
-
-            let accessed_type = calculate_ast_type(accessed.clone(), scope).unwrap();
-            // eprintln!("HAS TYPE: {:#?}", accessed_type.clone());
-            let struct_name = match *accessed_type.clone() {
-                Type::Struct(name, _) => name,
-                _ => {
-                    eprintln!("[ASM] Cannot perform member access on non-struct\n\tAccessed `{}` from `{:?}`", member, accessed);
-                    process::exit(1);
-                }
-            };
-            let member_types = scope.get_struct_data(struct_name.clone());
-            let external_offset = resolve_address(program_config, scope, accessed.clone()).unwrap();
-            let internal_offset = scope.get_struct_member_offset(struct_name, member.clone()).unwrap();
-            // eprintln!("{:?}.{:?} @ {} + {}", accessed, member, external_offset, internal_offset);
-            // let mut member_type_size = -1;
-            let member_located = member_types
-                                    .iter()
-                                    .find(|x| { x.0 == member })
-                                    .unwrap();
-            let member_type = string_to_collapsed_type_tree(member_located.1.to_string(), scope).unwrap();
-            let member_type_size = get_type_size(member_type.clone()).unwrap() as i64;
-            // for (member_name, member_type) in member_types {
-            //     if member_name.to_string() == member {
-            //         member_type_size =
-            //             get_type_size(string_to_collapsed_type_tree(member_type.to_string(), scope).unwrap())
-            //                 .unwrap() as i64;
-            //         break;
-            //     }
-            // }
-            // if member_type_size < 0 {
-            //     eprintln!("Could not find member `{member}` in struct `{:?}`", accessed_type);
-            //     process::exit(1);
-            // }
-            let register = asm_size_to_register(member_type_size, "a");
-            let size_prefix = asm_size_prefix(member_type_size);
-            /*
-                person: Person
-                ptr: @Person    // located at rbp+16
-                (@ptr).name     // located at ptr+0
-                
-                lea rax, [rbp+16]       ; load address of ptr into rax
-                mov rax, qword [rax]    ; load address of person into rax
-                mov rax, qword [rax+0]  ; load name into rax
-            */
-            asm.push_str(
-                format!("{external_offset}\tlea {register}, {size_prefix} [rdx] ; started to access `{member}`\n")
-                .as_str()
-            );
-            // asm.push_str(
-            //     format!("\tlea {register}, {size_prefix} [rbp+{external_offset}] ; starting to access `{member}`\n")
-            //     .as_str(),
-            // );
-            let mut scoping_accessed = accessed.clone();
-            while let AST::UnaryExpression { op: Operation::Deref, child: sub_type } = *scoping_accessed.clone() {
-                scoping_accessed = sub_type;
-                asm.push_str(&format!("\tmov {register}, qword [{register}]\n"));
-            }
-            asm.push_str(&format!("\tmov {register}, {size_prefix} [{register}{internal_offset:+}] ; finished accessing `{member}`\n"));
-            asm.push_str(scope.push("rax".to_string(), member_type_size).as_str());
-
-            asm
+            format!("{resolution}{push}")
         }
         AST::TypeDefinition { name, type_string } => {
             scope.defined_types.push((name, type_string));

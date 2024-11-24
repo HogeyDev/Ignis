@@ -167,9 +167,6 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
                         ));
         }
         Type::Slice(_) => {
-            // let loop_label_start = scope.add_label();
-            // let loop_label_end = scope.add_label();
-            // asm.push_str(&format!("\tmov rcx, qword [{}]\nlbl{loop_label_start}:\n\tcmp rcx, 0\nje lbl{loop_label_end}\n{move_inner}\tlbl{loop_label_end}\n", from_bottom.0));
             asm.push_str(&format!("\tmov r10, qword [{}{:+}]\n\tmov qword [{}{:+}], r10\n", from_bottom.0, from_bottom.1, to_bottom.0, to_bottom.1));
         },
         Type::FixedArray(size, sub) => {
@@ -178,7 +175,9 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
                 asm.push_str(&move_on_stack(scope, sub.clone(), (from_bottom.0, from_bottom.1 + ((i * sub_size) as i64)), (to_bottom.0, to_bottom.1 + ((i * sub_size) as i64))));
             }
         },
-        // Type::Pointer(child) => {},
+        Type::Pointer(_) => {
+            asm.push_str(&move_on_stack(scope, Box::new(Type::Primative("usize".to_owned())), from_bottom, to_bottom));
+        },
         Type::Struct(_, members) => {
             let mut total_size = 0;
             for member in members.iter().rev() {
