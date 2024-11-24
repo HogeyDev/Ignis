@@ -16,6 +16,7 @@ pub mod lexer;
 pub mod scope;
 pub mod types;
 pub mod util;
+pub mod asm;
 pub mod cli;
 pub mod io;
 
