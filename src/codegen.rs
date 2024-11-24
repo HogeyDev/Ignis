@@ -1,7 +1,7 @@
 use std::{path::Path, process::{self, exit}};
 
 use crate::{
-    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
+    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{ast_to_type_tree, calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
         asm_size_prefix, asm_size_to_register, initialize_type, move_on_stack, push_from_stack, resolve_address
     }
 };
@@ -556,6 +556,25 @@ pub fn compile_to_asm(
         }
         AST::MemberAccess { accessed, member } => {
             let mut asm = String::new();
+
+            let struct_type_name = match *ast_to_type_tree(accessed.clone(), scope).unwrap() {
+                Type::Struct(name, _) => name,
+                _ => {
+                    eprintln!("Accessing member `{member}` from non-struct type:\n{accessed:#?}");
+                    process::exit(1);
+                }
+            };
+            let data = scope.get_struct_data(struct_type_name.to_string());
+            // eprintln!("{struct_type_name:#?}\n{data:?}");
+            let member_type = data.iter().find(|x| x.0 == member).unwrap().1.clone();
+            let member_type = string_to_collapsed_type_tree(member_type, scope).unwrap();
+
+            let resolution = resolve_address(program_config, scope, root).unwrap();
+            let push = push_from_stack(scope, member_type, ("rdx", 0));
+
+            asm.push_str(&format!("{resolution}{push}"));
+
+            return asm;
 
             let accessed_type = calculate_ast_type(accessed.clone(), scope).unwrap();
             // eprintln!("HAS TYPE: {:#?}", accessed_type.clone());

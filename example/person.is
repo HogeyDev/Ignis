@@ -28,11 +28,11 @@ func print_person(void, person: Person) {
 }
 
 func print_person_ref(void, person: @Person) {
-    print("Hi, my name is ");
+    print("His name is ");
     print((@person).name);
-    print(" and I'm ");
+    print(" and he's ");
     print_int((@person).age);
-    print(" years old. I own a ");
+    print(" years old. He owns a ");
     print((@person).car.color);
     print(" ");
     print_int((@person).car.year);
@@ -52,8 +52,10 @@ func main(int) {
     car.year = 2008;
     person.car = car;
 
-    // print_person(person);
-    print_person_ref(&person);
+    print_person(person);
+    let cool_ref: @Person = &person;
+    let memory_padding: int = 42; // I serve ZERO purpose
+    print_person_ref(cool_ref);
 
     let x: int = 0;
     while (x < 10) {

@@ -109,7 +109,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
         }
         AST::UnaryExpression { op, child } => {
             match op {
-                Operation::Deref => resolve_address(program_config, scope, child),
+                Operation::Deref => Ok(format!("{}\tmov rdx, qword [rdx]\n", resolve_address(program_config, scope, child).unwrap())),
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown UnaryOperation`", ast)),
             }
         }
