@@ -134,6 +134,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
                 .clone();
             string_to_collapsed_type_tree(member_type_string, scope)
         }
+        AST::TypeCast { child, into } => string_to_type_tree(into, scope),
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able".to_owned())

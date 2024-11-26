@@ -575,6 +575,7 @@ pub fn compile_to_asm(
 
             String::new()
         }
+        AST::TypeCast { child, .. } => compile_to_asm(program_config, child, scope),
         _ => {
             eprintln!(
                 "[ASM] Could not find a way to compile {:?} to assembly",

@@ -6,9 +6,22 @@ struct Person {
     age: int;
 }
 
+func print_person_ref(void, person: @Person) {
+    print("My name is ");
+    print(person->name);
+    print(" and I'm ");
+    print_int(person->age);
+    print(" years old.");
+}
+
 func main(int) {
     let sizeof_person: usize = <!usize> 16;
-    let allocated: @Person = <!@Person> malloc(sizeof_person);
+    let person: @Person = <!@Person> malloc(sizeof_person);
 
-    return 1;
+    person->name = "Kourtet";
+    person->age = 17;
+
+    print_person_ref(person);
+
+    return 0;
 }

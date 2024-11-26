@@ -55,6 +55,7 @@ pub enum TokenType {
     DoublePipe,
     DoubleAmpersand,
     Arrow,
+    LessThanBang,
 
     String,
     Integer,
@@ -233,6 +234,7 @@ impl Tokenizer {
             TokenType::MoreThanEqualsTo,
             TokenType::BlockSeparator,
             TokenType::Arrow,
+            TokenType::LessThanBang,
         ]
         .contains(&token_type)
         {
@@ -301,6 +303,8 @@ impl Tokenizer {
             '<' => {
                 if self.peek(1) == '=' {
                     TokenType::LessThanEqualsTo
+                } else if self.peek(1) == '!' {
+                    TokenType::LessThanBang
                 } else {
                     TokenType::LessThan
                 }

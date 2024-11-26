@@ -127,6 +127,10 @@ pub enum AST {
         name: String,
         type_string: String,
     },
+    TypeCast {
+        child: Box<AST>,
+        into: String,
+    },
 }
 
 impl AST {
@@ -781,7 +785,6 @@ impl Parser {
             || self.current_token.token_type == TokenType::Decrement
             || self.current_token.token_type == TokenType::Ampersand
             || self.current_token.token_type == TokenType::At
-            || self.current_token.token_type == TokenType::LessThan
         {
             // println!("unary");
             let op = match self.current_token.token_type {
@@ -792,12 +795,7 @@ impl Parser {
                 TokenType::Ampersand => Ok(Operation::Ref),
                 TokenType::At => Ok(Operation::Deref),
                 _ => {
-                    // eprintln!(
-                    //     "[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet",
-                    //     self.current_token.token_type
-                    // );
-                    // process::exit(1);
-                    Err(format!("[ExpressionParser] {:?} is not a valid operation, or it has not been implemented yet", self.current_token.token_type))
+                    Err(format!("[ExpressionParser] {:?} is not a valid unary operation, or it has not been implemented yet", self.current_token.token_type))
                 }
             }?;
             self.advance();
@@ -805,6 +803,15 @@ impl Parser {
                 op,
                 child: self.accessor()?,
             }));
+        } else if self.current_token.token_type == TokenType::LessThanBang {
+            self.advance();
+            let mut into = String::new();
+            while self.current_token.token_type != TokenType::MoreThan {
+                into.push_str(&self.current_token.value);
+                self.advance();
+            }
+            self.advance();
+            return Ok(Box::new(AST::TypeCast { child: self.accessor()?, into }));
         }
         self.accessor()
     }
@@ -947,7 +954,7 @@ impl Parser {
                         Box::new(AST::StructInitializer {
                             spreads: true,
                             name,
-                            members: vec![("".to_string(), value)],
+                            members: vec![("".to_owned(), value)],
                         })
                     };
                     self.eat(TokenType::RightBrace);

@@ -160,6 +160,7 @@ impl PreProcessor {
                 self.macros.push((name.clone(), AST::Macro { name, parameters, expansion }));
                 (Box::new(AST::Null), false)
             }
+            AST::TypeCast { child, into } => (Box::new(AST::TypeCast { child, into }), false),
             _ => todo!("{:#?}", ast),
         };
         if result.1 {
