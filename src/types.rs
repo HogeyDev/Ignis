@@ -103,6 +103,9 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
             Ok(variable_type_tree)
         }
         AST::FunctionCall { name, .. } => {
+            if name == "sizeof" {
+                return string_to_collapsed_type_tree("usize".to_owned(), scope);
+            }
             let type_str = scope.get_function_data(name).0;
             let function_type_tree = string_to_type_tree(type_str, scope).unwrap();
             Ok(function_type_tree)
@@ -134,7 +137,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
                 .clone();
             string_to_collapsed_type_tree(member_type_string, scope)
         }
-        AST::TypeCast { child, into } => string_to_type_tree(into, scope),
+        AST::TypeCast { into, .. } => string_to_type_tree(into, scope),
         _ => {
             eprintln!("[TypeParser] {:?}", ast);
             Err("AST is not type-able".to_owned())
@@ -187,7 +190,7 @@ pub fn string_to_type_tree(
     type_str: String,
     scope: &ScopeContext,
 ) -> Result<Box<Type>, String> {
-    let type_tokens = TypeLexer::new(type_str).tokenize();
+    let type_tokens = TypeLexer::new(type_str).tokenize()?;
     TypeParser::new(type_tokens).parse(scope)
 }
 
@@ -240,7 +243,7 @@ impl TypeLexer {
         self.current_char = self.peek(1);
         self.index += 1;
     }
-    pub fn tokenize(&mut self) -> Vec<StrTokType> {
+    pub fn tokenize(&mut self) -> Result<Vec<StrTokType>, String> {
         let mut token_list = Vec::new();
         while self.index < self.type_string.len() {
             if self.current_char.is_alphabetic() {
@@ -266,17 +269,13 @@ impl TypeLexer {
                     '}' => StrTokType::RightBrace,
                     ',' => StrTokType::Comma,
                     _ => {
-                        eprintln!(
-                            "[TypeParser] Character `{}` is not parseable in a type",
-                            self.current_char
-                        );
-                        process::exit(1);
+                        return Err(format!("[TypeParser] Character `{}` is not parseable in a type", self.current_char));
                     }
                 });
                 self.advance();
             }
         }
-        token_list
+        Ok(token_list)
     }
 }
 

@@ -1,7 +1,7 @@
 use std::{path::Path, process::{self, exit}};
 
 use crate::{
-    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, modulizer::Modulizer, parser::{Operation, AST}, scope::ScopeContext, types::{ast_to_type_tree, calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
+    compile::parse_file, config::Configuration, io::{read_file, SourceFile}, lexer::Tokenizer, modulizer::Modulizer, parser::{Operation, Parser, AST}, scope::ScopeContext, types::{ast_to_type_tree, calculate_ast_type, get_type_size, string_to_collapsed_type_tree, Type}, util::{
         asm_size_prefix, asm_size_to_register, initialize_type, move_on_stack, push_from_stack, resolve_address
     }
 };
@@ -63,6 +63,23 @@ pub fn compile_to_asm(
             compile_to_asm(program_config, ast, scope)
         }
         AST::FunctionCall { name, arguments } => {
+            if name == "sizeof" {
+                let type_string = match *arguments.get(0).expect("sizeof expected a type to be passed, but none were supplied").clone() {
+                    AST::String(value) => value,
+                    _ => unreachable!(),
+                };
+                let type_size = match string_to_collapsed_type_tree(type_string.clone(), scope) {
+                    Ok(collapsed) => get_type_size(collapsed).unwrap(),
+                    Err(_) => {
+                        let tokens = Tokenizer::new(SourceFile { path: "".to_owned(), contents: type_string }).tokenize();
+                        let ast = Parser::new(tokens).expression().unwrap();
+                        let ast_type = ast_to_type_tree(ast, scope).unwrap();
+
+                        get_type_size(ast_type).unwrap()
+                    }
+                } as i64;
+                return compile_to_asm(program_config, Box::new(AST::Integer(type_size)), scope);
+            } 
             let mut asm = String::new();
 
             let function_data = scope.get_function_data(name.clone()); // also checks if function exists

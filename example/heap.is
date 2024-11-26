@@ -15,11 +15,10 @@ func print_person_ref(void, person: @Person) {
 }
 
 func main(int) {
-    let sizeof_person: usize = <!usize> 16;
-    let person: @Person = <!@Person> malloc(sizeof_person);
+    let person: @Person = <!@Person> malloc(sizeof(Person));
 
     person->name = "Kourtet";
-    person->age = 17;
+    person->age = 18;
 
     print_person_ref(person);
 

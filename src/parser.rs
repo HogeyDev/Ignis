@@ -625,7 +625,7 @@ impl Parser {
         }
         scope
     }
-    fn expression(&mut self) -> Result<Box<AST>, String> {
+    pub fn expression(&mut self) -> Result<Box<AST>, String> {
         let mut lhs = self.assignment()?;
 
         while self.current_token.token_type == TokenType::DoublePipe
@@ -911,16 +911,26 @@ impl Parser {
                     let name = self.current_token.value.clone();
                     self.eat(TokenType::Identifier);
                     self.eat(TokenType::LeftParenthesis);
-                    let mut arguments = Vec::new();
-                    while self.current_token.token_type != TokenType::RightParenthesis {
-                        let value = self.expression()?;
-                        arguments.push(Box::new(AST::Argument(value)));
-                        if self.current_token.token_type != TokenType::RightParenthesis {
-                            self.eat(TokenType::Comma);
+                    if name == "sizeof" {
+                        let mut type_string = String::new();
+                        while self.current_token.token_type != TokenType::RightParenthesis {
+                            type_string.push_str(&self.current_token.value);
+                            self.advance();
                         }
+                        self.eat(TokenType::RightParenthesis);
+                        return Ok(Box::new(AST::FunctionCall { name, arguments: vec![Box::new(AST::String(type_string))] }));
+                    } else {
+                        let mut arguments = Vec::new();
+                        while self.current_token.token_type != TokenType::RightParenthesis {
+                            let value = self.expression()?;
+                            arguments.push(Box::new(AST::Argument(value)));
+                            if self.current_token.token_type != TokenType::RightParenthesis {
+                                self.eat(TokenType::Comma);
+                            }
+                        }
+                        self.eat(TokenType::RightParenthesis);
+                        return Ok(Box::new(AST::FunctionCall { name, arguments }));
                     }
-                    self.eat(TokenType::RightParenthesis);
-                    return Ok(Box::new(AST::FunctionCall { name, arguments }));
                 } else if self.peek(1).token_type == TokenType::LeftBrace {
                     // println!("struct initializer");
                     // self.print_token_debug_stack(4);
