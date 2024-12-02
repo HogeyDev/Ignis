@@ -14,6 +14,7 @@ struct LinkedList {
 func LinkedList_new(@LinkedList) {
     let list: @LinkedList = <!@LinkedList> malloc(sizeof(LinkedList));
 
+    list->first = 0;
     list->size = 0;
 
     return list;
@@ -23,22 +24,19 @@ func LinkedList_push(void, list: @LinkedList, value: @void) {
     let node: @LinkedListNode = <!@LinkedListNode> malloc(sizeof(LinkedListNode));
 
     node->value = value;
-    print("alloc: ");
-    print_int(<!int> node);
-    print_char('\n');
+    node->next = 0;
 
     if (list->size > 0) {
-        let index: usize = list->size - <!usize> 1;
-        let end: @LinkedListNode = LinkedList_get(list, index);
-        print("end: ");
-        print_int(<!int> end);
-        print_char('\n');
-        print("...this is a very long message");
+        // let index: usize = list->size - <!usize> 1;
+        // let end: @LinkedListNode = LinkedList_get(list, index);
+        let end: @LinkedListNode = list->first;
+        while (end->next != 0) {
+            end = end->next;
+        }
         end->next = node;
     } else {
         list->first = node;
     }
-    print_char('\n');
 
     list->size = list->size + <!usize> 1;
 }
@@ -55,23 +53,12 @@ func LinkedList_get(@LinkedListNode, list: @LinkedList, index: usize) {
 
     let current: @LinkedListNode = list->first;
 
-    print("target: ");
-    print_int(<!int> index);
-    print_char('\n');
     let i: usize = <!usize> 0;
     while (i < index) {
-        print("from: ");
-        print_int(<!int> i);
-        print(", next: ");
-        print_int(<!int> current->next);
-        print_char('\n');
         current = current->next;
 
         i = i + <!usize> 1;
     }
-    print("reached: ");
-    print_int(<!int> i);
-    print_char('\n');
 
     return current;
 }

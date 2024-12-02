@@ -227,6 +227,7 @@ impl Tokenizer {
     }
     fn skip_and_return(&mut self, token_type: TokenType) -> Token {
         let token: Token = if [
+            TokenType::NotEqualsTo,
             TokenType::Increment,
             TokenType::Decrement,
             TokenType::EqualsTo,
