@@ -102,6 +102,7 @@ int main() {
     addTest(&tests, "primes", "", 168);
     addTest(&tests, "boolean", "", 100);
     addTest(&tests, "heap", "", 0);
+    addTest(&tests, "new_print", "", 16);
 
     // addTest(&tests, "stdtest", "", 37);
 

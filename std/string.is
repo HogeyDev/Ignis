@@ -1,3 +1,5 @@
+import stdmem;
+
 func strlen(int, str: []char) {
 	asm "	mov rsi, qword [rbp+16]
 	mov rax, -1
@@ -5,4 +7,8 @@ func strlen(int, str: []char) {
 	inc rax
 	cmp byte [rsi+rax], 0x00
 	jne .looper";
+}
+
+func format([]char, str: []char, format: [][]char) {
+
 }

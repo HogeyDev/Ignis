@@ -2,7 +2,8 @@ import stdlib;
 import string;
 
 func print_char(void, c: char) {
-	asm "	push QWORD [rbp+16]
+	asm "   movzx rax, byte [rbp+16]
+    push rax
 	mov rax, 1
 	mov rdi, 1
 	mov rdx, 1

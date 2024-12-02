@@ -1,4 +1,4 @@
-asmfile = person
+asmfile = new_print
 
 all: compile test
 

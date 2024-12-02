@@ -21,6 +21,7 @@ func main(int) {
     person->age = 18;
 
     print_person_ref(person);
+    print_char('\n');
 
     return 0;
 }

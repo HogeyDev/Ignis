@@ -1,0 +1,14 @@
+import linked_list;
+
+func main(int) {
+    let list: @LinkedList = LinkedList_new();
+
+    let i: int = 0;
+    while (i < 32) {
+        LinkedList_push(list, <!@void> i);
+    
+        i = i + 1;
+    }
+
+    return 16;
+}

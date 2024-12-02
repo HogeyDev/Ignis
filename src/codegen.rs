@@ -69,13 +69,13 @@ pub fn compile_to_asm(
                     _ => unreachable!(),
                 };
                 let type_size = match string_to_collapsed_type_tree(type_string.clone(), scope) {
-                    Ok(collapsed) => get_type_size(collapsed).unwrap(),
+                    Ok(collapsed) => get_type_size(scope, collapsed).unwrap(),
                     Err(_) => {
                         let tokens = Tokenizer::new(SourceFile { path: "".to_owned(), contents: type_string }).tokenize();
                         let ast = Parser::new(tokens).expression().unwrap();
                         let ast_type = ast_to_type_tree(ast, scope).unwrap();
 
-                        get_type_size(ast_type).unwrap()
+                        get_type_size(scope, ast_type).unwrap()
                     }
                 } as i64;
                 return compile_to_asm(program_config, Box::new(AST::Integer(type_size)), scope);
@@ -113,7 +113,7 @@ pub fn compile_to_asm(
             if function_data.0 != "void" {
                 // has a notable return value
                 let type_size =
-                    get_type_size(string_to_collapsed_type_tree(function_data.0, scope).unwrap())
+                    get_type_size(scope, string_to_collapsed_type_tree(function_data.0, scope).unwrap())
                         .unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
                 if type_size <= 2 {
@@ -209,7 +209,7 @@ pub fn compile_to_asm(
             let lhs_typing = calculate_ast_type(lhs.clone(), scope).unwrap();
             let rhs_typing = calculate_ast_type(rhs.clone(), scope).unwrap();
 
-            let lhs_size = get_type_size(lhs_typing.clone()).unwrap();
+            let lhs_size = get_type_size(scope, lhs_typing.clone()).unwrap();
 
             // if lhs_typing != rhs_typing {
             //     eprintln!(
@@ -265,7 +265,7 @@ pub fn compile_to_asm(
                                     process::exit(1);
                                 }
                             };
-                            let sub_size = get_type_size(sub_type.clone()).unwrap();
+                            let sub_size = get_type_size(scope, sub_type.clone()).unwrap();
                             format!("\timul rbx, {sub_size}\n\tadd rax, rbx\n{}", push_from_stack(scope, sub_type, ("rax", 0)))
                         };
                         format!("{calc_index}{find_address}{get_element}")
@@ -277,7 +277,7 @@ pub fn compile_to_asm(
                         // let from_addr = resolve_address(scope, rhs.clone()).unwrap_or(scope.stack_size);
                         // asm.push_str(move_type_on_stack(scope, rhs_typing, "rsp".to_string(), "rdx".to_string()).as_str());
                         asm.push_str(&move_on_stack(scope, rhs_typing.clone(), ("rsp", 0), ("rdx", 0)));
-                        let rhs_type_size = get_type_size(rhs_typing).unwrap() as i64;
+                        let rhs_type_size = get_type_size(scope, rhs_typing).unwrap() as i64;
                         asm.push_str(&format!("\tadd rsp, {rhs_type_size} ; cleaned up stack\n"));
                         scope.stack_size -= rhs_type_size;
 
@@ -336,7 +336,7 @@ pub fn compile_to_asm(
                         // }
                     }
                     Operation::Deref => {
-                        let size = get_type_size(typing.clone()).unwrap() as i64;
+                        let size = get_type_size(scope, typing.clone()).unwrap() as i64;
                         let asm_sizing = asm_size_prefix(size);
                         let register = asm_size_to_register(size, "a");
                         match *typing {
@@ -360,7 +360,7 @@ pub fn compile_to_asm(
             asm.push_str(
                 scope.push(
                         "rax".to_string(),
-                        get_type_size(typing).unwrap().try_into().unwrap(),
+                        get_type_size(scope, typing).unwrap().try_into().unwrap(),
                     ).as_str(),
             );
 
@@ -371,11 +371,11 @@ pub fn compile_to_asm(
 
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
             let offset = scope.get_variable_location(name.clone());
-            if get_type_size(variable_type.clone()).unwrap() > 8 {
+            if get_type_size(scope, variable_type.clone()).unwrap() > 8 {
                 asm.push_str(&push_from_stack(scope, variable_type, (&offset.0, offset.1)));
                 // todo!("Variable type too large");
             } else {
-                let type_size = get_type_size(variable_type).unwrap() as i64;
+                let type_size = get_type_size(scope, variable_type).unwrap() as i64;
                 let register = asm_size_to_register(type_size, "a");
                 let asm_sizing = asm_size_prefix(type_size);
 
@@ -413,7 +413,7 @@ pub fn compile_to_asm(
             let mut asm = String::new();
 
             let collapsed = string_to_collapsed_type_tree(variable_type.clone(), scope).unwrap();
-            let width = get_type_size(collapsed.clone()).unwrap() as i64;
+            let width = get_type_size(scope, collapsed.clone()).unwrap() as i64;
             scope.add_variable(name.clone(), variable_type, is_static, width);
             if !is_static {
                 asm.push_str(&format!("\tsub rsp, {width} ; stack reserved for `{name}`\n"));
@@ -439,7 +439,7 @@ pub fn compile_to_asm(
                 process::exit(1);
             }
 
-            let lhs_type_size = get_type_size(lhs_typing.clone()).unwrap() as i64;
+            let lhs_type_size = get_type_size(scope, lhs_typing.clone()).unwrap() as i64;
             if lhs_type_size > 8 {
                 unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
                 // match *lhs_typing.clone() {
@@ -571,7 +571,7 @@ pub fn compile_to_asm(
         }
         AST::MemberAccess { accessed, member } => {
             let struct_type_name = match *ast_to_type_tree(accessed.clone(), scope).unwrap() {
-                Type::Struct(name, _) => name,
+                Type::Struct(name, ..) => name,
                 _ => {
                     eprintln!("Accessing member `{member}` from non-struct type:\n{accessed:#?}");
                     process::exit(1);

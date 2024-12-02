@@ -13,7 +13,8 @@ pub enum Type {
     Pointer(Box<Type>),
     UnaryOperation(Operation, Box<Type>),
     BinaryOperation(Operation, Box<Type>, Box<Type>),
-    Struct(String, Vec<Box<Type>>),
+    // Struct(String, Vec<Box<Type>>),
+    Struct(String),
     Enum(String),
 }
 
@@ -24,7 +25,7 @@ impl Type {
             Self::FixedArray(size, sub) => format!("[{}]{}", size, sub.to_string()),
             Self::Slice(sub) => format!("[]{}", sub.to_string()),
             Self::Pointer(sub) => format!("@{}", sub.to_string()),
-            Self::Struct(name, _) => name,
+            Self::Struct(name, ..) => name,
             _ => {
                 eprintln!("[TypeParser] Cannot stringify type `{:?}`", self);
                 process::exit(1);
@@ -53,18 +54,19 @@ pub fn get_primative_type_size(prim: String) -> Result<usize, &'static str> {
     }
 }
 
-pub fn get_type_size(comp: Box<Type>) -> Result<usize, &'static str> {
+pub fn get_type_size(scope: &ScopeContext, comp: Box<Type>) -> Result<usize, &'static str> {
     match *comp {
         Type::Primative(prim) => get_primative_type_size(prim),
         Type::Pointer(_) => get_primative_type_size("usize".to_owned()),
-        Type::UnaryOperation(_, sub) => get_type_size(sub),
-        Type::BinaryOperation(_, lhs, _) => get_type_size(lhs),
-        Type::FixedArray(size, sub) => Ok(get_type_size(sub).unwrap() * size),
+        Type::UnaryOperation(_, sub) => get_type_size(scope, sub),
+        Type::BinaryOperation(_, lhs, _) => get_type_size(scope, lhs),
+        Type::FixedArray(size, sub) => Ok(get_type_size(scope, sub).unwrap() * size),
         Type::Slice(_) => get_primative_type_size("usize".to_owned()), // adding the size of the array onto the end of the space in memory, and since the size is a usize, then we add 8 bytes
-        Type::Struct(_, members) => {
+        Type::Struct(name, ..) => {
+            let members: Vec<Box<Type>> = scope.get_struct_data(name).iter().map(|x| string_to_collapsed_type_tree(x.1.clone(), scope).unwrap()).collect();
             let mut size = 0usize;
             for member in members {
-                size += get_type_size(member).unwrap();
+                size += get_type_size(scope, member).unwrap();
             }
             Ok(size)
         }
@@ -122,7 +124,7 @@ pub fn ast_to_type_tree(ast: Box<AST>, scope: &ScopeContext) -> Result<Box<Type>
             // println!("`{}` from `{:?}`", member, accessed);
             let accessed_type = collapse_type_tree(ast_to_type_tree(accessed.clone(), scope)?)?;
             let struct_name = match *accessed_type {
-                Type::Struct(name, _) => name,
+                Type::Struct(name, ..) => name,
                 _ => {
                     eprintln!("Cannot access member of non-struct type");
                     process::exit(1);
@@ -175,12 +177,13 @@ pub fn collapse_type_tree(tree: Box<Type>) -> Result<Box<Type>, String> {
             size,
             collapse_type_tree(sub_type)?,
         ))),
-        Type::Struct(name, members) => {
-            let mut collapsed = Vec::new();
-            for member in members {
-                collapsed.push(collapse_type_tree(member).unwrap());
-            }
-            Ok(Box::new(Type::Struct(name, collapsed)))
+        Type::Struct(name, ..) => {
+            Ok(Box::new(Type::Struct(name)))
+            // let mut collapsed = Vec::new();
+            // for member in members {
+            //     collapsed.push(collapse_type_tree(member).unwrap());
+            // }
+            // Ok(Box::new(Type::Struct(name, collapsed)))
         }
         Type::Enum(name) => Ok(Box::new(Type::Enum(name))),
     }
@@ -359,15 +362,14 @@ impl TypeParser {
                 "void" => Ok(Box::new(Type::Primative("void".to_owned()))),
                 _ => {
                     if type_is_struct(scope, id.clone()) {
-                        let members = scope.get_struct_data(id.clone());
-                        Ok(Box::new(Type::Struct(id, members.iter().map(|x| string_to_type_tree(x.1.clone(), scope).unwrap()).collect::<Vec<Box<Type>>>())))
+                        Ok(Box::new(Type::Struct(id)))
                     } else if let Some((_, alias)) = scope.defined_types.iter().find(|x| x.0 == id) {
                         Ok(string_to_type_tree(alias.to_owned(), scope)?)
                     } else {
                         Err(format!("Could not find type {id}"))
                     }
                 }
-            },
+            }
             StrTokType::LeftBrace => {
                 self.advance();
                 let mut members = Vec::new();
@@ -400,7 +402,7 @@ impl TypeParser {
                         break;
                     }
                 }
-                Ok(Box::new(Type::Struct("".to_string(), members)))
+                Ok(Box::new(Type::Struct("".to_owned())))
             }
             _ => {
                 eprintln!("[TypeParser] No way to parse `{:?}`", self.current_token);

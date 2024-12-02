@@ -233,6 +233,7 @@ impl Tokenizer {
             TokenType::LessThanEqualsTo,
             TokenType::MoreThanEqualsTo,
             TokenType::BlockSeparator,
+            TokenType::DoublePipe,
             TokenType::Arrow,
             TokenType::LessThanBang,
         ]
@@ -344,6 +345,13 @@ impl Tokenizer {
             '%' => TokenType::Percent,
             '@' => TokenType::At,
             '&' => TokenType::Ampersand,
+            '|' => {
+                if self.peek(1) == '|' {
+                    TokenType::DoublePipe
+                } else {
+                    panic!("The bitwise or operator (`|`) has not yet been implemented");
+                }
+            },
             _ => {
                 if self.index >= self.source.len() {
                     TokenType::EndOfFile

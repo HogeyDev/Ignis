@@ -108,13 +108,7 @@ impl ScopeContext {
     }
     pub fn add_struct(&mut self, name: String, members: Vec<(String, String)>) {
         self.structs.push((name.clone(), members.clone()));
-        let type_string = Type::Struct(
-            name.clone(),
-            members
-                .iter()
-                .map(|x| string_to_collapsed_type_tree(x.1.clone(), self).unwrap())
-                .collect(),
-        )
+        let type_string = Type::Struct(name.clone())
         .to_string();
         self.defined_types.push((name, type_string));
     }
@@ -135,7 +129,7 @@ impl ScopeContext {
                 found_result = true;
                 break;
             }
-            tot_off += get_type_size(string_to_collapsed_type_tree(mem.1.clone(), self)?)? as i64;
+            tot_off += get_type_size(self, string_to_collapsed_type_tree(mem.1.clone(), self)?)? as i64;
         }
         if found_result {
             Ok(tot_off)
@@ -202,7 +196,7 @@ impl ScopeContext {
 
         for stat in self.variables.iter().filter(|x| x.3).cloned().collect::<Vec<(String, String, i64, bool, String)>>() {
             let collapsed = string_to_collapsed_type_tree(stat.1, self).unwrap();
-            data.push_str(&format!("\t{}: resb {}\n", stat.4, get_type_size(collapsed).unwrap()));
+            data.push_str(&format!("\t{}: resb {}\n", stat.4, get_type_size(self, collapsed).unwrap()));
         }
 
         data
