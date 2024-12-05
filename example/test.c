@@ -94,7 +94,7 @@ int main() {
     Tests tests = initTests();
 
     addTest(&tests, "fibonacci", "", 13);
-    addTest(&tests, "person", "", 17);
+    addTest(&tests, "person", "", 18);
     addTest(&tests, "return", "", 19);
     addTest(&tests, "enum", "", 0);
     addTest(&tests, "preprocessing", "", 123);

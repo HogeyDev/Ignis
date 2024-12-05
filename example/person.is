@@ -28,11 +28,11 @@ func print_person(void, person: Person) {
 }
 
 func print_person_ref(void, person: @Person) {
-    print("His name is ");
+    print("Their name is ");
     print(person->name);
-    print(" and he's ");
+    print(" and they're ");
     print_int(person->age);
-    print(" years old. He owns a ");
+    print(" years old. They own a ");
     print(person->car.color);
     print(" ");
     print_int(person->car.year);
@@ -43,18 +43,18 @@ func print_person_ref(void, person: @Person) {
 
 func main(int) {
     let person: Person;
-    person.age = 17;
+    person.age = 18;
     person.name = "Kourtet";
 
     let car: Car;
-    car.color = "Yellow";
+    car.color = "Blue";
     car.model = "Acura TL";
     car.year = 2008;
     person.car = car;
 
     print_person(person);
     let cool_ref: @Person = &person;
-    let memory_padding: int = 42; // I serve ZERO purpose
+    let memory_padding: int = 42; // I serve ZERO purpose other than padding memory
     print_person_ref(cool_ref);
 
     let x: int = 0;

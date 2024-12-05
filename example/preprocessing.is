@@ -4,15 +4,15 @@ import stdlib;
 typedef i64 int;
 typedef str []char;
 
-enum Level [ noprefix ] {
+enum JobLevel [ noprefix ] {
     Junior,
-    Middle,
+    Intern,
     Senior,
 }
 
-func level_to_string(str, level: Level) {
+func level_to_string(str, level: JobLevel) {
     if (level == Junior) return "junior";
-    else if (level == Middle) return "middle";
+    else if (level == Intern) return "intern";
     else if (level == Senior) return "senior";
     
     print("Cannot stringify level `");
@@ -22,11 +22,11 @@ func level_to_string(str, level: Level) {
 }
 
 def Name "Kourtet";
-def Level Middle;
+def Level Intern;
 
 struct Person {
     name: str;
-    level: Level;
+    level: JobLevel;
 }
 
 func main(i64) {
@@ -40,7 +40,7 @@ func main(i64) {
     print(kourtet.name);
     print(" and I have ");
     print(experience_string);
-    println(" experience");
+    println(" level experience");
     
     return 123;
 }

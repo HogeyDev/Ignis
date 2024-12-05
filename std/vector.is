@@ -1,0 +1,23 @@
+import stdlib;
+import stdmem;
+import stdio;
+
+struct Vector {
+    data: @void;
+    size: usize;
+    capacity: usize;
+}
+
+func Vector_new(@Vector) {
+    let vec: @Vector = <!@Vector> malloc(sizeof(Vector));
+
+    vec->size = 0;
+    vec->capacity = 8;
+    vec->data = malloc(vec->capacity);
+
+    return vec;
+}
+
+func Vector_push(void, vec: @Vector, value: @void) {
+    
+}

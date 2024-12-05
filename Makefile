@@ -9,6 +9,9 @@ compile:
 # 	nasm -f win64 example/hello_world.asm -o example/hello_world.o
 # 	gcc example/hello_world.o -o example/hello_world.exe
 
+build:
+	cargo build --release
+
 compile_asm:
 	nasm -f elf64 example/$(asmfile).bin.asm -o example/$(asmfile).o -g
 	@# ld -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 example/fibonacci.o -o example/fibonacci -lc # link with libc
@@ -29,3 +32,6 @@ test:
 	gcc -o example/_test example/test.c -g
 	cd example && ./_test
 	rm example/_test
+
+install:
+	cp ./target/release/ignis /usr/local/bin/
