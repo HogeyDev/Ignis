@@ -82,7 +82,7 @@ pub fn initialize_type(scope: &mut ScopeContext, val_type: Box<Type>, loc: (&str
 }
 
 pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeContext, ast: Box<AST>) -> Result<String, String> {
-    let _typing = calculate_ast_type(ast.clone(), scope)?;
+    // let typing = calculate_ast_type(ast.clone(), scope)?;
     // println!("\t{:?}\n\t{:?}", ast, typing);
     match *ast.clone() {
         AST::VariableCall { name } => {
@@ -110,7 +110,10 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
         }
         AST::UnaryExpression { op, child } => {
             match op {
-                Operation::Deref => Ok(format!("{}\tmov rdx, qword [rdx]\n", resolve_address(program_config, scope, child).unwrap())),
+                Operation::Deref => {
+                    let child_calculated = compile_to_asm(program_config, child, scope);
+                    Ok(format!(";TESTTESTTESTTEST\n{};TESTESTESTESTESTESTESTESTEST\n\tpop rdx\n", child_calculated))
+                }
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown UnaryOperation`", ast)),
             }
         }
@@ -123,16 +126,18 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                         Type::FixedArray(_, child) => {
                             child
                         }
-                        _ => {
-                            eprintln!("Attempting to calculate resulting memory address from indexing a non array type");
+                        Type::Slice(child) => {
+                            child
+                        }
+                        x => {
+                            eprintln!("Attempting to calculate resulting memory address from indexing a non array type: {x:?}");
                             exit(1);
                         }
                     };
-                    let array_name = match *lhs {
-                        AST::VariableCall { name } => name,
+                    let array_base = match *lhs {
+                        AST::VariableCall { name } => scope.get_variable_location(name),
                         _ => unreachable!("Honestly I hope that this is unreachable, because I can't seem to think of a single reason why you would be indexing an array which isn't stored in a variable")
                     };
-                    let array_base = scope.get_variable_location(array_name.clone());
                     let child_size = get_type_size(scope, child_type)?;
                     // eprintln!("{array_name}: {array_base}");
 
@@ -141,6 +146,7 @@ pub fn resolve_address(program_config: &mut Configuration, scope: &mut ScopeCont
                     Ok(format!("{rhs_resolution}\tpop rcx\n\tlea rdx, qword [{}{:+}+rcx*{child_size}] ; rcx is multiplied to adjust for type sizing\n", array_base.0, array_base.1))
                     // Ok(format!("{child_size}*{}"))
                 }
+                // _ => Ok("\tlea rdx, qword [rsp+8]\n".to_owned()),
                 _ => Err(format!("Cannot resolve address of: {:?}\n\tReason: `Unknown BinaryOperation`", ast)),
             }
         }

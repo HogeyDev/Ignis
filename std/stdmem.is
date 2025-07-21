@@ -1,6 +1,18 @@
 static heap: [1048576]char;
 static heap_pointer: usize = <!usize> 0;
 
+func mmap(@void, addr: usize, leng: usize, prot: int, flags: int, fd: int, offset: usize) {
+    asm "	mov rax, 9";
+    asm "	mov rdi, qword [rbp+56]";
+    asm "	mov rsi, qword [rbp+48]";
+    asm "	mov rdx, qword [rbp+40]";
+    asm "	mov r10, qword [rbp+32]";
+    asm "	mov r8, qword [rbp+24]";
+    asm "	mov r9, qword [rbp+16]";
+    asm "	syscall";
+    asm "	mov qword [rbp-8], rax";
+}
+
 func malloc(@void, bytes: usize) {
     let top: usize = heap_pointer;
     heap_pointer = heap_pointer + bytes;

@@ -62,7 +62,7 @@ func main(int) {
         print_int(x);
         x = x + 1;
     }
-    println("");
+    print_char('\n');
 
     return person.age;
 }

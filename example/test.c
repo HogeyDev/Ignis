@@ -56,8 +56,8 @@ void runTests(Tests *tests) {
         {
             char *compile_command = (char *)malloc((strlen("RUST_BACKTRACE=1 ") + strlen(IGNIS_PATH) + strlen(" -o ") + strlen(test.binary_path) + strlen(" ") + strlen(test.source_path) + strlen(" --stdlib ../std/") + strlen(" --debug-asm") + strlen(" --debug-ast")) * sizeof(char));
             // sprintf(compile_command, "RUST_BACKTRACE=1 %s -o %s %s --debug-asm --debug-ast", IGNIS_PATH, test.binary_path, test.source_path);
-            sprintf(compile_command, "%s -o %s %s -stdlib ../std/ --debug-asm", IGNIS_PATH, test.binary_path, test.source_path);
-            // printf("COMPILING: %s\n", compile_command);
+            sprintf(compile_command, "%s -o %s %s -stdlib ../std/ --debug-asr", IGNIS_PATH, test.binary_path, test.source_path);
+            printf("COMPILING: %s\n", compile_command);
             unsigned int code = WEXITSTATUS(system(compile_command));
             if (code != 0) {
                 printf("Test `%s` failed to compile\n", test.name);
@@ -102,8 +102,9 @@ int main() {
     addTest(&tests, "primes", "", 168);
     addTest(&tests, "boolean", "", 100);
     addTest(&tests, "heap", "", 0);
-    addTest(&tests, "new_print", "", 16);
+    addTest(&tests, "pointers", "", 128);
 
+    // addTest(&tests, "new_print", "", 16);
     // addTest(&tests, "stdtest", "", 37);
 
     runTests(&tests);

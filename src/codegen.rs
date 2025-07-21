@@ -98,8 +98,7 @@ pub fn compile_to_asm(
 
                 // check typing
                 let arg_type = calculate_ast_type(arg, scope).unwrap();
-                let func_arg_type =
-                    string_to_collapsed_type_tree(function_data.1[i].clone(), scope).unwrap();
+                let func_arg_type = string_to_collapsed_type_tree(function_data.1[i].clone(), scope).unwrap();
                 if arg_type != func_arg_type {
                     // eprintln!("{:?}\n{:?}", func_arg_type, arg_type);
                     eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
@@ -337,16 +336,20 @@ pub fn compile_to_asm(
                     }
                     Operation::Deref => {
                         let size = get_type_size(scope, typing.clone()).unwrap() as i64;
-                        let asm_sizing = asm_size_prefix(size);
-                        let register = asm_size_to_register(size, "a");
+                        // let asm_sizing = asm_size_prefix(size);
+                        // let register = asm_size_to_register(size, "a");
                         match *typing {
-                            Type::Pointer(_) => {
-                                format!("\tmov {}, {} [rax] ; deref or smth\n", register, asm_sizing)
-                            }
+                            // Type::Pointer(_) => {
                             _ => {
-                                eprintln!("[ASM] Cannot dereference non-pointer type");
-                                process::exit(1);
+                                // format!("\tmov {}, {} [rax] ; deref or smth\n", register, asm_sizing) // FIX: ここは悪いだ
+                                let movement = move_on_stack(scope, typing.clone(), ("rax", 0), ("rsp", 0));
+                                scope.stack_size += size;
+                                format!("\tsub rsp, {size}\n;movingSTART\n{movement};movingEND\n")
                             }
+                            // x => {
+                            //     eprintln!("[ASM] Cannot dereference non-pointer type: {x:?}");
+                            //     process::exit(1);
+                            // }
                         }
                     }
                     _ => {
@@ -440,49 +443,52 @@ pub fn compile_to_asm(
             }
 
             let lhs_type_size = get_type_size(scope, lhs_typing.clone()).unwrap() as i64;
-            if lhs_type_size > 8 {
-                unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
-                // match *lhs_typing.clone() {
-                //     Type::Struct(_, members) => {
-                //         let offset = scope.get_variable_location(name);
-                //         let temporary_start = -scope.stack_size;
-                //         let mut internal_offset = 0;
-                //         for member in members {
-                //             let member_size = get_type_size(member).unwrap() as i64;
+            let offset = scope.get_variable_location(name.clone());
+            asm.push_str(&format!("{}\tadd rsp, {lhs_type_size}\n", move_on_stack(scope, lhs_typing, ("rsp", 0), (&offset.0, offset.1))));
+            scope.stack_size -= lhs_type_size;
+            // if lhs_type_size > 8 {
+            //     unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
+            //     // match *lhs_typing.clone() {
+            //     //     Type::Struct(_, members) => {
+            //     //         let offset = scope.get_variable_location(name);
+            //     //         let temporary_start = -scope.stack_size;
+            //     //         let mut internal_offset = 0;
+            //     //         for member in members {
+            //     //             let member_size = get_type_size(member).unwrap() as i64;
 
-                //             asm.push_str(
-                //                 format!(
-                //                     "\tmov rax, {} [rbp{:+}] ; FORK\n\tmov {} [{}{:+}], rax\n",
-                //                     "qword",
-                //                     temporary_start - internal_offset,
-                //                     "qword",
-                //                     offset.0,
-                //                     offset.1 - internal_offset
-                //                 )
-                //                 .as_str(),
-                //             );
+            //     //             asm.push_str(
+            //     //                 format!(
+            //     //                     "\tmov rax, {} [rbp{:+}] ; FORK\n\tmov {} [{}{:+}], rax\n",
+            //     //                     "qword",
+            //     //                     temporary_start - internal_offset,
+            //     //                     "qword",
+            //     //                     offset.0,
+            //     //                     offset.1 - internal_offset
+            //     //                 )
+            //     //                 .as_str(),
+            //     //             );
 
-                //             internal_offset += member_size;
-                //         }
-                //         asm.push_str(&format!("\tadd rsp, {}\n", lhs_type_size));
-                //     }
-                //     _ => {
-                //         eprintln!(
-                //             "[ASM] type `{}` has size {} (>8), but isn't a struct",
-                //             lhs_typing.to_string(),
-                //             lhs_type_size
-                //         );
-                //     }
-                // }
-            } else {
-                let asm_sizing = asm_size_prefix(lhs_type_size);
-                let register = asm_size_to_register(lhs_type_size, "a");
+            //     //             internal_offset += member_size;
+            //     //         }
+            //     //         asm.push_str(&format!("\tadd rsp, {}\n", lhs_type_size));
+            //     //     }
+            //     //     _ => {
+            //     //         eprintln!(
+            //     //             "[ASM] type `{}` has size {} (>8), but isn't a struct",
+            //     //             lhs_typing.to_string(),
+            //     //             lhs_type_size
+            //     //         );
+            //     //     }
+            //     // }
+            // } else {
+            //     let asm_sizing = asm_size_prefix(lhs_type_size);
+            //     let register = asm_size_to_register(lhs_type_size, "a");
 
-                let offset = scope.get_variable_location(name.clone());
-                // asm.push_str(scope.pop(register.clone(), lhs_type_size).as_str());
-                scope.stack_size -= lhs_type_size;
-                asm.push_str(&format!("\tmov {register}, {asm_sizing} [rsp]\n\tadd rsp, {lhs_type_size}\n\tmov {asm_sizing} [{}{:+}], {register} ; assigned `{name}`\n", offset.0, offset.1));
-            }
+            //     let offset = scope.get_variable_location(name.clone());
+            //     // asm.push_str(scope.pop(register.clone(), lhs_type_size).as_str());
+            //     scope.stack_size -= lhs_type_size;
+            //     asm.push_str(&format!("\tmov {register}, {asm_sizing} [rsp]\n\tadd rsp, {lhs_type_size}\n\tmov {asm_sizing} [{}{:+}], {register} ; assigned `{name}`\n", offset.0, offset.1));
+            // }
 
             asm
         }

@@ -1,0 +1,44 @@
+import stdio;
+
+struct Show {
+    name: []char;
+    rating: int;
+}
+
+struct Watcher {
+    name: []char;
+    show: Show;
+}
+
+func main(int) {
+    let x: int = 42;
+    let y: @int = &x;
+    let z: int = @y;
+
+    print_int_pointer(&x);
+    print(" ?= ");
+    print_int_pointer(y);
+    print_char('\n');
+    print_int(@y);
+    print(" ?= ");
+    print_int(z);
+    print_char('\n');
+
+    let show: Show;
+    show.name = "STEINS;GATE";
+    show.rating = 10;
+
+    let show_ptr: @Show = &show;
+    print(show_ptr->name);
+    print(" was rated ");
+    print_int(show.rating);
+    println(" stars.");
+
+    let show_copy: Show = @show_ptr;
+
+    // let watcher: Watcher;
+    // watcher.name = "Kourtet";
+    // watcher.show = @show_ptr;
+
+    return 128;
+}
