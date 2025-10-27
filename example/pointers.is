@@ -10,10 +10,23 @@ struct Watcher {
     show: Show;
 }
 
+func print_show_ptr(void, show_ptr: @Show) {
+    print(show_ptr->name);
+    print(" was rated ");
+    print_int(show_ptr->rating);
+    println(" stars.");
+}
+func print_show(void, show: Show) {
+    print(show.name);
+    print(" was rated ");
+    print_int(show.rating);
+    println(" stars.");
+}
+
 func main(int) {
-    let x: int = 42;
-    let y: @int = &x;
-    let z: int = @y;
+    let x: int = 42; // -8
+    let y: @int = &x; // -16
+    let z: int = @y; // -24
 
     print_int_pointer(&x);
     print(" ?= ");
@@ -24,21 +37,20 @@ func main(int) {
     print_int(z);
     print_char('\n');
 
-    let show: Show;
-    show.name = "STEINS;GATE";
+    let show: Show; // -40
+    show.name = "SHOW_NAME";
     show.rating = 10;
+    print_show(show);
 
-    let show_ptr: @Show = &show;
-    print(show_ptr->name);
-    print(" was rated ");
-    print_int(show.rating);
-    println(" stars.");
+    let show_ptr: @Show = &show; // -48
+    print_show_ptr(show_ptr);
 
-    let show_copy: Show = @show_ptr;
+    let show_copy: Show = @show_ptr; // -64
+    print_show(show_copy);
 
-    // let watcher: Watcher;
-    // watcher.name = "Kourtet";
-    // watcher.show = @show_ptr;
+    let watcher: Watcher;
+    watcher.name = "Kourtet";
+    watcher.show = @show_ptr;
 
     return 128;
 }

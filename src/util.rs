@@ -164,7 +164,7 @@ pub fn move_on_stack(scope: &mut ScopeContext, collapsed: Box<Type>, from_bottom
                 exit(1);
             }
             let prim_size = get_type_size(scope, string_to_collapsed_type_tree(prim.clone(), scope).unwrap()).unwrap().try_into().unwrap();
-            let register = asm_size_to_register(prim_size, "a");
+            let register = asm_size_to_register(prim_size, "b");
             let prefix = asm_size_prefix(prim_size);
             asm.push_str(&format!("\tmov {register}, {prefix} [{}{:+}]\n\tmov {prefix} [{}{:+}], {register}\n",
                             from_bottom.0,

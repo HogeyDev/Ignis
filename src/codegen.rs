@@ -104,9 +104,10 @@ pub fn compile_to_asm(
                     eprintln!("[ASM] Function `{}` expected argument of type `{}`, but recieved argument of type `{}`", name, func_arg_type.to_string(), arg_type.to_string());
                     process::exit(1);
                 }
-                added_stack_size += 8;
-                // added_stack_size += get_type_size(arg_type).unwrap();
+                // added_stack_size += 8;
+                added_stack_size += get_type_size(scope, arg_type).unwrap();
             }
+            // eprintln!("{name}: {added_stack_size}");
             asm.push_str(format!("\tcall _{}\n\tadd rsp, {}\n", name, added_stack_size).as_str());
             scope.stack_size -= added_stack_size as i64;
             if function_data.0 != "void" {
@@ -335,16 +336,15 @@ pub fn compile_to_asm(
                         // }
                     }
                     Operation::Deref => {
-                        let size = get_type_size(scope, typing.clone()).unwrap() as i64;
+                        // let size = get_type_size(scope, typing.clone()).unwrap() as i64;
                         // let asm_sizing = asm_size_prefix(size);
                         // let register = asm_size_to_register(size, "a");
                         match *typing {
                             // Type::Pointer(_) => {
                             _ => {
-                                // format!("\tmov {}, {} [rax] ; deref or smth\n", register, asm_sizing) // FIX: ここは悪いだ
                                 let movement = move_on_stack(scope, typing.clone(), ("rax", 0), ("rsp", 0));
-                                scope.stack_size += size;
-                                format!("\tsub rsp, {size}\n;movingSTART\n{movement};movingEND\n")
+                                // scope.stack_size += size;
+                                format!(";movingSTART\n{movement};movingEND\n")
                             }
                             // x => {
                             //     eprintln!("[ASM] Cannot dereference non-pointer type: {x:?}");
@@ -360,12 +360,14 @@ pub fn compile_to_asm(
                 .as_str(),
             );
 
-            asm.push_str(
-                scope.push(
+            if op != Operation::Deref {
+                asm.push_str(
+                    scope.push(
                         "rax".to_string(),
                         get_type_size(scope, typing).unwrap().try_into().unwrap(),
                     ).as_str(),
-            );
+                );
+            }
 
             asm
         }
@@ -375,7 +377,9 @@ pub fn compile_to_asm(
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
             let offset = scope.get_variable_location(name.clone());
             if get_type_size(scope, variable_type.clone()).unwrap() > 8 {
+                asm.push_str("; ABC\n");
                 asm.push_str(&push_from_stack(scope, variable_type, (&offset.0, offset.1)));
+                asm.push_str("; CBA\n");
                 // todo!("Variable type too large");
             } else {
                 let type_size = get_type_size(scope, variable_type).unwrap() as i64;
@@ -417,7 +421,9 @@ pub fn compile_to_asm(
 
             let collapsed = string_to_collapsed_type_tree(variable_type.clone(), scope).unwrap();
             let width = get_type_size(scope, collapsed.clone()).unwrap() as i64;
-            scope.add_variable(name.clone(), variable_type, is_static, width);
+            let pre = scope.stack_size;
+            let x = scope.add_variable(name.clone(), variable_type, is_static, width);
+            // eprintln!("{name} ({width}): {x:?} ({pre} -> {})", scope.stack_size);
             if !is_static {
                 asm.push_str(&format!("\tsub rsp, {width} ; stack reserved for `{name}`\n"));
                 asm.push_str(&initialize_type(scope, collapsed, ("rsp", 0)));
@@ -428,6 +434,7 @@ pub fn compile_to_asm(
         AST::VariableAssignment { name, value } => {
             let mut asm = String::new();
 
+            asm.push_str(&format!("; DEF {:?}\n", value));
             asm.push_str(compile_to_asm(program_config, value.clone(), scope).as_str());
             let lhs_string_type = scope.get_variable_data(name.clone()).0;
             let lhs_typing = string_to_collapsed_type_tree(lhs_string_type.clone(), scope).unwrap();
@@ -444,7 +451,8 @@ pub fn compile_to_asm(
 
             let lhs_type_size = get_type_size(scope, lhs_typing.clone()).unwrap() as i64;
             let offset = scope.get_variable_location(name.clone());
-            asm.push_str(&format!("{}\tadd rsp, {lhs_type_size}\n", move_on_stack(scope, lhs_typing, ("rsp", 0), (&offset.0, offset.1))));
+            asm.push_str(&format!(";header_start\n{}\tadd rsp, {lhs_type_size}\n;header_end\n", move_on_stack(scope, lhs_typing, ("rsp", 0), (&offset.0, offset.1))));
+            asm.push_str("; FED\n");
             scope.stack_size -= lhs_type_size;
             // if lhs_type_size > 8 {
             //     unimplemented!("Please review the surrounding code before using this feature cause the previous line feels awfully sketchy and I don't have the time to do a deep dive rn.");
