@@ -377,9 +377,9 @@ pub fn compile_to_asm(
             let variable_type = string_to_collapsed_type_tree(scope.get_variable_data(name.clone()).0, scope).unwrap();
             let offset = scope.get_variable_location(name.clone());
             if get_type_size(scope, variable_type.clone()).unwrap() > 8 {
-                asm.push_str("; ABC\n");
+                // asm.push_str("; ABC\n");
                 asm.push_str(&push_from_stack(scope, variable_type, (&offset.0, offset.1)));
-                asm.push_str("; CBA\n");
+                // asm.push_str("; CBA\n");
                 // todo!("Variable type too large");
             } else {
                 let type_size = get_type_size(scope, variable_type).unwrap() as i64;
