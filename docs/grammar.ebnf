@@ -1,0 +1,50 @@
+program = { declaration } ;
+
+declaration = function_declaration 
+            |  ;
+
+lvalue = { "*" } lvalue_primary { postfix_op } ;
+lvalue_primary = identifier
+               | "(" lvalue ")" ;
+
+expression = assignment ;
+
+assignment = ( lvalue ( "=" | "*=" | "/=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | "&=" | "^=" | "|=" ) assignment )
+           | logical_or ;
+
+logical_or = logical_and { "||" logical_and } ;
+logical_and = comparison { "&&" comparison } ;
+
+comparison = bitwise [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) bitwise ] ;
+
+bitwise = shift { ( "&" | "^" | "|" ) shift } ;
+shift = addition { ( "<<" | ">>" ) addition } ;
+addition = multiplication { ( "+" | "-" ) multiplication } ;
+multiplication = unary { ( "*" | "/" | "%" ) unary } ;
+
+unary = ( ( "!" | "-" | "~" | "&" | "*" ) unary )
+      | primary ;
+
+primary = base_primary { postfix_op } ;
+base_primary = identifier
+        | struct_initializer
+        | "(" expression ")" ;
+postfix_op = "(" [...] ")"
+           | "[" [...] "]"
+           | "." identifier ;
+
+struct_initializer = identifier "{" [...] "}" ; # i promise ill work on this one later lol
+
+identifier = ( ALPHA | "_" ) { NUM | ALPHA | "_" } ;
+
+# x() x[] x.y
+# x{}
+# !x -x ~x &x *x
+# * / %
+# + -
+# << >>
+# & ^ |
+# == != < > <= >=
+# &&
+# ||
+# = *= /= %= += -= <<= >>= &= ^= |=
