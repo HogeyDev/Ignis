@@ -1,50 +1,20 @@
-program = { declaration } ;
+declaration = struct_decl;
+            | func_decl ;
+            | var_decl ;
 
-declaration = function_declaration 
-            |  ;
+param = ident ":" type ;
+params = param "," params ;
+           | param ;
+func_decl = "func" ident "(" params ")" block ;
 
-lvalue = { "*" } lvalue_primary { postfix_op } ;
-lvalue_primary = identifier
-               | "(" lvalue ")" ;
+var_decl = "let" ident ":" type ["=" expr] ";" ;
 
-expression = assignment ;
+field = ident ":" type;
+fields = field { "," field } [ "," ] ;
+struct_decl = "struct" ident "{" fields "}" ;
 
-assignment = ( lvalue ( "=" | "*=" | "/=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | "&=" | "^=" | "|=" ) assignment )
-           | logical_or ;
-
-logical_or = logical_and { "||" logical_and } ;
-logical_and = comparison { "&&" comparison } ;
-
-comparison = bitwise [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) bitwise ] ;
-
-bitwise = shift { ( "&" | "^" | "|" ) shift } ;
-shift = addition { ( "<<" | ">>" ) addition } ;
-addition = multiplication { ( "+" | "-" ) multiplication } ;
-multiplication = unary { ( "*" | "/" | "%" ) unary } ;
-
-unary = ( ( "!" | "-" | "~" | "&" | "*" ) unary )
-      | primary ;
-
-primary = base_primary { postfix_op } ;
-base_primary = identifier
-        | struct_initializer
-        | "(" expression ")" ;
-postfix_op = "(" [...] ")"
-           | "[" [...] "]"
-           | "." identifier ;
-
-struct_initializer = identifier "{" [...] "}" ; # i promise ill work on this one later lol
-
-identifier = ( ALPHA | "_" ) { NUM | ALPHA | "_" } ;
-
-# x() x[] x.y
-# x{}
-# !x -x ~x &x *x
-# * / %
-# + -
-# << >>
-# & ^ |
-# == != < > <= >=
-# &&
-# ||
-# = *= /= %= += -= <<= >>= &= ^= |=
+enum_mod = "noprefix" ;
+enum_mods = enum_mod "," enum_mods ;
+          | enum_mod ;
+variants = variant { "," variants } [ "," ] ;
+enum_decl = "enum" ident [ enum_mods ] "{" variants "}" ;
