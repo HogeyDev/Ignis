@@ -5,7 +5,7 @@ declaration = struct_decl;
 param = ident ":" type ;
 params = param "," params ;
            | param ;
-func_decl = "func" ident "(" params ")" block ;
+func_decl = "func" ident "(" type [ "," params ] ")" block ;
 
 var_decl = "let" ident ":" type ["=" expr] ";" ;
 
@@ -16,5 +16,38 @@ struct_decl = "struct" ident "{" fields "}" ;
 enum_mod = "noprefix" ;
 enum_mods = enum_mod "," enum_mods ;
           | enum_mod ;
+variant = ident ;
 variants = variant { "," variants } [ "," ] ;
 enum_decl = "enum" ident [ enum_mods ] "{" variants "}" ;
+
+statement = import_st ;
+          | return_st ;
+
+import_st = "import" ident { "." ident } ";" ;
+return_st = "return" expr ";" ;
+
+expr = assign ;
+assign = logic_or [ "=" assign ] ;
+logic_or = logic_and { "||" logic_and } ;
+logic_and = equality { "&&" equality } ;
+equality = relation [ ( "==" | "!=" ) relation ] ;
+relation = bitwise [ ( "<" | ">" | "<=" | ">=" ) bitwise ] ;
+bitwise_or = bitwise_xor { "|" bitwise_xor } ;
+bitwise_xor = bitwise_and { "^" bitwise_and } ;
+bitwise_and = shift { "&" shift } ;
+shift = add { ( "<<" | ">>" ) add } ;
+add = mult { ( "+" | "-" ) mult } ;
+mult = unary { ( "*" | "/" | "%" ) unary } ;
+unary = { "!" | "-" | "~" } ref ;
+ref = [ "&" ] access ;
+access = "@" primary ;
+       | primary { postfix_op } ;
+
+args = expr { "," expr } [ "," ] ;
+postfix_op = "(" [ args ] ")" ;
+           | "[" expr "]" ;
+           | "." ident ;
+
+primary = NUM | STR | ident | "(" expr ")" ;
+
+ident = ( ALPHA | "_" ) { ALNUM | "_" } ;
