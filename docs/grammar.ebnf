@@ -1,10 +1,12 @@
-declaration = struct_decl;
+program = "{" { declaration } "}" ;
+
+declaration = struct_decl ;
+            | enum_decl ;
             | func_decl ;
-            | var_decl ;
+            | typedef_decl ;
 
 param = ident ":" type ;
-params = param "," params ;
-           | param ;
+params = param { "," params } ;
 func_decl = "func" ident "(" type [ "," params ] ")" block ;
 
 var_decl = "let" ident ":" type ["=" expr] ";" ;
@@ -20,11 +22,22 @@ variant = ident ;
 variants = variant { "," variants } [ "," ] ;
 enum_decl = "enum" ident [ enum_mods ] "{" variants "}" ;
 
+block = "{" { statement } "}" ;
+
 statement = import_st ;
           | return_st ;
+          | var_decl ;
+          | if_st ;
+          | while_st ;
+          | for_st ;
+          | block ;
+          | expr ";" ;
 
 import_st = "import" ident { "." ident } ";" ;
 return_st = "return" expr ";" ;
+if_st = "if" "(" expr ")" block [ "else" statement ];
+while_st = "while" "(" expr ")" block ;
+for_st = "for" "(" expr ";" expr ";" expr ")" block ;
 
 expr = assign ;
 assign = logic_or [ "=" assign ] ;
@@ -46,7 +59,29 @@ access = "@" primary ;
 args = expr { "," expr } [ "," ] ;
 postfix_op = "(" [ args ] ")" ;
            | "[" expr "]" ;
+           | "->" ident ;
            | "." ident ;
+
+typedef_decl = "typedef" ident type ";" ;
+
+prim = "void" ;
+     | "char" ;
+     | "usize" ;
+     | "isize" ;
+     | "u64" ;
+     | "i64" ;
+     | "u32" ;
+     | "i32" ;
+     | "u16" ;
+     | "i16" ;
+     | "u8" ;
+     | "i8" ;
+
+type = prim ;
+     | "[" expr "]" type ;
+     | "@" type ;
+     | ident ;
+     | "Func" "<" type { "," type } ">" ;
 
 primary = NUM | STR | ident | "(" expr ")" ;
 
