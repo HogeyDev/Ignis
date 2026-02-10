@@ -20,7 +20,7 @@ enum_mods = enum_mod "," enum_mods ;
           | enum_mod ;
 variant = ident ;
 variants = variant { "," variants } [ "," ] ;
-enum_decl = "enum" ident [ enum_mods ] "{" variants "}" ;
+enum_decl = "enum" ident [ "[" enum_mods "]" ] "{" variants "}" ;
 
 block = "{" { statement } "}" ;
 
