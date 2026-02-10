@@ -106,11 +106,31 @@ impl Parser {
     pub fn from(tokens: Vec<Token>) -> Self {
         Self {
             tokens,
-            i: 0,
+            i: 0usize,
         }
     }
 
     pub fn run(&mut self) -> Vec<Declaration> {
-        Vec::new()
+        let mut program: Vec<Declaration> = Vec::new();
+
+        while self.i < self.tokens.len() {
+            program.push(self.declaration());
+        }
+
+        program
+    }
+
+    fn declaration(&mut self) -> Declaration {
+        match self.tokens[self.i] {
+            Token::Struct => self.struct_decl(),
+            Token::Enum => self.enum_decl(),
+            Token::Function => self.function_decl(),
+            Token::TypeDef => self.typedef_decl(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn struct_decl(&mut self) -> Declaration {
+        Declaration::Struct { name: String::new(), fields: HashMap::new() }
     }
 }

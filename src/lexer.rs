@@ -2,7 +2,7 @@
 pub enum Token {
     Function,
     NoPrefix,
-    Typedef,
+    TypeDef,
     Import,
     Return,
     Struct,
@@ -188,7 +188,7 @@ impl Lexer {
         match value.as_str() {
             "func" => Token::Function,
             "noprefix" => Token::NoPrefix,
-            "typedef" => Token::Typedef,
+            "typedef" => Token::TypeDef,
             "import" => Token::Import,
             "return" => Token::Return,
             "struct" => Token::Struct,
