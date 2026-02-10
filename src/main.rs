@@ -1,7 +1,7 @@
 pub mod parser;
 pub mod lexer;
 
-use crate::{lexer::{Lexer, Token}, parser::Parser};
+use crate::{lexer::{Lexer, Token}, parser::{Declaration, Parser}};
 
 fn main() {
     let contents: String = std::fs::read_to_string("example/boolean.is").unwrap();
@@ -10,7 +10,7 @@ fn main() {
     let tokens: Vec<Token> = lexer.run();
 
     let mut parser: Parser = Parser::from(tokens);
-    let ast: AST = parser.run();
+    let ast: Vec<Declaration> = parser.run();
 
-    eprintln!("{tokens:?}");
+    eprintln!("{ast:?}");
 }
