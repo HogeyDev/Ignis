@@ -110,6 +110,23 @@ impl Parser {
         }
     }
 
+    fn previous(&mut self) -> Option<Token> {
+        if self.i > 0 && self.i < self.tokens.len() {
+            return Some(self.tokens[self.i - 1].clone());
+        }
+        None
+    }
+    fn advance(&mut self) -> Token {
+        self.i += 1;
+        self.previous().unwrap()
+    }
+    fn consume(&mut self, kind: Token) -> Token {
+        if std::mem::discriminant(&self.tokens[self.i]) == std::mem::discriminant(&kind) {
+            return self.advance();
+        }
+        panic!("Token types don't match: {kind:?}, {:?}", self.tokens[self.i]);
+    }
+
     pub fn run(&mut self) -> Vec<Declaration> {
         let mut program: Vec<Declaration> = Vec::new();
 
@@ -129,8 +146,40 @@ impl Parser {
             _ => unreachable!(),
         }
     }
-
     fn struct_decl(&mut self) -> Declaration {
-        Declaration::Struct { name: String::new(), fields: HashMap::new() }
+        self.consume(Token::Struct);
+        let Token::Ident(name) = self.consume(Token::Ident("".to_owned())) else { unreachable!(); };
+        let mut fields: HashMap<String, Type> = HashMap::new();
+
+        self.consume(Token::LBrace);
+        while let Token::Ident(field) = self.tokens[self.i].to_owned() {
+            self.i += 1;
+            let kind = self.kind();
+            fields.insert(field.to_owned(), kind);
+        }
+        self.consume(Token::RBrace);
+
+        Declaration::Struct { name, fields }
     }
+    fn enum_decl(&mut self) -> Declaration {
+        self.consume(Token::Enum);
+        let Token::Ident(name) = self.consume(Token::Ident("".to_owned())) else { unreachable!(); };
+        let mut variants: Vec<String> = Vec::new();
+
+        if let Token::LBracket = self.tokens[self.i].to_owned() {
+
+        }
+
+        self.consume(Token::LBrace);
+        while let Token::Ident(var) = self.tokens[self.i].to_owned() {
+            self.i += 1;
+            variants.push(var.to_owned());
+        }
+        self.consume(Token::RBrace);
+
+        Declaration::Enum { name, variants }
+    }
+    fn function_decl(&mut self) -> Declaration {}
+    fn typedef_decl(&mut self) -> Declaration {}
+    fn kind(&mut self) -> Type {}
 }
