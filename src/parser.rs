@@ -1,6 +1,129 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::lexer::Token;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TokenKind {
+    Function,
+    NoPrefix,
+    TypeDef,
+    Import,
+    Return,
+    Struct,
+    While,
+    Else,
+    Enum,
+    For,
+    Let,
+    If,
+
+    Ident,
+    String,
+    Integer,
+
+    PrimType,
+    FuncType,
+
+    LBrace,
+    RBrace,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
+    
+    Colon,
+    Semi,
+    Comma,
+
+    Equals,
+    LogOr,
+    LogAnd,
+    LogNot,
+    EqualTo,
+    NotEqualTo,
+    LessThan,
+    MoreThan,
+    LessThanEq,
+    MoreThanEq,
+    BitOr,
+    BitXor,
+    BitNeg,
+    LShift,
+    RShift,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Ampersand,
+    At,
+
+    Dot,
+    Arrow,
+}
+
+impl Token {
+    pub fn get_kind(&self) -> TokenKind {
+        match self {
+            Self::Function => TokenKind::Function,
+            Self::NoPrefix => TokenKind::NoPrefix,
+            Self::TypeDef => TokenKind::TypeDef,
+            Self::Import => TokenKind::Import,
+            Self::Return => TokenKind::Return,
+            Self::Struct => TokenKind::Struct,
+            Self::While => TokenKind::While,
+            Self::Else => TokenKind::Else,
+            Self::Enum => TokenKind::Enum,
+            Self::For => TokenKind::For,
+            Self::Let => TokenKind::Let,
+            Self::If => TokenKind::If,
+
+            Self::Ident(_) => TokenKind::Ident,
+            Self::String(_) => TokenKind::String,
+            Self::Integer(_) => TokenKind::Integer,
+
+            Self::PrimType(_) => TokenKind::PrimType,
+            Self::FuncType => TokenKind::FuncType,
+
+            Self::LBrace => TokenKind::LBrace,
+            Self::RBrace => TokenKind::RBrace,
+            Self::LParen => TokenKind::LParen,
+            Self::RParen => TokenKind::RParen,
+            Self::LBracket => TokenKind::LBracket,
+            Self::RBracket => TokenKind::RBracket,
+            
+            Self::Colon => TokenKind::Colon,
+            Self::Semi => TokenKind::Semi,
+            Self::Comma => TokenKind::Comma,
+
+            Self::Equals => TokenKind::Equals,
+            Self::LogOr => TokenKind::LogOr,
+            Self::LogAnd => TokenKind::LogAnd,
+            Self::LogNot => TokenKind::LogNot,
+            Self::EqualTo => TokenKind::EqualTo,
+            Self::NotEqualTo => TokenKind::NotEqualTo,
+            Self::LessThan => TokenKind::LessThan,
+            Self::MoreThan => TokenKind::MoreThan,
+            Self::LessThanEq => TokenKind::LessThanEq,
+            Self::MoreThanEq => TokenKind::MoreThanEq,
+            Self::BitOr => TokenKind::BitOr,
+            Self::BitXor => TokenKind::BitXor,
+            Self::BitNeg => TokenKind::BitNeg,
+            Self::LShift => TokenKind::LShift,
+            Self::RShift => TokenKind::RShift,
+            Self::Plus => TokenKind::Plus,
+            Self::Minus => TokenKind::Minus,
+            Self::Star => TokenKind::Star,
+            Self::Slash => TokenKind::Slash,
+            Self::Percent => TokenKind::Percent,
+            Self::Ampersand => TokenKind::Ampersand,
+            Self::At => TokenKind::At,
+
+            Self::Dot => TokenKind::Dot,
+            Self::Arrow => TokenKind::Arrow,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum Type {
@@ -29,7 +152,7 @@ pub enum Declaration {
     },
     Enum {
         name: String,
-        modifiers: Vec<String>,
+        modifiers: HashSet<String>,
         variants: Vec<String>,
     },
     Function {
@@ -120,11 +243,14 @@ impl Parser {
         self.i += 1;
         self.previous().unwrap()
     }
-    fn consume(&mut self, kind: Token) -> Token {
-        if std::mem::discriminant(&self.tokens[self.i]) == std::mem::discriminant(&kind) {
+    fn current(&self) -> &Token {
+        &self.tokens[self.i]
+    }
+    fn consume(&mut self, kind: TokenKind) -> Token {
+        if self.current().get_kind() == kind {
             return self.advance();
         }
-        panic!("Token types don't match: {kind:?}, {:?}", self.tokens[self.i]);
+        panic!("Token types don't match: {kind:?}, {:?}", self.current());
     }
 
     pub fn run(&mut self) -> Vec<Declaration> {
@@ -138,7 +264,7 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Declaration {
-        match self.tokens[self.i] {
+        match self.current() {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
             Token::Function => self.function_decl(),
@@ -147,39 +273,46 @@ impl Parser {
         }
     }
     fn struct_decl(&mut self) -> Declaration {
-        self.consume(Token::Struct);
-        let Token::Ident(name) = self.consume(Token::Ident("".to_owned())) else { unreachable!(); };
+        self.consume(TokenKind::Struct);
+        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut fields: HashMap<String, Type> = HashMap::new();
 
-        self.consume(Token::LBrace);
-        while let Token::Ident(field) = self.tokens[self.i].to_owned() {
+        self.consume(TokenKind::LBrace);
+        while let Token::Ident(field) = self.current().to_owned() {
             self.i += 1;
-            let kind = self.kind();
+            let kind = self.parse_type();
             fields.insert(field.to_owned(), kind);
         }
-        self.consume(Token::RBrace);
+        self.consume(TokenKind::RBrace);
 
         Declaration::Struct { name, fields }
     }
     fn enum_decl(&mut self) -> Declaration {
-        self.consume(Token::Enum);
-        let Token::Ident(name) = self.consume(Token::Ident("".to_owned())) else { unreachable!(); };
+        self.consume(TokenKind::Enum);
+        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut variants: Vec<String> = Vec::new();
 
-        if let Token::LBracket = self.tokens[self.i].to_owned() {
-
+        let mut modifiers: HashSet<String> = HashSet::new();
+        if TokenKind::LBracket == self.current().get_kind() {
+            self.i += 1;
+            while let Token::Ident(name) = self.consume(TokenKind::Ident) {
+                modifiers.insert(name);
+            }
         }
+        self.consume(TokenKind::RBracket);
 
-        self.consume(Token::LBrace);
-        while let Token::Ident(var) = self.tokens[self.i].to_owned() {
+        self.consume(TokenKind::LBrace);
+        while let Token::Ident(var) = self.current().to_owned() {
             self.i += 1;
             variants.push(var.to_owned());
         }
-        self.consume(Token::RBrace);
+        self.consume(TokenKind::RBrace);
 
-        Declaration::Enum { name, variants }
+        Declaration::Enum { name, modifiers, variants }
     }
-    fn function_decl(&mut self) -> Declaration {}
+    fn function_decl(&mut self) -> Declaration {
+        self.consume(TokenKind::Function);
+    }
     fn typedef_decl(&mut self) -> Declaration {}
-    fn kind(&mut self) -> Type {}
+    fn parse_type(&mut self) -> Type {}
 }
