@@ -187,14 +187,6 @@ pub enum Statement {
 }
 
 #[derive(Debug)]
-pub enum Primary {
-    Integer(i128),
-    String(String),
-    Identifier(String),
-    Group(Box<Expression>),
-}
-
-#[derive(Debug)]
 pub enum Expression {
     Unary {
         child: Box<Expression>,
@@ -206,18 +198,22 @@ pub enum Expression {
         op: Token,
     },
     FunctionCall {
-        name: Primary,
+        name: Box<Expression>,
         args: Vec<Expression>,
     },
     ArrayAccess {
-        lhs: Primary,
+        lhs: Box<Expression>,
         index: Box<Expression>,
     },
     MemberAccess {
-        lhs: Primary,
+        lhs: Box<Expression>,
         member: String,
     },
-    Primary(Primary),
+
+    Integer(i128),
+    String(String),
+    Identifier(String),
+    Group(Box<Expression>),
 }
 
 pub struct Parser {
@@ -417,9 +413,58 @@ impl Parser {
 
         Statement::VarDecl { name, kind, value }
     }
-    fn if_st(&mut self) -> Statement { todo!(); }
-    fn while_st(&mut self) -> Statement { todo!(); }
-    fn for_st(&mut self) -> Statement { todo!(); }
+    fn if_st(&mut self) -> Statement {
+        self.consume(TokenKind::If);
+
+        self.consume(TokenKind::LParen);
+        let condition = self.expression();
+        self.consume(TokenKind::RParen);
+
+        let body = self.block();
+
+        let alt = if self.current().get_kind() == TokenKind::Else {
+            self.consume(TokenKind::Else);
+            Some(Box::new(self.statement()))
+        } else { None };
+
+        Statement::If { condition, body: Box::new(body), alt }
+    }
+    fn while_st(&mut self) -> Statement {
+        self.consume(TokenKind::While);
+
+        self.consume(TokenKind::LParen);
+        let condition = self.expression();
+        self.consume(TokenKind::RParen);
+
+        let body = self.block();
+
+        Statement::While { condition, body: Box::new(body) }
+    }
+    fn for_st(&mut self) -> Statement {
+        self.consume(TokenKind::For);
+
+        self.consume(TokenKind::LParen);
+        let init = self.expression();
+        self.consume(TokenKind::Semi);
+
+        let condition = self.expression();
+        self.consume(TokenKind::Semi);
+
+        let updater = self.expression();
+        self.consume(TokenKind::Semi);
+        self.consume(TokenKind::RParen);
+
+        let mut body = self.block();
+        match body {
+            Statement::Block(ref mut xs) => xs.push(Statement::Expression(updater)),
+            _ => unreachable!(),
+        }
+
+        Statement::Block(vec![
+            Statement::Expression(init),
+            Statement::While { condition, body: Box::new(body) },
+        ])
+    }
 
     fn parse_type(&mut self) -> Type {
         match self.current().to_owned() {
@@ -462,5 +507,95 @@ impl Parser {
         }
     }
 
-    fn expression(&mut self) -> Expression { Expression::Primary(Primary::Integer(1618)) }
+    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser) -> Expression) -> Expression {
+        let mut lhs = child(self);
+
+        while symbols.contains(&self.current().get_kind()) {
+            let op = self.advance();
+            let rhs = child(self);
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op }
+        }
+
+        lhs
+    }
+    fn right_rec(&mut self,
+        symbols: &[TokenKind],
+        parent: fn(&mut Parser) -> Expression,
+        child: fn(&mut Parser) -> Expression,
+    ) -> Expression {
+        let lhs = child(self);
+
+        if symbols.contains(&self.current().get_kind()) {
+            let op = self.advance();
+            let rhs = parent(self);
+            Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op }
+        } else { lhs }
+    }
+    fn expression(&mut self) -> Expression { self.assignment() }
+    fn assignment(&mut self) -> Expression { self.right_rec(&[TokenKind::Equals], Self::assignment, Self::logical_or) }
+    fn logical_or(&mut self) -> Expression { self.left_rec(&[TokenKind::LogOr], Self::logical_and) }
+    fn logical_and(&mut self) -> Expression { self.left_rec(&[TokenKind::LogAnd], Self::equality) }
+    fn equality(&mut self) -> Expression {
+        let mut lhs = self.relation();
+
+        if [TokenKind::EqualTo,
+            TokenKind::NotEqualTo,
+        ].contains(&self.current().get_kind()) {
+            let op = self.advance();
+            let rhs = self.relation();
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op };
+        }
+
+        lhs
+    }
+    fn relation(&mut self) -> Expression {
+        let mut lhs = self.bitwise_or();
+
+        if [TokenKind::LessThan,
+            TokenKind::MoreThan,
+            TokenKind::MoreThanEq,
+            TokenKind::LessThanEq
+        ].contains(&self.current().get_kind()) {
+            let op = self.advance();
+            let rhs = self.bitwise_or();
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op };
+        }
+
+        lhs
+    }
+    fn bitwise_or(&mut self) -> Expression { self.left_rec(&[TokenKind::BitOr], Self::bitwise_xor) }
+    fn bitwise_xor(&mut self) -> Expression { self.left_rec(&[TokenKind::BitXor], Self::bitwise_and) }
+    fn bitwise_and(&mut self) -> Expression { self.left_rec(&[TokenKind::Ampersand], Self::shift) }
+    fn shift(&mut self) -> Expression { self.left_rec(&[TokenKind::LShift, TokenKind::RShift], Self::addition) }
+    fn addition(&mut self) -> Expression { self.left_rec(&[TokenKind::Plus, TokenKind::Minus], Self::multiplication) }
+    fn multiplication(&mut self) -> Expression { self.left_rec(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent], Self::unary)}
+    fn unary(&mut self) -> Expression {
+        if [TokenKind::LogNot,
+            TokenKind::Minus,
+            TokenKind::BitNeg
+        ].contains(&self.current().get_kind()) {
+            let op = self.advance();
+            Expression::Unary { child: Box::new(self.unary()), op }
+        } else { self.reference() }
+    }
+    fn reference(&mut self) -> Expression {
+        if self.current().get_kind() == TokenKind::Ampersand {
+            let op = self.advance();
+            Expression::Unary { child: Box::new(self.access()), op }
+        } else { self.reference() }
+    }
+    fn access(&mut self) -> Expression {
+        if self.current().get_kind() == TokenKind::At {
+            let op = self.advance();
+            Expression::Unary { child: Box::new(self.primary()), op }
+        } else {
+            let prim = self.primary();
+            while [TokenKind::
+            ].contains(&self.current().get_kind()) {}
+        }
+    }
+
+    fn reference(&mut self) -> Expression {}
+    fn reference(&mut self) -> Expression {}
+    fn reference(&mut self) -> Expression {}
 }

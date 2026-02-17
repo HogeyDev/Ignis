@@ -1,10 +1,10 @@
 program = { declaration } ;
 
-declaration = struct_decl ;
-            | enum_decl ;
-            | func_decl ;
-            | typedef_decl ;
-            | import_st ;
+declaration = struct_decl
+            | enum_decl
+            | func_decl
+            | typedef_decl
+            | import_st
             | "static" var_decl ;
 
 param = ident ":" type ;
@@ -25,13 +25,13 @@ enum_decl = "enum" ident [ "[" enum_mods "]" ] "{" variants "}" ;
 
 block = "{" { statement } "}" ;
 
-statement = import_st ;
-          | return_st ;
-          | var_decl ;
-          | if_st ;
-          | while_st ;
-          | for_st ;
-          | block ;
+statement = import_st
+          | return_st
+          | var_decl
+          | if_st
+          | while_st
+          | for_st
+          | block
           | expr ";" ;
 
 import_st = "import" ident { "." ident } ";" ;
@@ -45,7 +45,7 @@ assign = logic_or [ "=" assign ] ;
 logic_or = logic_and { "||" logic_and } ;
 logic_and = equality { "&&" equality } ;
 equality = relation [ ( "==" | "!=" ) relation ] ;
-relation = bitwise [ ( "<" | ">" | "<=" | ">=" ) bitwise ] ;
+relation = bitwise_or [ ( "<" | ">" | "<=" | ">=" ) bitwise_or ] ;
 bitwise_or = bitwise_xor { "|" bitwise_xor } ;
 bitwise_xor = bitwise_and { "^" bitwise_and } ;
 bitwise_and = shift { "&" shift } ;
@@ -54,34 +54,34 @@ add = mult { ( "+" | "-" ) mult } ;
 mult = unary { ( "*" | "/" | "%" ) unary } ;
 unary = { "!" | "-" | "~" } ref ;
 ref = [ "&" ] access ;
-access = "@" primary ;
+access = "@" primary
        | primary { postfix_op } ;
 
 args = expr { "," expr } [ "," ] ;
-postfix_op = "(" [ args ] ")" ;
-           | "[" expr "]" ;
-           | "->" ident ;
+postfix_op = "(" [ args ] ")"
+           | "[" expr "]"
+           | "->" ident
            | "." ident ;
 
 typedef_decl = "typedef" ident type ";" ;
 
-prim = "void" ;
-     | "char" ;
-     | "usize" ;
-     | "isize" ;
-     | "u64" ;
-     | "i64" ;
-     | "u32" ;
-     | "i32" ;
-     | "u16" ;
-     | "i16" ;
-     | "u8" ;
+prim = "void"
+     | "char"
+     | "usize"
+     | "isize"
+     | "u64"
+     | "i64"
+     | "u32"
+     | "i32"
+     | "u16"
+     | "i16"
+     | "u8"
      | "i8" ;
 
-type = "[" expr "]" type ;
-     | "@" type ;
-     | ident ;
-     | prim ;
+type = "[" expr "]" type
+     | "@" type
+     | ident
+     | prim
      | "Func" "<" type { "," type } ">" ;
 
 primary = NUM | STR | ident | "(" expr ")" ;
