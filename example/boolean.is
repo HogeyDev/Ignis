@@ -7,12 +7,12 @@ enum bool [ noprefix ] {
 
 struct Person {
     name: []char;
-    age: int;
+    age: i32;
     homeless: bool;
     married: bool;
 }
 
-func main(int) {
+func main(i32) {
     let k: Person;
 
     k.name = "Kourtet";

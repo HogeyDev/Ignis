@@ -167,7 +167,7 @@ impl Lexer {
         let mut value = "".to_owned();
         self.i += 1;
 
-        while let Some(x) = self.curr() && x != '\n' {
+        while let Some(x) = self.curr() && !['\n', '\"'].contains(&x) {
             value.push(x);
             self.i += 1;
         }

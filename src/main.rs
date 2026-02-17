@@ -12,5 +12,5 @@ fn main() {
     let mut parser: Parser = Parser::from(tokens);
     let ast: Vec<Declaration> = parser.run();
 
-    eprintln!("{ast:?}");
+    eprintln!("{ast:#?}");
 }

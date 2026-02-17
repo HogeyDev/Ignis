@@ -127,7 +127,7 @@ impl Token {
 pub enum Type {
     Prim(String),
     Array {
-        size: Expression,
+        size: Option<Expression>,
         kind: Box<Type>,
     },
     Pointer {
@@ -230,7 +230,7 @@ impl Parser {
     }
 
     fn previous(&mut self) -> Option<Token> {
-        if self.i > 0 && self.i < self.tokens.len() {
+        if self.i > 0 && self.i-1 < self.tokens.len() {
             return Some(self.tokens[self.i - 1].clone());
         }
         None
@@ -260,6 +260,7 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Declaration {
+        eprintln!("decl!");
         match self.current() {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
@@ -271,6 +272,7 @@ impl Parser {
         }
     }
     fn struct_decl(&mut self) -> Declaration {
+        eprintln!("struct!");
         self.consume(TokenKind::Struct);
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut fields: HashMap<String, Type> = HashMap::new();
@@ -288,6 +290,7 @@ impl Parser {
         Declaration::Struct { name, fields }
     }
     fn enum_decl(&mut self) -> Declaration {
+        eprintln!("enum!");
         self.consume(TokenKind::Enum);
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut variants: Vec<String> = Vec::new();
@@ -314,6 +317,7 @@ impl Parser {
         Declaration::Enum { name, modifiers, variants }
     }
     fn function_decl(&mut self) -> Declaration {
+        eprintln!("function!");
         self.consume(TokenKind::Function);
 
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
@@ -337,6 +341,7 @@ impl Parser {
     }
     fn typedef_decl(&mut self) -> Declaration { todo!(); }
     fn block(&mut self) -> Statement {
+        eprintln!("block!");
         let mut statement = Vec::new();
 
         self.consume(TokenKind::LBrace);
@@ -349,6 +354,7 @@ impl Parser {
     }
     
     fn statement(&mut self) -> Statement {
+        eprintln!("statement!");
         match self.current() {
             Token::Import => self.import_st(),
             Token::Return => self.return_st(),
@@ -383,6 +389,7 @@ impl Parser {
     fn return_st(&mut self) -> Statement {
         self.consume(TokenKind::Return);
         if self.current().get_kind() == TokenKind::Semi {
+            self.advance();
             Statement::Return(None)
         } else {
             let value = self.expression();
@@ -391,6 +398,7 @@ impl Parser {
         }
     }
     fn var_decl(&mut self) -> Statement {
+        eprintln!("vardecl!");
         self.consume(TokenKind::Let);
 
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
@@ -410,6 +418,8 @@ impl Parser {
         } else {
             None
         };
+
+        self.consume(TokenKind::Semi);
 
         Statement::VarDecl { name, kind, value }
     }
@@ -470,7 +480,9 @@ impl Parser {
         match self.current().to_owned() {
             Token::LBracket => {
                 self.i += 1;
-                let size = self.expression();
+                let size = if self.current().get_kind() != TokenKind::RBracket {
+                    Some(self.expression())
+                } else { None };
                 self.consume(TokenKind::RBracket);
                 let child = self.parse_type();
                 Type::Array { size, kind: Box::new(child) }
@@ -582,7 +594,7 @@ impl Parser {
         if self.current().get_kind() == TokenKind::Ampersand {
             let op = self.advance();
             Expression::Unary { child: Box::new(self.access()), op }
-        } else { self.reference() }
+        } else { self.access() }
     }
     fn access(&mut self) -> Expression {
         if self.current().get_kind() == TokenKind::At {
@@ -606,17 +618,45 @@ impl Parser {
                     lhs = Expression::FunctionCall { name: Box::new(lhs), args };
                     true
                 }
-                Token::LBracket => { true }
-                Token::Arrow => { true }
-                Token::Dot => { true }
-                _ => false,
+                Token::LBracket => {
+                    let index = self.expression();
+
+                    lhs = Expression::ArrayAccess { lhs: Box::new(lhs), index: Box::new(index) };
+                    self.consume(TokenKind::RBracket);
+                    true
+                }
+                Token::Arrow => {
+                    let Token::Ident(member) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                    lhs = Expression::Unary { child: Box::new(lhs), op: Token::Star };
+                    lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
+                    true
+                }
+                Token::Dot => {
+                    let Token::Ident(member) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                    lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
+                    true
+                }
+                _ => {
+                    self.i -= 1;
+                    false
+                }
             } { /* "ughh she never pays any attention to me" uh huh for sure bud, maybe if you werent so useless here i would actually use you... did you ever consider that?!?*/ }
 
             lhs
         }
     }
 
-    fn primary(&mut self) -> Expression {}
-    fn reference(&mut self) -> Expression {}
-    fn reference(&mut self) -> Expression {}
+    fn primary(&mut self) -> Expression {
+        match self.advance() {
+            Token::Ident(x) => Expression::Identifier(x),
+            Token::Integer(x) => Expression::Integer(x.parse::<i128>().unwrap()),
+            Token::String(x) => Expression::String(x),
+            Token::LParen => {
+                let child = self.expression();
+                self.consume(TokenKind::RParen);
+                child
+            }
+            x => panic!("Unknown primary {x:?}"),
+        }
+    }
 }
