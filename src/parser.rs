@@ -5,7 +5,6 @@ use crate::lexer::Token;
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
     Function,
-    NoPrefix,
     TypeDef,
     Import,
     Return,
@@ -66,7 +65,6 @@ impl Token {
     pub fn get_kind(&self) -> TokenKind {
         match self {
             Self::Function => TokenKind::Function,
-            Self::NoPrefix => TokenKind::NoPrefix,
             Self::TypeDef => TokenKind::TypeDef,
             Self::Import => TokenKind::Import,
             Self::Return => TokenKind::Return,
@@ -142,8 +140,6 @@ pub enum Type {
     },
 }
 
-type Block = Vec<Statement>;
-
 #[derive(Debug)]
 pub enum Declaration {
     Struct {
@@ -157,33 +153,36 @@ pub enum Declaration {
     },
     Function {
         name: String,
-        kind: Type,
-        body: Block,
+        ret: Type,
+        params: Vec<(String, Type)>, // (name, type)
+        body: Statement,
     },
     TypeDef {
         name: String,
         kind: Type,
     },
+    Statement(Statement), // this is pretty much only for global variable declarations and imports
 }
 
 #[derive(Debug)]
 pub enum Statement {
     Import(String), // path (relative?)
-    Return(Expression),
+    Return(Option<Expression>),
     VarDecl {
         name: String,
-        kind: Type,
+        kind: Option<Type>,
         value: Option<Expression>,
     },
     If {
         condition: Expression,
-        body: Block,
+        body: Box<Statement>,
         alt: Option<Box<Statement>>,
     },
     While {
         condition: Expression,
-        body: Block,
+        body: Box<Statement>,
     },
+    Block(Vec<Statement>),
     Expression(Expression),
 }
 
@@ -218,6 +217,7 @@ pub enum Expression {
         lhs: Primary,
         member: String,
     },
+    Primary(Primary),
 }
 
 pub struct Parser {
@@ -250,7 +250,7 @@ impl Parser {
         if self.current().get_kind() == kind {
             return self.advance();
         }
-        panic!("Token types don't match: {kind:?}, {:?}", self.current());
+        panic!("Token types don't match:\n\tLooking for: {kind:?}\n\tFound: {:?}", self.current());
     }
 
     pub fn run(&mut self) -> Vec<Declaration> {
@@ -269,6 +269,8 @@ impl Parser {
             Token::Enum => self.enum_decl(),
             Token::Function => self.function_decl(),
             Token::TypeDef => self.typedef_decl(),
+            Token::Import => Declaration::Statement(self.import_st()),
+            Token::Ident(name) if name == "static" => Declaration::Statement(self.var_decl()),
             _ => unreachable!(),
         }
     }
@@ -280,8 +282,10 @@ impl Parser {
         self.consume(TokenKind::LBrace);
         while let Token::Ident(field) = self.current().to_owned() {
             self.i += 1;
+            self.consume(TokenKind::Colon);
             let kind = self.parse_type();
             fields.insert(field.to_owned(), kind);
+            self.consume(TokenKind::Semi);
         }
         self.consume(TokenKind::RBrace);
 
@@ -295,16 +299,19 @@ impl Parser {
         let mut modifiers: HashSet<String> = HashSet::new();
         if TokenKind::LBracket == self.current().get_kind() {
             self.i += 1;
-            while let Token::Ident(name) = self.consume(TokenKind::Ident) {
-                modifiers.insert(name);
+            while let Token::Ident(modifier) = self.current().to_owned() {
+                self.i += 1;
+                modifiers.insert(modifier);
             }
         }
         self.consume(TokenKind::RBracket);
 
         self.consume(TokenKind::LBrace);
-        while let Token::Ident(var) = self.current().to_owned() {
+        while let Token::Ident(variant) = self.current().to_owned() {
             self.i += 1;
-            variants.push(var.to_owned());
+            variants.push(variant);
+            if self.current().get_kind() != TokenKind::Comma { break; }
+            else { self.i += 1; }
         }
         self.consume(TokenKind::RBrace);
 
@@ -312,7 +319,148 @@ impl Parser {
     }
     fn function_decl(&mut self) -> Declaration {
         self.consume(TokenKind::Function);
+
+        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+
+        self.consume(TokenKind::LParen);
+        let ret = self.parse_type();
+
+        let mut params = Vec::new();
+        while self.current().get_kind() == TokenKind::Comma {
+            self.consume(TokenKind::Comma);
+
+            let Token::Ident(param_name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+            self.consume(TokenKind::Colon);
+            let param_type = self.parse_type();
+            
+            params.push((param_name, param_type));
+        }
+        self.consume(TokenKind::RParen);
+
+        Declaration::Function { name, ret, params, body: self.block() }
     }
-    fn typedef_decl(&mut self) -> Declaration {}
-    fn parse_type(&mut self) -> Type {}
+    fn typedef_decl(&mut self) -> Declaration { todo!(); }
+    fn block(&mut self) -> Statement {
+        let mut statement = Vec::new();
+
+        self.consume(TokenKind::LBrace);
+        while self.current().get_kind() != TokenKind::RBrace {
+            statement.push(self.statement());
+        }
+        self.consume(TokenKind::RBrace);
+
+        Statement::Block(statement)
+    }
+    
+    fn statement(&mut self) -> Statement {
+        match self.current() {
+            Token::Import => self.import_st(),
+            Token::Return => self.return_st(),
+            Token::Let => self.var_decl(),
+            Token::If => self.if_st(),
+            Token::While => self.while_st(),
+            Token::For => self.for_st(),
+            Token::LBrace => self.block(),
+            _ => {
+                let expr = self.expression();
+                self.consume(TokenKind::Semi);
+                Statement::Expression(expr)
+            }
+        }
+    }
+    fn import_st(&mut self) -> Statement {
+        self.consume(TokenKind::Import);
+
+        let Token::Ident(mut path) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        while self.current().get_kind() == TokenKind::Dot {
+            self.consume(TokenKind::Dot);
+            let Token::Ident(subdir) = self.consume(TokenKind::Ident) else { unreachable!(); };
+
+            path.push('/');
+            path.push_str(&subdir);
+        }
+
+        self.consume(TokenKind::Semi);
+
+        Statement::Import(path)
+    }
+    fn return_st(&mut self) -> Statement {
+        self.consume(TokenKind::Return);
+        if self.current().get_kind() == TokenKind::Semi {
+            Statement::Return(None)
+        } else {
+            let value = self.expression();
+            self.consume(TokenKind::Semi);
+            Statement::Return(Some(value))
+        }
+    }
+    fn var_decl(&mut self) -> Statement {
+        self.consume(TokenKind::Let);
+
+        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+
+        let kind = if self.current().get_kind() == TokenKind::Colon {
+            self.consume(TokenKind::Colon);
+            let kind = self.parse_type();
+            Some(kind)
+        } else {
+            None
+        };
+
+        let value = if self.current().get_kind() == TokenKind::Equals {
+            self.consume(TokenKind::Equals);
+            let expr = self.expression();
+            Some(expr)
+        } else {
+            None
+        };
+
+        Statement::VarDecl { name, kind, value }
+    }
+    fn if_st(&mut self) -> Statement { todo!(); }
+    fn while_st(&mut self) -> Statement { todo!(); }
+    fn for_st(&mut self) -> Statement { todo!(); }
+
+    fn parse_type(&mut self) -> Type {
+        match self.current().to_owned() {
+            Token::LBracket => {
+                self.i += 1;
+                let size = self.expression();
+                self.consume(TokenKind::RBracket);
+                let child = self.parse_type();
+                Type::Array { size, kind: Box::new(child) }
+            }
+            Token::At => {
+                self.i += 1;
+                let child = self.parse_type();
+                Type::Pointer { kind: Box::new(child) }
+            }
+            Token::FuncType => {
+                self.i += 1;
+
+                self.consume(TokenKind::LessThan);
+                let ret_type = self.parse_type();
+
+                let mut params = Vec::new();
+                while self.current().get_kind() == TokenKind::Comma {
+                    self.i += 1;
+                    params.push(self.parse_type());
+                }
+
+                self.consume(TokenKind::MoreThan);
+                Type::Function { ret: Box::new(ret_type), params }
+            }
+            Token::PrimType(kind) => {
+                self.i += 1;
+                Type::Prim(kind.to_owned())
+            }
+            Token::Ident(kind) => {
+                self.i += 1;
+                Type::Ident(kind.to_owned())
+            }
+            x => { panic!("Not a valid type: `{x:?}`"); }
+        }
+    }
+
+    fn expression(&mut self) -> Expression { Expression::Primary(Primary::Integer(1618)) }
 }

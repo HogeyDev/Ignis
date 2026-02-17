@@ -1,7 +1,6 @@
 #[derive(Debug, Clone)]
 pub enum Token {
     Function,
-    NoPrefix,
     TypeDef,
     Import,
     Return,
@@ -96,7 +95,7 @@ impl Lexer {
             Some(x) => {
                 if x.is_numeric() {
                     Some(self.number())
-                } else if x.is_alphabetic() {
+                } else if x.is_alphabetic() || x == '_' {
                     Some(self.identifier())
                 } else if x == '\"' {
                     Some(self.string())
@@ -180,14 +179,13 @@ impl Lexer {
         let mut value = self.curr().unwrap().to_string();
         self.i += 1;
 
-        while let Some(x) = self.curr() && x.is_alphanumeric() {
+        while let Some(x) = self.curr() && (x.is_alphanumeric() || x == '_') {
             value.push(x);
             self.i += 1;
         }
 
         match value.as_str() {
             "func" => Token::Function,
-            "noprefix" => Token::NoPrefix,
             "typedef" => Token::TypeDef,
             "import" => Token::Import,
             "return" => Token::Return,

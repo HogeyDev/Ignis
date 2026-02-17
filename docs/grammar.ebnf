@@ -4,6 +4,8 @@ declaration = struct_decl ;
             | enum_decl ;
             | func_decl ;
             | typedef_decl ;
+            | import_st ;
+            | "static" var_decl ;
 
 param = ident ":" type ;
 params = param { "," params } ;
@@ -12,12 +14,11 @@ func_decl = "func" ident "(" type [ "," params ] ")" block ;
 var_decl = "let" ident ":" type ["=" expr] ";" ;
 
 field = ident ":" type;
-fields = field { "," field } [ "," ] ;
+fields = { field ";" } ;
 struct_decl = "struct" ident "{" fields "}" ;
 
 enum_mod = "noprefix" ;
-enum_mods = enum_mod "," enum_mods ;
-          | enum_mod ;
+enum_mods = enum_mod [ "," enum_mods ] ;
 variant = ident ;
 variants = variant { "," variants } [ "," ] ;
 enum_decl = "enum" ident [ "[" enum_mods "]" ] "{" variants "}" ;
@@ -77,10 +78,10 @@ prim = "void" ;
      | "u8" ;
      | "i8" ;
 
-type = prim ;
-     | "[" expr "]" type ;
+type = "[" expr "]" type ;
      | "@" type ;
      | ident ;
+     | prim ;
      | "Func" "<" type { "," type } ">" ;
 
 primary = NUM | STR | ident | "(" expr ")" ;
