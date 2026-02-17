@@ -589,16 +589,34 @@ impl Parser {
             let op = self.advance();
             Expression::Unary { child: Box::new(self.primary()), op }
         } else {
-            let prim = self.primary();
-            while [TokenKind::LParen,
-                TokenKind::LBracket,
-                TokenKind::Arrow,
-                TokenKind::Dot,
-            ].contains(&self.current().get_kind()) {}
+            let mut lhs = self.primary();
+
+            while match self.advance() {
+                Token::LParen => {
+                    let mut args = Vec::new();
+                    while self.current().get_kind() != TokenKind::RParen {
+                        let arg = self.expression();
+                        args.push(arg);
+
+                        if self.current().get_kind() != TokenKind::Comma { break; }
+                        else { self.advance(); }
+                    }
+                    self.consume(TokenKind::RParen);
+
+                    lhs = Expression::FunctionCall { name: Box::new(lhs), args };
+                    true
+                }
+                Token::LBracket => { true }
+                Token::Arrow => { true }
+                Token::Dot => { true }
+                _ => false,
+            } { /* "ughh she never pays any attention to me" uh huh for sure bud, maybe if you werent so useless here i would actually use you... did you ever consider that?!?*/ }
+
+            lhs
         }
     }
 
-    fn reference(&mut self) -> Expression {}
+    fn primary(&mut self) -> Expression {}
     fn reference(&mut self) -> Expression {}
     fn reference(&mut self) -> Expression {}
 }
