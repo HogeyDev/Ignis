@@ -590,7 +590,10 @@ impl Parser {
             Expression::Unary { child: Box::new(self.primary()), op }
         } else {
             let prim = self.primary();
-            while [TokenKind::
+            while [TokenKind::LParen,
+                TokenKind::LBracket,
+                TokenKind::Arrow,
+                TokenKind::Dot,
             ].contains(&self.current().get_kind()) {}
         }
     }
