@@ -57,9 +57,12 @@ ref = [ "&" ] access ;
 access = "@" primary
        | primary { postfix_op } ;
 
+si_mem = identifier ":" expr ;
+struct_init = si_mem { "," si_mem } [ "," ];
 args = expr { "," expr } [ "," ] ;
 postfix_op = "(" [ args ] ")"
            | "[" expr "]"
+           | "{" struct_init "}"
            | "->" ident
            | "." ident ;
 

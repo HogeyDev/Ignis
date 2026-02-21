@@ -209,6 +209,10 @@ pub enum Expression {
         lhs: Box<Expression>,
         member: String,
     },
+    StructInitializer {
+        name: String,
+        values: HashMap<String, Expression>
+    },
 
     Integer(i128),
     String(String),
@@ -260,7 +264,6 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Declaration {
-        eprintln!("decl!");
         match self.current() {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
@@ -272,7 +275,6 @@ impl Parser {
         }
     }
     fn struct_decl(&mut self) -> Declaration {
-        eprintln!("struct!");
         self.consume(TokenKind::Struct);
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut fields: HashMap<String, Type> = HashMap::new();
@@ -290,7 +292,6 @@ impl Parser {
         Declaration::Struct { name, fields }
     }
     fn enum_decl(&mut self) -> Declaration {
-        eprintln!("enum!");
         self.consume(TokenKind::Enum);
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
         let mut variants: Vec<String> = Vec::new();
@@ -317,7 +318,6 @@ impl Parser {
         Declaration::Enum { name, modifiers, variants }
     }
     fn function_decl(&mut self) -> Declaration {
-        eprintln!("function!");
         self.consume(TokenKind::Function);
 
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
@@ -341,7 +341,6 @@ impl Parser {
     }
     fn typedef_decl(&mut self) -> Declaration { todo!(); }
     fn block(&mut self) -> Statement {
-        eprintln!("block!");
         let mut statement = Vec::new();
 
         self.consume(TokenKind::LBrace);
@@ -354,7 +353,6 @@ impl Parser {
     }
     
     fn statement(&mut self) -> Statement {
-        eprintln!("statement!");
         match self.current() {
             Token::Import => self.import_st(),
             Token::Return => self.return_st(),
@@ -398,7 +396,6 @@ impl Parser {
         }
     }
     fn var_decl(&mut self) -> Statement {
-        eprintln!("vardecl!");
         self.consume(TokenKind::Let);
 
         let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
@@ -623,6 +620,22 @@ impl Parser {
 
                     lhs = Expression::ArrayAccess { lhs: Box::new(lhs), index: Box::new(index) };
                     self.consume(TokenKind::RBracket);
+                    true
+                }
+                Token::LBrace => {
+                    let mut values = HashMap::new();
+                    while self.current().get_kind() != TokenKind::RBrace {
+                        let Token::Ident(val_name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                        self.consume(TokenKind::Colon);
+                        let value = self.expression();
+                        values.insert(val_name, value);
+
+                        if self.current().get_kind() == TokenKind::Comma { self.advance(); }
+                        else { break; }
+                    }
+                    self.consume(TokenKind::RBrace);
+                    let Expression::Identifier(name) = lhs else { panic!("expected a struct name before initializer"); };
+                    lhs = Expression::StructInitializer { name, values };
                     true
                 }
                 Token::Arrow => {

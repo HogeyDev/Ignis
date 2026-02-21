@@ -13,12 +13,12 @@ struct Person {
 }
 
 func main(i32) {
-    let k: Person;
-
-    k.name = "Kourtet";
-    k.age = 18;
-    k.homeless = true;
-    k.married = false;
+    let k: Person = Person {
+        name: "Kourtet",
+        age: 18,
+        homeless: true,
+        married: false,
+    };
 
     return 100 * k.homeless - k.married;
 }
