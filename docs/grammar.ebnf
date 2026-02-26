@@ -31,8 +31,11 @@ statement = import_st
           | if_st
           | while_st
           | for_st
+          | asm_st
           | block
           | expr ";" ;
+
+asm_st = "asm" STR ";" ;
 
 import_st = "import" ident { "." ident } ";" ;
 return_st = "return" expr ";" ;
@@ -55,6 +58,7 @@ mult = unary { ( "*" | "/" | "%" ) unary } ;
 unary = { "!" | "-" | "~" } ref ;
 ref = [ "&" ] access ;
 access = "@" primary
+       | "cast" "(" type "," expr ")"
        | primary { postfix_op } ;
 
 si_mem = identifier ":" expr ;

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenMeta};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
@@ -10,8 +10,10 @@ pub enum TokenKind {
     Return,
     Struct,
     While,
+    Cast,
     Else,
     Enum,
+    Asm,
     For,
     Let,
     If,
@@ -70,8 +72,10 @@ impl Token {
             Self::Return => TokenKind::Return,
             Self::Struct => TokenKind::Struct,
             Self::While => TokenKind::While,
+            Self::Cast => TokenKind::Cast,
             Self::Else => TokenKind::Else,
             Self::Enum => TokenKind::Enum,
+            Self::Asm => TokenKind::Asm,
             Self::For => TokenKind::For,
             Self::Let => TokenKind::Let,
             Self::If => TokenKind::If,
@@ -169,6 +173,7 @@ pub enum Statement {
     Import(String), // path (relative?)
     Return(Option<Expression>),
     VarDecl {
+        is_static: bool,
         name: String,
         kind: Option<Type>,
         value: Option<Expression>,
@@ -182,6 +187,7 @@ pub enum Statement {
         condition: Expression,
         body: Box<Statement>,
     },
+    Asm(String),
     Block(Vec<Statement>),
     Expression(Expression),
 }
@@ -214,6 +220,11 @@ pub enum Expression {
         values: HashMap<String, Expression>
     },
 
+    TypeCast {
+        to: Box<Type>,
+        value: Box<Expression>,
+    },
+
     Integer(i128),
     String(String),
     Identifier(String),
@@ -221,32 +232,34 @@ pub enum Expression {
 }
 
 pub struct Parser {
-    tokens: Vec<Token>,
+    source_lines: Vec<String>,
+    tokens: Vec<TokenMeta>,
     i: usize,
 }
 
 impl Parser {
-    pub fn from(tokens: Vec<Token>) -> Self {
+    pub fn from(source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
         Self {
+            source_lines,
             tokens,
             i: 0usize,
         }
     }
 
-    fn previous(&mut self) -> Option<Token> {
+    fn previous(&mut self) -> Option<TokenMeta> {
         if self.i > 0 && self.i-1 < self.tokens.len() {
             return Some(self.tokens[self.i - 1].clone());
         }
         None
     }
-    fn advance(&mut self) -> Token {
+    fn advance(&mut self) -> TokenMeta {
         self.i += 1;
         self.previous().unwrap()
     }
-    fn current(&self) -> &Token {
+    fn current(&self) -> &TokenMeta {
         &self.tokens[self.i]
     }
-    fn consume(&mut self, kind: TokenKind) -> Token {
+    fn consume(&mut self, kind: TokenKind) -> TokenMeta {
         if self.current().get_kind() == kind {
             return self.advance();
         }
@@ -264,7 +277,7 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Declaration {
-        match self.current() {
+        match &self.current().value {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
             Token::Function => self.function_decl(),
@@ -276,11 +289,11 @@ impl Parser {
     }
     fn struct_decl(&mut self) -> Declaration {
         self.consume(TokenKind::Struct);
-        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        let Token::Ident(name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
         let mut fields: HashMap<String, Type> = HashMap::new();
 
         self.consume(TokenKind::LBrace);
-        while let Token::Ident(field) = self.current().to_owned() {
+        while let Token::Ident(field) = self.current().value.to_owned() {
             self.i += 1;
             self.consume(TokenKind::Colon);
             let kind = self.parse_type();
@@ -293,13 +306,13 @@ impl Parser {
     }
     fn enum_decl(&mut self) -> Declaration {
         self.consume(TokenKind::Enum);
-        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        let Token::Ident(name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
         let mut variants: Vec<String> = Vec::new();
 
         let mut modifiers: HashSet<String> = HashSet::new();
         if TokenKind::LBracket == self.current().get_kind() {
             self.i += 1;
-            while let Token::Ident(modifier) = self.current().to_owned() {
+            while let Token::Ident(modifier) = self.current().value.to_owned() {
                 self.i += 1;
                 modifiers.insert(modifier);
             }
@@ -307,7 +320,7 @@ impl Parser {
         self.consume(TokenKind::RBracket);
 
         self.consume(TokenKind::LBrace);
-        while let Token::Ident(variant) = self.current().to_owned() {
+        while let Token::Ident(variant) = self.current().value.to_owned() {
             self.i += 1;
             variants.push(variant);
             if self.current().get_kind() != TokenKind::Comma { break; }
@@ -320,7 +333,7 @@ impl Parser {
     fn function_decl(&mut self) -> Declaration {
         self.consume(TokenKind::Function);
 
-        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        let Token::Ident(name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
 
         self.consume(TokenKind::LParen);
         let ret = self.parse_type();
@@ -329,7 +342,7 @@ impl Parser {
         while self.current().get_kind() == TokenKind::Comma {
             self.consume(TokenKind::Comma);
 
-            let Token::Ident(param_name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+            let Token::Ident(param_name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
             self.consume(TokenKind::Colon);
             let param_type = self.parse_type();
             
@@ -353,12 +366,13 @@ impl Parser {
     }
     
     fn statement(&mut self) -> Statement {
-        match self.current() {
+        match self.current().value {
             Token::Import => self.import_st(),
             Token::Return => self.return_st(),
             Token::Let => self.var_decl(),
             Token::If => self.if_st(),
             Token::While => self.while_st(),
+            Token::Asm => self.asm_st(),
             Token::For => self.for_st(),
             Token::LBrace => self.block(),
             _ => {
@@ -371,10 +385,10 @@ impl Parser {
     fn import_st(&mut self) -> Statement {
         self.consume(TokenKind::Import);
 
-        let Token::Ident(mut path) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        let Token::Ident(mut path) = self.consume(TokenKind::Ident).value else { unreachable!(); };
         while self.current().get_kind() == TokenKind::Dot {
             self.consume(TokenKind::Dot);
-            let Token::Ident(subdir) = self.consume(TokenKind::Ident) else { unreachable!(); };
+            let Token::Ident(subdir) = self.consume(TokenKind::Ident).value else { unreachable!(); };
 
             path.push('/');
             path.push_str(&subdir);
@@ -396,9 +410,13 @@ impl Parser {
         }
     }
     fn var_decl(&mut self) -> Statement {
-        self.consume(TokenKind::Let);
+        let is_static = match self.advance().value {
+            Token::Let => false,
+            Token::Ident(name) if name == "static" => true,
+            x => panic!("Variable is neither static nor non-static. What are you?\n\t{x:?}"),
+        };
 
-        let Token::Ident(name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+        let Token::Ident(name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
 
         let kind = if self.current().get_kind() == TokenKind::Colon {
             self.consume(TokenKind::Colon);
@@ -418,7 +436,7 @@ impl Parser {
 
         self.consume(TokenKind::Semi);
 
-        Statement::VarDecl { name, kind, value }
+        Statement::VarDecl { is_static, name, kind, value }
     }
     fn if_st(&mut self) -> Statement {
         self.consume(TokenKind::If);
@@ -447,6 +465,14 @@ impl Parser {
 
         Statement::While { condition, body: Box::new(body) }
     }
+    fn asm_st(&mut self) -> Statement {
+        self.consume(TokenKind::Asm);
+        
+        let Token::String(value) = self.consume(TokenKind::String).value else { unreachable!(); };
+
+        self.consume(TokenKind::Semi);
+        Statement::Asm(value)
+    }
     fn for_st(&mut self) -> Statement {
         self.consume(TokenKind::For);
 
@@ -474,7 +500,7 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Type {
-        match self.current().to_owned() {
+        match self.current().value.to_owned() {
             Token::LBracket => {
                 self.i += 1;
                 let size = if self.current().get_kind() != TokenKind::RBracket {
@@ -522,7 +548,7 @@ impl Parser {
         while symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = child(self);
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op }
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value }
         }
 
         lhs
@@ -537,7 +563,7 @@ impl Parser {
         if symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = parent(self);
-            Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op }
+            Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value }
         } else { lhs }
     }
     fn expression(&mut self) -> Expression { self.assignment() }
@@ -552,7 +578,7 @@ impl Parser {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.relation();
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op };
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value };
         }
 
         lhs
@@ -567,7 +593,7 @@ impl Parser {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.bitwise_or();
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op };
+            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value };
         }
 
         lhs
@@ -584,23 +610,34 @@ impl Parser {
             TokenKind::BitNeg
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.unary()), op }
+            Expression::Unary { child: Box::new(self.unary()), op: op.value }
         } else { self.reference() }
     }
     fn reference(&mut self) -> Expression {
         if self.current().get_kind() == TokenKind::Ampersand {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.access()), op }
+            Expression::Unary { child: Box::new(self.access()), op: op.value }
         } else { self.access() }
     }
     fn access(&mut self) -> Expression {
-        if self.current().get_kind() == TokenKind::At {
+        if self.current().get_kind() == TokenKind::Cast {
+            self.advance();
+            self.consume(TokenKind::LParen);
+
+            let to = self.parse_type();
+            self.consume(TokenKind::Comma);
+
+            let value = self.expression();
+
+            self.consume(TokenKind::RParen);
+            Expression::TypeCast { to: Box::new(to), value: Box::new(value) }
+        } else if self.current().get_kind() == TokenKind::At {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.primary()), op }
+            Expression::Unary { child: Box::new(self.primary()), op: op.value }
         } else {
             let mut lhs = self.primary();
 
-            while match self.advance() {
+            while match self.advance().value {
                 Token::LParen => {
                     let mut args = Vec::new();
                     while self.current().get_kind() != TokenKind::RParen {
@@ -625,7 +662,7 @@ impl Parser {
                 Token::LBrace => {
                     let mut values = HashMap::new();
                     while self.current().get_kind() != TokenKind::RBrace {
-                        let Token::Ident(val_name) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                        let Token::Ident(val_name) = self.consume(TokenKind::Ident).value else { unreachable!(); };
                         self.consume(TokenKind::Colon);
                         let value = self.expression();
                         values.insert(val_name, value);
@@ -639,13 +676,13 @@ impl Parser {
                     true
                 }
                 Token::Arrow => {
-                    let Token::Ident(member) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                    let Token::Ident(member) = self.consume(TokenKind::Ident).value else { unreachable!(); };
                     lhs = Expression::Unary { child: Box::new(lhs), op: Token::Star };
                     lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
                     true
                 }
                 Token::Dot => {
-                    let Token::Ident(member) = self.consume(TokenKind::Ident) else { unreachable!(); };
+                    let Token::Ident(member) = self.consume(TokenKind::Ident).value else { unreachable!(); };
                     lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
                     true
                 }
@@ -660,7 +697,7 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Expression {
-        match self.advance() {
+        match self.advance().value {
             Token::Ident(x) => Expression::Identifier(x),
             Token::Integer(x) => Expression::Integer(x.parse::<i128>().unwrap()),
             Token::String(x) => Expression::String(x),

@@ -20,5 +20,8 @@ func main(i32) {
         married: false,
     };
 
+    let x: u8 = 14;
+    let y: u32 = cast(u32, x);
+
     return 100 * k.homeless - k.married;
 }

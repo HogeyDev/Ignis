@@ -1,3 +1,17 @@
+use crate::{errors, parser::TokenKind};
+
+#[derive(Debug, Clone)]
+pub struct TokenMeta {
+    pub pos: (usize, usize), // line, index
+    pub value: Token,
+}
+
+impl TokenMeta {
+    pub fn get_kind(&self) -> TokenKind {
+        self.value.get_kind()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Token {
     Function,
@@ -6,8 +20,10 @@ pub enum Token {
     Return,
     Struct,
     While,
+    Cast,
     Else,
     Enum,
+    Asm,
     For,
     Let,
     If,
@@ -57,16 +73,22 @@ pub enum Token {
     Arrow,
 }
 
-pub struct Lexer {
+pub struct Lexer<'a> {
+    filename: &'a str,
     source: Vec<char>,
+    lines: &'a Vec<String>,
     i: usize,
+    pos: (usize, usize), // line, index
 }
 
-impl Lexer {
-    pub fn from(contents: String) -> Self {
+impl<'a> Lexer<'a> {
+    pub fn from(filename: &'a str, lines: &'a Vec<String>, source: &'a String) -> Self {
         Self {
-            source: contents.chars().collect(),
-            i: 0usize,
+            filename,
+            source: source.chars().collect(),
+            lines,
+            i: 0,
+            pos: (0, 0),
         }
     }
 
@@ -82,9 +104,20 @@ impl Lexer {
     fn curr(&self) -> Option<char> {
         self.get(self.i)
     }
+    fn advance(&mut self) {
+        self.i += 1;
+        self.pos.1 += 1;
+    }
 
-    pub fn run(&mut self) -> Vec<Token> {
-        std::iter::from_fn(|| self.next_token()).collect()
+    pub fn run(&mut self) -> Vec<TokenMeta> {
+        let mut tokens = Vec::new();
+        while self.i < self.source.len() {
+            let pos = self.pos;
+            let Some(token) = self.next_token() else { break; };
+
+            tokens.push(TokenMeta { value: token, pos });
+        }
+        tokens
     }
     fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
@@ -112,33 +145,33 @@ impl Lexer {
                         ';' => Token::Semi,
                         ',' => Token::Comma,
 
-                        '=' => if self.rel(1) == Some('=') { self.i += 1; Token::EqualTo } else { Token::Equals },
-                        '|' => if self.rel(1) == Some('|') { self.i += 1; Token::LogOr } else { Token::BitOr },
-                        '&' => if self.rel(1) == Some('&') { self.i += 1; Token::LogAnd } else { Token::Ampersand },
+                        '=' => if self.rel(1) == Some('=') { self.advance(); Token::EqualTo } else { Token::Equals },
+                        '|' => if self.rel(1) == Some('|') { self.advance(); Token::LogOr } else { Token::BitOr },
+                        '&' => if self.rel(1) == Some('&') { self.advance(); Token::LogAnd } else { Token::Ampersand },
                         '!' => Token::LogNot,
                         '<' => match self.rel(1) {
-                            Some('=') => { self.i += 1; Token::LessThanEq }
-                            Some('<') => { self.i += 1; Token::LShift }
+                            Some('=') => { self.advance(); Token::LessThanEq }
+                            Some('<') => { self.advance(); Token::LShift }
                             _ => { Token::LessThan }
                         }
                         '>' => match self.rel(1) {
-                            Some('=') => { self.i += 1; Token::MoreThanEq }
-                            Some('>') => { self.i += 1; Token::RShift }
+                            Some('=') => { self.advance(); Token::MoreThanEq }
+                            Some('>') => { self.advance(); Token::RShift }
                             _ => { Token::MoreThan }
                         }
                         '^' => Token::BitXor,
                         '~' => Token::BitNeg,
                         '+' => Token::Plus,
-                        '-' => if self.rel(1) == Some('>') { self.i += 1; Token::Arrow } else { Token::Minus },
+                        '-' => if self.rel(1) == Some('>') { self.advance(); Token::Arrow } else { Token::Minus },
                         '*' => Token::Star,
                         '/' => Token::Slash,
                         '%' => Token::Percent,
                         '@' => Token::At,
                         
                         '.' => Token::Dot,
-                        y => panic!("What is this: `{y}`"),
+                        _ => errors::lexer::unknown_character(self.filename, self.lines, self.pos),
                     };
-                    self.i += 1;
+                    self.advance();
                     Some(z)
                 }
             }
@@ -146,11 +179,20 @@ impl Lexer {
     }
 
     fn skip_whitespace(&mut self) {
-        while let Some(x) = self.curr() && x.is_ascii_whitespace() { self.i += 1; }
+        while let Some(x) = self.curr() && x.is_whitespace() {
+            self.advance();
+            if x == '\n' {
+                self.pos.0 += 1;
+                self.pos.1 = 0;
+            }
+        }
     }
     fn skip_comments(&mut self) {
         if self.curr() == Some('/') && self.rel(1) == Some('/') {
-            while self.curr() != Some('\n') { self.i += 1; }
+            while self.curr() != Some('\n') { self.advance(); }
+            self.advance();
+            self.pos.0 += 1;
+            self.pos.1 = 0;
         }
     }
     fn number(&mut self) -> Token {
@@ -158,30 +200,33 @@ impl Lexer {
 
         while let Some(x) = self.curr() && x.is_numeric() {
             value.push(x);
-            self.i += 1;
+            self.advance();
         }
 
         Token::Integer(value)
     }
     fn string(&mut self) -> Token {
         let mut value = "".to_owned();
-        self.i += 1;
+        self.advance();
 
-        while let Some(x) = self.curr() && !['\n', '\"'].contains(&x) {
+        while let Some(x) = self.curr() && x != '\"' {
+            if x == '\n' {
+                errors::lexer::unterminated_string(self.filename, self.lines, self.pos);
+            }
             value.push(x);
-            self.i += 1;
+            self.advance();
         }
-        self.i += 1;
+        self.advance();
 
         Token::String(value)
     }
     fn identifier(&mut self) -> Token {
         let mut value = self.curr().unwrap().to_string();
-        self.i += 1;
+        self.advance();
 
         while let Some(x) = self.curr() && (x.is_alphanumeric() || x == '_') {
             value.push(x);
-            self.i += 1;
+            self.advance();
         }
 
         match value.as_str() {
@@ -191,8 +236,10 @@ impl Lexer {
             "return" => Token::Return,
             "struct" => Token::Struct,
             "while" => Token::While,
+            "cast" => Token::Cast,
             "else" => Token::Else,
             "enum" => Token::Enum,
+            "asm" => Token::Asm,
             "for" => Token::For,
             "let" => Token::Let,
             "if" => Token::If,
@@ -204,6 +251,5 @@ impl Lexer {
                 
             _ => Token::Ident(value),
         }
-
     }
 }
