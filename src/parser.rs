@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::lexer::{Token, TokenMeta};
+use crate::{errors, lexer::{Token, TokenMeta}};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
@@ -231,15 +231,17 @@ pub enum Expression {
     Group(Box<Expression>),
 }
 
-pub struct Parser {
+pub struct Parser<'a> {
+    filename: &'a str,
     source_lines: Vec<String>,
     tokens: Vec<TokenMeta>,
     i: usize,
 }
 
-impl Parser {
-    pub fn from(source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
+impl<'a> Parser<'a> {
+    pub fn from(filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
         Self {
+            filename,
             source_lines,
             tokens,
             i: 0usize,
@@ -260,10 +262,12 @@ impl Parser {
         &self.tokens[self.i]
     }
     fn consume(&mut self, kind: TokenKind) -> TokenMeta {
-        if self.current().get_kind() == kind {
+        let curr = self.current();
+        let ck = curr.get_kind();
+        if ck == kind {
             return self.advance();
         }
-        panic!("Token types don't match:\n\tLooking for: {kind:?}\n\tFound: {:?}", self.current());
+        errors::parser::expect_mismatch(self.filename, &self.source_lines, curr.pos, kind, ck);
     }
 
     pub fn run(&mut self) -> Vec<Declaration> {
@@ -542,7 +546,7 @@ impl Parser {
         }
     }
 
-    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser) -> Expression) -> Expression {
+    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser<'a>) -> Expression) -> Expression {
         let mut lhs = child(self);
 
         while symbols.contains(&self.current().get_kind()) {
@@ -555,8 +559,8 @@ impl Parser {
     }
     fn right_rec(&mut self,
         symbols: &[TokenKind],
-        parent: fn(&mut Parser) -> Expression,
-        child: fn(&mut Parser) -> Expression,
+        parent: fn(&mut Parser<'a>) -> Expression,
+        child: fn(&mut Parser<'a>) -> Expression,
     ) -> Expression {
         let lhs = child(self);
 
