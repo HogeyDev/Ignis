@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
             Token::Import => Some(Declaration::Statement(self.import_st()?)),
             Token::Ident(name) if name == "static" => Some(Declaration::Statement(self.var_decl()?)),
             x => {
-                self.error(format!("invalid declaration: {x:?}"));
+                self.error(format!("invalid declaration: '{}'", x.get_plaintext()));
                 None
             }
         }
@@ -588,7 +588,7 @@ impl<'a> Parser<'a> {
                 Some(Type::Ident(kind.to_owned()))
             }
             x => {
-                self.error(format!("invalid type: {x:?}"));
+                self.error(format!("invalid type: '{}'", x.get_plaintext()));
                 None
             }
         }

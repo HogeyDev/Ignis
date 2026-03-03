@@ -73,6 +73,70 @@ pub enum Token {
     Arrow,
 }
 
+impl Token {
+    pub fn get_plaintext(&self) -> String {
+        match self {
+            Self::Function => "fn",
+            Self::TypeDef => "typedef",
+            Self::Import => "import",
+            Self::Return => "return",
+            Self::Struct => "struct",
+            Self::While => "while",
+            Self::Cast => "cast",
+            Self::Else => "else",
+            Self::Enum => "enum",
+            Self::Asm => "asm",
+            Self::For => "for",
+            Self::Let => "let",
+            Self::If => "if",
+
+            Self::Ident(x) => x,
+            Self::String(x) => x,
+            Self::Integer(x) => x,
+
+            Self::PrimType(x) => x,
+            Self::FuncType => "Fn",
+
+            Self::LBrace => "{",
+            Self::RBrace => "}",
+            Self::LParen => "(",
+            Self::RParen => ")",
+            Self::LBracket => "[",
+            Self::RBracket => "]",
+
+            Self::Colon => ":",
+            Self::Semi => ";",
+            Self::Comma => ",",
+
+            Self::Equals => "=",
+            Self::LogOr => "||",
+            Self::LogAnd => "&&",
+            Self::LogNot => "!",
+            Self::DoubleEquals => "==",
+            Self::NotEquals => "!=",
+            Self::LessThan => "<",
+            Self::MoreThan => ">",
+            Self::LessThanEq => "<=",
+            Self::MoreThanEq => ">=",
+            Self::BitOr => "|",
+            Self::BitXor => "^",
+            Self::BitNeg => "~",
+            Self::LShift => "<<",
+            Self::RShift => ">>",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Star => "*",
+            Self::Slash => "/",
+            Self::Percent => "%",
+            Self::Ampersand => "&",
+            Self::At => "@",
+
+            Self::Dot => ".",
+            Self::Arrow => "->",
+        }.to_owned()
+    }
+}
+
 pub struct Lexer<'a> {
     filename: &'a str,
     source: Vec<char>,
