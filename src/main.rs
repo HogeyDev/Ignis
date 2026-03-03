@@ -1,6 +1,6 @@
 pub mod symbol_table;
+pub mod diagnostics;
 pub mod parser;
-pub mod errors;
 pub mod lexer;
 
 use crate::{lexer::{Lexer, TokenMeta}, parser::{Declaration, Parser}};
@@ -12,10 +12,12 @@ fn main() {
 
     let mut lexer: Lexer = Lexer::from(&filename, &lines, &contents);
     let tokens: Vec<TokenMeta> = lexer.run();
-    // eprintln!("{tokens:#?}");
 
     let mut parser: Parser = Parser::from(&filename, lines, tokens);
     let ast: Vec<Declaration> = parser.run();
 
-    // eprintln!("{ast:#?}");
+    if parser.err_count > 0 {
+        eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", parser.err_count);
+        std::process::exit(1);
+    }
 }

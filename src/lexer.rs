@@ -1,4 +1,4 @@
-use crate::{errors, parser::TokenKind};
+use crate::{diagnostics, parser::TokenKind};
 
 #[derive(Debug, Clone)]
 pub struct TokenMeta {
@@ -50,8 +50,8 @@ pub enum Token {
     LogOr,
     LogAnd,
     LogNot,
-    EqualTo,
-    NotEqualTo,
+    DoubleEquals,
+    NotEquals,
     LessThan,
     MoreThan,
     LessThanEq,
@@ -112,26 +112,27 @@ impl<'a> Lexer<'a> {
     pub fn run(&mut self) -> Vec<TokenMeta> {
         let mut tokens = Vec::new();
         while self.i < self.source.len() {
-            let pos = self.pos;
-            let Some(token) = self.next_token() else { break; };
+            let Some((value, pos)) = self.next_token() else { break; };
 
-            tokens.push(TokenMeta { value: token, pos });
+            tokens.push(TokenMeta { value, pos });
         }
         tokens
     }
-    fn next_token(&mut self) -> Option<Token> {
+    fn next_token(&mut self) -> Option<(Token, (usize, usize))> {
         self.skip_whitespace();
         self.skip_comments();
+
+        let pos = self.pos;
 
         match self.curr() {
             None => None,
             Some(x) => {
                 if x.is_numeric() {
-                    Some(self.number())
+                    Some((self.number(), pos))
                 } else if x.is_alphabetic() || x == '_' {
-                    Some(self.identifier())
+                    Some((self.identifier(), pos))
                 } else if x == '\"' {
-                    Some(self.string())
+                    Some((self.string(), pos))
                 } else {
                     let z = match x {
                         '{' => Token::LBrace,
@@ -145,7 +146,7 @@ impl<'a> Lexer<'a> {
                         ';' => Token::Semi,
                         ',' => Token::Comma,
 
-                        '=' => if self.rel(1) == Some('=') { self.advance(); Token::EqualTo } else { Token::Equals },
+                        '=' => if self.rel(1) == Some('=') { self.advance(); Token::DoubleEquals } else { Token::Equals },
                         '|' => if self.rel(1) == Some('|') { self.advance(); Token::LogOr } else { Token::BitOr },
                         '&' => if self.rel(1) == Some('&') { self.advance(); Token::LogAnd } else { Token::Ampersand },
                         '!' => Token::LogNot,
@@ -169,10 +170,10 @@ impl<'a> Lexer<'a> {
                         '@' => Token::At,
                         
                         '.' => Token::Dot,
-                        _ => errors::lexer::unknown_character(self.filename, self.lines, self.pos),
+                        _ => diagnostics::lexer::unknown_character(self.filename, self.lines, self.pos),
                     };
                     self.advance();
-                    Some(z)
+                    Some((z, pos))
                 }
             }
         }
@@ -211,7 +212,7 @@ impl<'a> Lexer<'a> {
 
         while let Some(x) = self.curr() && x != '\"' {
             if x == '\n' {
-                errors::lexer::unterminated_string(self.filename, self.lines, self.pos);
+                diagnostics::lexer::unterminated_string(self.filename, self.lines, self.pos);
             }
             value.push(x);
             self.advance();

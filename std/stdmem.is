@@ -13,12 +13,14 @@ func mmap(@void, addr: usize, leng: usize, prot: int, flags: int, fd: int, offse
     asm "	mov qword [rbp-8], rax";
 }
 
+static x: *i32 = 14;
 func malloc(@void, bytes: usize) {
-    let top: usize = heap_pointer;
+    let top: *usize = heap_pointer;
     heap_pointer = heap_pointer + bytes;
 
     return &heap[top];
 }
+ hazel
 
 func free(void, ptr: @void) {
     // TODO: so, about that

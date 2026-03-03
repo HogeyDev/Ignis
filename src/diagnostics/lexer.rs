@@ -1,4 +1,4 @@
-use crate::errors::util::error_align_caret;
+use crate::diagnostics::util::error_align_caret;
 
 pub fn unknown_character<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
     eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
