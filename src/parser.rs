@@ -8,6 +8,7 @@ pub enum TokenKind {
     TypeDef,
     Import,
     Return,
+    Static,
     Struct,
     While,
     Cast,
@@ -70,6 +71,7 @@ impl Token {
             Self::TypeDef => TokenKind::TypeDef,
             Self::Import => TokenKind::Import,
             Self::Return => TokenKind::Return,
+            Self::Static => TokenKind::Static,
             Self::Struct => TokenKind::Struct,
             Self::While => TokenKind::While,
             Self::Cast => TokenKind::Cast,
@@ -275,6 +277,7 @@ impl<'a> Parser<'a> {
             return Some(self.advance());
         }
         self.error(format!("expected {kind:?}, but instead got {curr_kind:?}"));
+        self.synchronize();
         None
     }
 
@@ -292,13 +295,17 @@ impl<'a> Parser<'a> {
     }
     fn synchronize(&mut self) {
         'outer: while self.i < self.tokens.len() {
-            match self.current().get_kind() {
-                TokenKind::Function | TokenKind::TypeDef | TokenKind::Import
-                    | TokenKind::Return | TokenKind::Struct | TokenKind::While
-                    | TokenKind::Cast | TokenKind::Else | TokenKind::Enum
-                    | TokenKind::Asm | TokenKind::For | TokenKind::Let | TokenKind::If => {
+            match self.current().value {
+                Token::Function | Token::TypeDef | Token::Import
+                    | Token::Return | Token::Static | Token::Struct
+                    | Token::While | Token::Else | Token::Enum
+                    | Token::Asm | Token::For | Token::Let | Token::If => {
                         break 'outer;
                     }
+                Token::Semi => {
+                    self.advance();
+                    break 'outer;
+                }
                 _ => { self.advance(); }
             }
         }
@@ -325,7 +332,7 @@ impl<'a> Parser<'a> {
             Token::Function => self.function_decl(),
             Token::TypeDef => self.typedef_decl(),
             Token::Import => Some(Declaration::Statement(self.import_st()?)),
-            Token::Ident(name) if name == "static" => Some(Declaration::Statement(self.var_decl()?)),
+            Token::Static => Some(Declaration::Statement(self.var_decl()?)),
             x => {
                 self.error(format!("invalid declaration: '{}'", x.get_plaintext()));
                 None
@@ -461,7 +468,7 @@ impl<'a> Parser<'a> {
     fn var_decl(&mut self) -> Option<Statement> {
         let is_static = match self.advance().value {
             Token::Let => false,
-            Token::Ident(name) if name == "static" => true,
+            Token::Static => true,
             x => unreachable!("Variable is neither static nor non-static. What are you?\n\t{x:?}"),
         };
 
@@ -754,11 +761,15 @@ impl<'a> Parser<'a> {
             Token::Integer(x) => Some(Expression::Integer(x.parse::<i128>().unwrap())),
             Token::String(x) => Some(Expression::String(x)),
             Token::LParen => {
-                let child = self.expression();
+                let child = self.expression()?;
                 self.consume(TokenKind::RParen);
-                child
+                Some(child)
             }
-            x => panic!("Unknown primary {x:?}"),
+            x => {
+                self.i -= 1; // go back to fix alignment
+                self.error(format!("'{}' is not an expression", x.get_plaintext()));
+                None
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ pub fn token_width(token: TokenMeta) -> usize {
 
         Token::Import | 
         Token::Return | 
+        Token::Static |
         Token::Struct => 6,
 
         Token::While => 5,
