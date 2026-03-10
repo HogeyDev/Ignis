@@ -7,17 +7,21 @@ pub fn token_width(token: TokenMeta) -> usize {
         Token::Import | 
         Token::Return | 
         Token::Static |
-        Token::Struct => 6,
+        Token::Struct
+            => 6,
 
-        Token::While => 5,
+        Token::While
+            => 5,
 
         Token::Cast | 
         Token::Else | 
-        Token::Enum => 4,
+        Token::Enum
+            => 4,
 
         Token::Asm | 
         Token::For | 
-        Token::Let => 3,
+        Token::Let
+            => 3,
 
         Token::Arrow | 
         Token::DoubleEquals | 
@@ -30,7 +34,8 @@ pub fn token_width(token: TokenMeta) -> usize {
         Token::LogOr | 
         Token::MoreThanEq | 
         Token::NotEquals | 
-        Token::RShift => 2,
+        Token::RShift
+            => 2,
         
         Token::Ampersand | 
         Token::At | 
@@ -55,12 +60,14 @@ pub fn token_width(token: TokenMeta) -> usize {
         Token::RParen | 
         Token::Semi | 
         Token::Slash | 
-        Token::Star => 1,
+        Token::Star
+            => 1,
 
         Token::Ident(x) | 
         Token::Integer(x) | 
         Token::PrimType(x) | 
-        Token::String(x) => x.len(),
+        Token::String(x)
+            => x.len(),
     }
 }
 
