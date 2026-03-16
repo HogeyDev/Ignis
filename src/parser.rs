@@ -137,7 +137,7 @@ impl Token {
 
 pub type RootAST = Vec<Declaration>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     ParseError,
     Prim(String),
@@ -207,7 +207,7 @@ pub enum Statement {
     Expression(Expression),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     ParseError,
     Unary {

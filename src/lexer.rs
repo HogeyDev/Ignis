@@ -12,7 +12,7 @@ impl TokenMeta {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Continue,
     Function,

@@ -3,11 +3,14 @@ pub mod analyzer;
 pub mod parser;
 pub mod lexer;
 
-use crate::{lexer::{Lexer, TokenMeta}, parser::{Parser, RootAST}};
+use crate::{analyzer::Analyzer, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAST}};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let filename: &str = &args.get(3).unwrap();
+    let filename: &str = match args.get(3) {
+        Some(x) => &x,
+        None => "example/preprocessing.is",
+    };
     let contents: String = std::fs::read_to_string(filename).unwrap();
     let lines: Vec<String> = contents.lines().map(|x| x.to_owned()).collect();
 
@@ -22,5 +25,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    analyzer::analyze(&root);
+    let mut analyzer = Analyzer::new();
+    analyzer.run(&root);
 }
