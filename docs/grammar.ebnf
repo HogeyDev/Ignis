@@ -91,6 +91,6 @@ type = "[" expr "]" type
      | prim
      | "Func" "<" type { "," type } ">" ;
 
-primary = NUM | STR | ident | "(" expr ")" ;
+primary = NUM | STR | CHAR | ident | "(" expr ")" ;
 
 ident = ( ALPHA | "_" ) { ALNUM | "_" } ;

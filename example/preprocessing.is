@@ -1,7 +1,6 @@
 import stdio;
 import stdlib;
 
-typedef i64 int;
 typedef str []char;
 
 enum JobLevel [ noprefix ] {
@@ -20,9 +19,6 @@ func level_to_string(str, level: JobLevel) {
     println("`");
     exit(1);
 }
-
-def Name "Kourtet";
-def Level Intern;
 
 struct Person {
     name: str;

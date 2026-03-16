@@ -2,7 +2,11 @@ use crate::lexer::{Token, TokenMeta};
 
 pub fn token_width(token: TokenMeta) -> usize {
     match token.value {
-        Token::TypeDef => 7,
+        Token::Continue
+            => 8,
+
+        Token::TypeDef
+            => 7,
 
         Token::Import | 
         Token::Return | 
@@ -10,6 +14,7 @@ pub fn token_width(token: TokenMeta) -> usize {
         Token::Struct
             => 6,
 
+        Token::Break |
         Token::While
             => 5,
 
@@ -60,7 +65,8 @@ pub fn token_width(token: TokenMeta) -> usize {
         Token::RParen | 
         Token::Semi | 
         Token::Slash | 
-        Token::Star
+        Token::Star |
+        Token::Char(_)
             => 1,
 
         Token::Ident(x) | 

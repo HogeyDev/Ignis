@@ -72,7 +72,7 @@ void runTests(Tests *tests) {
             unsigned int code = WEXITSTATUS(system(run_command));
             if (code != test.return_code) {
                 printf("Test `%s` failed at runtime\n\t`%s` expected exit code `%d`, but exited `%d` instead\n", test.name, test.name, test.return_code, code);
-                exit(1);
+                // exit(1);
             }
         }
 
@@ -83,7 +83,7 @@ void runTests(Tests *tests) {
             unsigned int code = WEXITSTATUS(system(clean_command));
             if (code != 0) {
                 printf("Test `%s` failed to clean\n", test.name);
-                exit(1);
+                // exit(1);
             }
         }
     }

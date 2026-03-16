@@ -4,12 +4,14 @@ use crate::{diagnostics::{util::{error_align_caret, print_error_header, token_wi
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenKind {
+    Continue,
     Function,
     TypeDef,
     Import,
     Return,
     Static,
     Struct,
+    Break,
     While,
     Cast,
     Else,
@@ -22,6 +24,7 @@ pub enum TokenKind {
     Ident,
     String,
     Integer,
+    Char,
 
     PrimType,
     FuncType,
@@ -67,12 +70,14 @@ pub enum TokenKind {
 impl Token {
     pub fn get_kind(&self) -> TokenKind {
         match self {
+            Self::Continue => TokenKind::Continue,
             Self::Function => TokenKind::Function,
             Self::TypeDef => TokenKind::TypeDef,
             Self::Import => TokenKind::Import,
             Self::Return => TokenKind::Return,
             Self::Static => TokenKind::Static,
             Self::Struct => TokenKind::Struct,
+            Self::Break => TokenKind::Break,
             Self::While => TokenKind::While,
             Self::Cast => TokenKind::Cast,
             Self::Else => TokenKind::Else,
@@ -85,6 +90,7 @@ impl Token {
             Self::Ident(_) => TokenKind::Ident,
             Self::String(_) => TokenKind::String,
             Self::Integer(_) => TokenKind::Integer,
+            Self::Char(_) => TokenKind::Char,
 
             Self::PrimType(_) => TokenKind::PrimType,
             Self::FuncType => TokenKind::FuncType,
@@ -129,7 +135,9 @@ impl Token {
     }
 }
 
-#[derive(Debug)]
+pub type RootAST = Vec<Declaration>;
+
+#[derive(Debug, Clone)]
 pub enum Type {
     ParseError,
     Prim(String),
@@ -192,12 +200,14 @@ pub enum Statement {
         condition: Expression,
         body: Box<Statement>,
     },
+    Break,
+    Continue,
     Asm(String),
     Block(Vec<Statement>),
     Expression(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     ParseError,
     Unary {
@@ -233,6 +243,7 @@ pub enum Expression {
 
     Integer(i128),
     String(String),
+    Char(char),
     Identifier(String),
     Group(Box<Expression>),
 }
@@ -413,8 +424,8 @@ impl<'a> Parser<'a> {
                 self.advance();
                 modifiers.insert(modifier);
             }
+            consume!(self, RBracket, "expected ']'".into(), Declaration, &[TokenKind::LBrace], DECL_FOLLOW);
         }
-        consume!(self, RBracket, "expected ']'".into(), Declaration, &[TokenKind::LBrace], DECL_FOLLOW);
 
         consume!(self, LBrace, "expected '{'".into(), Declaration, DECL_FOLLOW);
         while let Token::Ident(variant) = self.current().value.to_owned() {
@@ -462,11 +473,15 @@ impl<'a> Parser<'a> {
     fn block(&mut self) -> Statement {
         let mut statements = Vec::new();
 
-        consume!(self, LBrace, "expected '{'".into(), Statement, STMT_FOLLOW);
-        while self.current().get_kind() != TokenKind::RBrace {
+        if self.current().get_kind() == TokenKind::LBrace {
+            consume!(self, LBrace, "expected '{'".into(), Statement, STMT_FOLLOW);
+            while self.current().get_kind() != TokenKind::RBrace {
+                statements.push(self.statement());
+            }
+            consume!(self, RBrace, "expected '}'".into(), Statement, STMT_FOLLOW);
+        } else {
             statements.push(self.statement());
         }
-        consume!(self, RBrace, "expected '}'".into(), Statement, STMT_FOLLOW);
 
         Statement::Block(statements)
     }
@@ -812,6 +827,7 @@ impl<'a> Parser<'a> {
             Token::Ident(x) => Expression::Identifier(x),
             Token::Integer(x) => Expression::Integer(x.parse::<i128>().unwrap()),
             Token::String(x) => Expression::String(x),
+            Token::Char(x) => Expression::Char(x),
             Token::LParen => {
                 let child = self.expression();
                 consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);

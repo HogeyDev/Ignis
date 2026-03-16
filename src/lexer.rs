@@ -14,12 +14,14 @@ impl TokenMeta {
 
 #[derive(Debug, Clone)]
 pub enum Token {
+    Continue,
     Function,
     TypeDef,
     Import,
     Return,
     Static,
     Struct,
+    Break,
     While,
     Cast,
     Else,
@@ -32,6 +34,7 @@ pub enum Token {
     Ident(String),
     String(String),
     Integer(String),
+    Char(char),
 
     PrimType(String),
     FuncType,
@@ -135,6 +138,10 @@ impl Token {
 
             Self::Dot => ".",
             Self::Arrow => "->",
+            x => {
+                eprintln!("no viable conversion for {x:?}");
+                std::process::exit(1);
+            }
         }.to_owned()
     }
 }
@@ -186,7 +193,6 @@ impl<'a> Lexer<'a> {
     }
     fn next_token(&mut self) -> Option<(Token, (usize, usize))> {
         self.skip_whitespace();
-        self.skip_comments();
 
         let pos = self.pos;
 
@@ -199,6 +205,57 @@ impl<'a> Lexer<'a> {
                     Some((self.identifier(), pos))
                 } else if x == '\"' {
                     Some((self.string(), pos))
+                } else if x == '\'' {
+                    self.advance();
+                    let val = match self.curr().unwrap() {
+                        '\\' => {
+                            self.advance();
+                            match self.curr() {
+                                Some('a') => { self.advance(); Token::Char('\x07') }
+                                Some('b') => { self.advance(); Token::Char('\x08') }
+                                Some('t') => { self.advance(); Token::Char('\t') }
+                                Some('n') => { self.advance(); Token::Char('\n') }
+                                Some('v') => { self.advance(); Token::Char('\x0b') }
+                                Some('f') => { self.advance(); Token::Char('\x0c') }
+                                Some('r') => { self.advance(); Token::Char('\r') }
+                                Some('e') => { self.advance(); Token::Char('\x1b') }
+                                Some('\\') => { self.advance(); Token::Char('\\') }
+                                Some('\'') => { self.advance(); Token::Char('\'') }
+                                Some('\"') => { self.advance(); Token::Char('\"') }
+                                Some('x') => {
+                                    let Token::Integer(value) = self.number() else {
+                                        diagnostics::lexer::hex_non_int(self.filename, self.lines, self.pos);
+                                    };
+                                    let Ok(value) = u8::from_str_radix(&value, 16) else {
+                                        diagnostics::lexer::hex_non_int(self.filename, self.lines, self.pos);
+                                    };
+
+                                    Token::Char(value as char)
+                                }
+                                Some(x) if ('0'..'9').contains(&x) => {
+                                    let Token::Integer(value) = self.number() else {
+                                        diagnostics::lexer::oct_non_int(self.filename, self.lines, self.pos);
+                                    };
+                                    let Ok(value) = u8::from_str_radix(&value, 8) else {
+                                        diagnostics::lexer::oct_non_int(self.filename, self.lines, self.pos);
+                                    };
+
+                                    Token::Char(value as char)
+                                }
+                                _ => diagnostics::lexer::unknown_escape_sequence(self.filename, self.lines, self.pos),
+                            }
+                        }
+                        x => Token::Char(x),
+                    };
+                    if self.curr() == Some('\'') {
+                        self.advance();
+                    } else {
+                        diagnostics::lexer::char_length(self.filename, self.lines, self.pos);
+                    }
+                    Some((val, pos))
+                } else if x == '/' && self.rel(1) == Some('/') {
+                    self.skip_comments();
+                    self.next_token()
                 } else {
                     let z = match x {
                         '{' => Token::LBrace,
@@ -297,12 +354,14 @@ impl<'a> Lexer<'a> {
         }
 
         match value.as_str() {
+            "continue" => Token::Continue,
             "func" => Token::Function,
             "typedef" => Token::TypeDef,
             "import" => Token::Import,
             "return" => Token::Return,
             "static" => Token::Static,
             "struct" => Token::Struct,
+            "break" => Token::Continue,
             "while" => Token::While,
             "cast" => Token::Cast,
             "else" => Token::Else,
