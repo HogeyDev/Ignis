@@ -19,6 +19,8 @@ pub enum Symbol {
 type Environment = Vec<HashMap<String, Symbol>>;
 pub struct Analyzer {
     env: Environment,
+
+    pub warn_count: usize,
     pub err_count: usize,
 }
 
@@ -26,12 +28,19 @@ impl Analyzer {
     pub fn new() -> Self {
         Self {
             env: Environment::new(),
+
+            warn_count: 0,
             err_count: 0,
         }
     }
 
-    fn warning(&self, msg: &str) {
+    fn warning(&mut self, msg: &str) {
+        self.warn_count += 1;
         eprintln!("\x1b[0;33mwarning\x1b[0;0m: {msg}");
+    }
+    fn error(&mut self, msg: &str) {
+        self.err_count += 1;
+        eprintln!("\x1b[0;31merror\x1b[0;0m: {msg}");
     }
 
     fn add_table(&mut self) {
@@ -173,6 +182,78 @@ impl Analyzer {
             Statement::While { condition, body } => Self::comptime_true(&condition) && Self::uniform_branch_return(&body),
         }
     }
+
+    fn kindof(&mut self, expr: &Expression) -> Option<Type> {
+        match expr {
+            Expression::ParseError => None,
+
+            Expression::Unary { child, .. } => self.kindof(child),
+            Expression::Binary { lhs, .. } => self.kindof(lhs), // lhs must match rhs, so we can infer this i think
+            Expression::FunctionCall { name, args } => {
+                match **name {
+                    Expression::Identifier(n) => {
+                        let Some(var) = self.get_entry(n) else {
+                            self.error(&format!("cannot find function named `{n}`"));
+                            return None;
+                        };
+                        let Symbol::Variable { kind } = var else {
+                            self.error(&format!("`{n}` is not callable"));
+                            return None;
+                        };
+                        
+                        Some(*kind)
+                    }
+                    _ => todo!(),
+                }
+            }
+            Expression::ArrayAccess { lhs, .. } => {
+                match **lhs {
+                    Expression::Identifier(n) => {
+                        let Some(var) = self.get_entry(n) else {
+                            self.error(&format!("cannot find variable named `{n}`"));
+                            return None;
+                        };
+                        let Symbol::Variable { kind: Type::Array { kind, .. } } = var else {
+                            self.error(&format!("`{n}` is not an array"));
+                            return None;
+                        };
+
+                        Some(**kind)
+                    }
+                    _ => todo!(),
+                }
+            }
+            Expression::MemberAccess { lhs, member } => {
+                match **lhs {
+                    Expression::Identifier(n) => {
+                        let Some(var) = self.get_entry(n) else {
+                            self.error(&format!("cannot find variable named `{n}`"));
+                            return None;
+                        };
+                        let Symbol::Variable { kind: arr_kind } = var else {
+                            self.error(&format!("`{n}` is not a variable"));
+                            return None;
+                        };
+                        let Type::Ident(struct_name) = arr_kind else {
+                            self.error(&format!("`{n}` is not a struct"));
+                            return None;
+                        };
+                        let Some(Symbol::Struct { fields }) = self.get_entry(*struct_name) else {
+                            self.error(&format!("could not find struct type `{struct_name}`"));
+                            return None;
+                        };
+
+                        fields.get(member).map(|x| *x)
+                    }
+                    _ => todo!(),
+                }
+            }
+            Expression::StructInitializer { name, values } => Some(Type::Ident(*name)),
+            Expression::TypeCast { to, .. } => Some(**to),
+            Expression::Integer(_) => Some(Type::Prim()), // oh okay this is actually difficult i see 
+        }
+    }
+
     fn analyze_declaration(&mut self, decl: &Declaration) {
         match &decl {
             &Declaration::ParseError => unreachable!(),
@@ -200,7 +281,7 @@ impl Analyzer {
                 }
 
                 self.analyze_statement(body);
-                self.pop_table();
+                // self.pop_table();
             }
             &Declaration::TypeDef { name, kind } => {
 
@@ -209,13 +290,26 @@ impl Analyzer {
         }
     }
 
-    fn analyze_statement(&mut self, body: &Statement) {}
+    fn analyze_statement(&mut self, body: &Statement) {
+        match body {
+            Statement::VarDecl { is_static, name, kind, value } => {
+                if let None = kind && let None = value {
+                    self.error("variable must have a type if no value is assigned");
+                }
+                let kind_final = match kind {
+                    Some(k) => k.to_owned(),
+                    None => self.kindof(&value.unwrap()),
+                };
+                self.add_entry(name.clone(), Symbol::Variable { kind: kind_final });
+            }
+        }
+    }
 
     pub fn run(&mut self, root: &RootAST) {
         for decl in root {
             self.analyze_declaration(decl);
         }
 
-        // eprintln!("{:#?}", self.env);
+        eprintln!("{:#?}", self.env);
     }
 }
