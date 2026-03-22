@@ -26,6 +26,7 @@ pub enum Token {
     Cast,
     Else,
     Enum,
+    Spec,
     Asm,
     For,
     Let,
@@ -33,7 +34,7 @@ pub enum Token {
 
     Ident(String),
     String(String),
-    Integer(String),
+    Integer(String, String),
     Char(char),
 
     PrimType(String),
@@ -80,16 +81,19 @@ pub enum Token {
 impl Token {
     pub fn get_plaintext(&self) -> String {
         match self {
+            Self::Continue => "continue",
             Self::Function => "fn",
             Self::TypeDef => "typedef",
             Self::Import => "import",
             Self::Return => "return",
             Self::Static => "static",
             Self::Struct => "struct",
+            Self::Break => "break",
             Self::While => "while",
             Self::Cast => "cast",
             Self::Else => "else",
             Self::Enum => "enum",
+            Self::Spec => "spec",
             Self::Asm => "asm",
             Self::For => "for",
             Self::Let => "let",
@@ -97,7 +101,7 @@ impl Token {
 
             Self::Ident(x) => x,
             Self::String(x) => x,
-            Self::Integer(x) => x,
+            Self::Integer(x, _) => x,
 
             Self::PrimType(x) => x,
             Self::FuncType => "Fn",
@@ -223,7 +227,7 @@ impl<'a> Lexer<'a> {
                                 Some('\'') => { self.advance(); Token::Char('\'') }
                                 Some('\"') => { self.advance(); Token::Char('\"') }
                                 Some('x') => {
-                                    let Token::Integer(value) = self.number() else {
+                                    let Token::Integer(value, _) = self.number() else {
                                         diagnostics::lexer::hex_non_int(self.filename, self.lines, self.pos);
                                     };
                                     let Ok(value) = u8::from_str_radix(&value, 16) else {
@@ -233,7 +237,7 @@ impl<'a> Lexer<'a> {
                                     Token::Char(value as char)
                                 }
                                 Some(x) if ('0'..'9').contains(&x) => {
-                                    let Token::Integer(value) = self.number() else {
+                                    let Token::Integer(value, _) = self.number() else {
                                         diagnostics::lexer::oct_non_int(self.filename, self.lines, self.pos);
                                     };
                                     let Ok(value) = u8::from_str_radix(&value, 8) else {
@@ -326,8 +330,17 @@ impl<'a> Lexer<'a> {
             value.push(x);
             self.advance();
         }
+        let kind = match self.curr() {
+            Some(c) if c == 'i' || c == 'u' => {
+                let Some((Token::PrimType(t), (_, _))) = self.next_token() else {
+                    diagnostics::lexer::int_follower(self.filename, self.lines, self.pos);
+                };
+                t
+            }
+            _ => "i32".into(),
+        };
 
-        Token::Integer(value)
+        Token::Integer(value, kind)
     }
     fn string(&mut self) -> Token {
         let mut value = "".to_owned();
@@ -361,11 +374,12 @@ impl<'a> Lexer<'a> {
             "return" => Token::Return,
             "static" => Token::Static,
             "struct" => Token::Struct,
-            "break" => Token::Continue,
+            "break" => Token::Break,
             "while" => Token::While,
             "cast" => Token::Cast,
             "else" => Token::Else,
             "enum" => Token::Enum,
+            "spec" => Token::Spec,
             "asm" => Token::Asm,
             "for" => Token::For,
             "let" => Token::Let,

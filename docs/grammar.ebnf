@@ -70,7 +70,7 @@ postfix_op = "(" [ args ] ")"
            | "->" ident
            | "." ident ;
 
-typedef_decl = "typedef" ident type ";" ;
+typedef_decl = "typedef" ident "=" type ";" ;
 
 prim = "void"
      | "char"
@@ -89,6 +89,7 @@ type = "[" expr "]" type
      | "@" type
      | ident
      | prim
+     | "spec" ident
      | "Func" "<" type { "," type } ">" ;
 
 primary = NUM | STR | CHAR | ident | "(" expr ")" ;

@@ -1,7 +1,7 @@
 import stdio;
 import stdlib;
 
-typedef str []char;
+typedef str = []char;
 
 enum JobLevel [ noprefix ] {
     Junior,

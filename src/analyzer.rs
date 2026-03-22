@@ -14,6 +14,9 @@ pub enum Symbol {
     Struct {
         fields: HashMap<String, Type>,
     },
+    Type {
+        kind: Type,
+    }
 }
 
 type Environment = Vec<HashMap<String, Symbol>>;
@@ -58,24 +61,30 @@ impl Analyzer {
             eprintln!("\x1b[0;31merror\x1b[0;0m: redefinition of {}", name);
         }
     }
-    fn get_entry(&mut self, name: String) -> Option<&Symbol> {
-        self.env.iter().rev().find_map(|table| table.get(&name))
+    fn get_entry(&mut self, name: &String) -> Option<&Symbol> {
+        self.env.iter().rev().find_map(|table| table.get(name))
     }
 
     fn comptime_eval(expr: &Expression) -> Option<Expression> {
         match expr {
             Expression::Binary { lhs, rhs, op } => {
                 let eval_logic = |lhs: &Expression, rhs: &Expression, op: fn(bool, bool) -> bool| -> Option<Expression> {
-                    let lhs_eval = Self::comptime_eval(lhs)? != Expression::Integer(0);
-                    let rhs_eval = Self::comptime_eval(rhs)? != Expression::Integer(0);
+                    let lhs_eval = {
+                        let Expression::Integer(val, _) = Self::comptime_eval(lhs)? else { unreachable!(); };
+                        val != 0
+                    };
+                    let rhs_eval = {
+                        let Expression::Integer(val, _) = Self::comptime_eval(rhs)? else { unreachable!(); };
+                        val != 0
+                    };
 
-                    Some(Expression::Integer(op(lhs_eval, rhs_eval) as i128))
+                    Some(Expression::Integer(op(lhs_eval, rhs_eval) as i128, "i32".into()))
                 };
                 let eval_math = |lhs: &Expression, rhs: &Expression, op: fn(i128, i128) -> i128| -> Option<Expression> {
-                    let Expression::Integer(lhs_eval) = Self::comptime_eval(lhs)? else { unreachable!(); };
-                    let Expression::Integer(rhs_eval) = Self::comptime_eval(rhs)? else { unreachable!(); };
+                    let Expression::Integer(lhs_eval, _) = Self::comptime_eval(lhs)? else { unreachable!(); };
+                    let Expression::Integer(rhs_eval, _) = Self::comptime_eval(rhs)? else { unreachable!(); };
 
-                    Some(Expression::Integer(op(lhs_eval, rhs_eval)))
+                    Some(Expression::Integer(op(lhs_eval, rhs_eval), "i32".into()))
                 };
                 match op {
                     Token::Equals => Self::comptime_eval(rhs),
@@ -105,16 +114,19 @@ impl Analyzer {
             Expression::Unary { child, op } => {
                 match op {
                     Token::LogNot => {
-                        let eval = Self::comptime_eval(child)? != Expression::Integer(0);
-                        Some(Expression::Integer((!eval) as i128))
+                        let (eval, kind) = {
+                            let Expression::Integer(v, k) = Self::comptime_eval(child)? else { unreachable!(); };
+                            (v != 0, k)
+                        };
+                        Some(Expression::Integer((!eval) as i128, kind))
                     }
                     Token::Minus => {
-                        let Expression::Integer(eval) = Self::comptime_eval(child)? else { unreachable!(); };
-                        Some(Expression::Integer(-eval))
+                        let Expression::Integer(eval, kind) = Self::comptime_eval(child)? else { unreachable!(); };
+                        Some(Expression::Integer((-eval) as i128, kind))
                     }
                     Token::BitNeg => {
-                        let Expression::Integer(eval) = Self::comptime_eval(child)? else { unreachable!(); };
-                        Some(Expression::Integer(!eval))
+                        let Expression::Integer(eval, kind) = Self::comptime_eval(child)? else { unreachable!(); };
+                        Some(Expression::Integer(!eval, kind))
                     }
                     Token::Ampersand => None,
                     Token::At => None,
@@ -133,15 +145,13 @@ impl Analyzer {
 
             Expression::Identifier(_) => None,
 
-            s @ Expression::String(_) => Some(s.to_owned()),
-            x @ Expression::Integer(_) => Some(x.to_owned()),
-            c @ Expression::Char(_) => Some(c.to_owned()),
+            expr @ (Expression::String(_) | Expression::Integer(_, _) | Expression::Char(_)) => Some(expr.to_owned()),
         }
     }
     fn comptime_true(expr: &Expression) -> bool {
         match expr {
             expr @ (Expression::Binary { .. } | Expression::Unary { .. }) => match Self::comptime_eval(expr) {
-                Some(Expression::Integer(x)) if x != 0 => true,
+                Some(Expression::Integer(x, _)) if x != 0 => true,
                 _ => false,
             },
             Expression::TypeCast { .. } => false,
@@ -156,7 +166,7 @@ impl Analyzer {
             Expression::String(_) => false,
             Expression::Identifier(_) => false,
 
-            Expression::Integer(x) => x != &0,
+            Expression::Integer(x, _) => x != &0,
             Expression::Char(c) => c != &'\0',
         }
     }
@@ -189,9 +199,9 @@ impl Analyzer {
 
             Expression::Unary { child, .. } => self.kindof(child),
             Expression::Binary { lhs, .. } => self.kindof(lhs), // lhs must match rhs, so we can infer this i think
-            Expression::FunctionCall { name, args } => {
-                match **name {
-                    Expression::Identifier(n) => {
+            Expression::FunctionCall { name, .. } => {
+                match *name.to_owned() {
+                    Expression::Identifier(ref n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find function named `{n}`"));
                             return None;
@@ -201,14 +211,14 @@ impl Analyzer {
                             return None;
                         };
                         
-                        Some(*kind)
+                        Some(kind.to_owned())
                     }
                     _ => todo!(),
                 }
             }
             Expression::ArrayAccess { lhs, .. } => {
-                match **lhs {
-                    Expression::Identifier(n) => {
+                match *lhs.to_owned() {
+                    Expression::Identifier(ref n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find variable named `{n}`"));
                             return None;
@@ -218,52 +228,66 @@ impl Analyzer {
                             return None;
                         };
 
-                        Some(**kind)
+                        Some(*kind.to_owned())
                     }
                     _ => todo!(),
                 }
             }
             Expression::MemberAccess { lhs, member } => {
-                match **lhs {
-                    Expression::Identifier(n) => {
+                match *lhs.to_owned() {
+                    Expression::Identifier(ref n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find variable named `{n}`"));
                             return None;
                         };
-                        let Symbol::Variable { kind: arr_kind } = var else {
+                        let Symbol::Variable { kind } = var else {
                             self.error(&format!("`{n}` is not a variable"));
                             return None;
                         };
-                        let Type::Ident(struct_name) = arr_kind else {
-                            self.error(&format!("`{n}` is not a struct"));
-                            return None;
+                        let struct_name = match kind {
+                            Type::Ident(name) => name.clone(),
+                            _ => {
+                                self.error(&format!("`{n}` is not a struct"));
+                                return None;
+                            }
                         };
-                        let Some(Symbol::Struct { fields }) = self.get_entry(*struct_name) else {
+                        let Some(Symbol::Struct { fields }) = self.get_entry(&struct_name) else {
                             self.error(&format!("could not find struct type `{struct_name}`"));
                             return None;
                         };
 
-                        fields.get(member).map(|x| *x)
+                        fields.get(member).map(|x| x.to_owned())
                     }
                     _ => todo!(),
                 }
             }
-            Expression::StructInitializer { name, values } => Some(Type::Ident(*name)),
-            Expression::TypeCast { to, .. } => Some(**to),
-            Expression::Integer(_) => Some(Type::Prim()), // oh okay this is actually difficult i see 
+            Expression::StructInitializer { name, .. } => Some(Type::Ident(name.to_owned())),
+            Expression::TypeCast { to, .. } => Some(*to.to_owned()),
+            Expression::Integer(_, k) => Some(Type::Prim(k.to_owned())),
+            Expression::String(_) => Some(Type::Pointer { kind: Box::from(Type::Prim("char".into())) }),
+            Expression::Char(_) => Some(Type::Prim("char".into())),
+            Expression::Identifier(x) => {
+                let Some(Symbol::Variable { kind }) = self.get_entry(x) else {
+                    self.error(&format!("cannot find variable named `{x}`"));
+                    return None;
+                };
+
+                Some(kind.to_owned())
+            }
+            Expression::Group(child) => self.kindof(child),
         }
     }
 
     fn analyze_declaration(&mut self, decl: &Declaration) {
         match &decl {
-            &Declaration::ParseError => unreachable!(),
-            &Declaration::Enum { name, modifiers, variants } => {
+            Declaration::ParseError => unreachable!(),
+            Declaration::Enum { name, modifiers, variants } => {
                 self.add_entry(name.into(), Symbol::Enum { mods: modifiers.clone(), variants: variants.clone() });
             }
-            &Declaration::Struct { name, fields } => {
+            Declaration::Struct { name, fields } => {
                 self.add_entry(name.into(), Symbol::Struct { fields: fields.clone() });
             }
-            &Declaration::Function { name, ret, params, body } => {
+            Declaration::Function { name, ret, params, body } => {
                 self.add_entry(name.clone(),
                     Symbol::Variable {
                         kind: Type::Function {
@@ -281,27 +305,46 @@ impl Analyzer {
                 }
 
                 self.analyze_statement(body);
-                // self.pop_table();
+                self.pop_table();
             }
-            &Declaration::TypeDef { name, kind } => {
-
-            }
-            &Declaration::Statement(stmt) => {}
+            Declaration::TypeDef { name, kind } => self.add_entry(name.into(), Symbol::Type { kind: kind.to_owned() }),
+            Declaration::Statement(stmt) => self.analyze_statement(stmt),
         }
     }
 
     fn analyze_statement(&mut self, body: &Statement) {
         match body {
+            Statement::ParseError => unreachable!(),
             Statement::VarDecl { is_static, name, kind, value } => {
                 if let None = kind && let None = value {
                     self.error("variable must have a type if no value is assigned");
                 }
                 let kind_final = match kind {
                     Some(k) => k.to_owned(),
-                    None => self.kindof(&value.unwrap()),
+                    None => {
+                        let Some(k) = self.kindof(&value.unwrap()) else {
+                            self.error(&format!("could not infer the type of `{name}`")); return;
+                        };
+                        k
+                    }
                 };
                 self.add_entry(name.clone(), Symbol::Variable { kind: kind_final });
             }
+            Statement::Import(path) => {
+                if let Err(e) = std::fs::exists(path) {
+                    match e.kind() {
+                        std::io::ErrorKind::NotFound => self.error(&format!("could not find file `{path}`")),
+                        _ => self.error(&format!("file read error: `{e}`"))
+                    }
+                };
+            }
+            Statement::Return(expr) => if expr.is_some() { self.analyze_expression(&expr.unwrap()) }
+        }
+    }
+
+    fn analyze_expression(&mut self, expr: &Expression) {
+        match expr {
+
         }
     }
 

@@ -16,6 +16,7 @@ pub enum TokenKind {
     Cast,
     Else,
     Enum,
+    Spec,
     Asm,
     For,
     Let,
@@ -82,6 +83,7 @@ impl Token {
             Self::Cast => TokenKind::Cast,
             Self::Else => TokenKind::Else,
             Self::Enum => TokenKind::Enum,
+            Self::Spec => TokenKind::Spec,
             Self::Asm => TokenKind::Asm,
             Self::For => TokenKind::For,
             Self::Let => TokenKind::Let,
@@ -89,7 +91,7 @@ impl Token {
 
             Self::Ident(_) => TokenKind::Ident,
             Self::String(_) => TokenKind::String,
-            Self::Integer(_) => TokenKind::Integer,
+            Self::Integer(_, _) => TokenKind::Integer,
             Self::Char(_) => TokenKind::Char,
 
             Self::PrimType(_) => TokenKind::PrimType,
@@ -241,7 +243,7 @@ pub enum Expression {
         value: Box<Expression>,
     },
 
-    Integer(i128),
+    Integer(i128, String), // (value, type) : 69u32 -> (69, "u32")
     String(String),
     Char(char),
     Identifier(String),
@@ -465,6 +467,7 @@ impl<'a> Parser<'a> {
 
         let curr = self.current().value.to_owned();
         let new_type = consume!(self, Ident, format!("expected an identifier, recieved {curr:?}"), Declaration, DECL_FOLLOW);
+        consume!(self, Equals, "expected '='".into(), Declaration, DECL_FOLLOW);
         let value = self.parse_type();
         consume!(self, Semi, "expected ';'".into(), Declaration, DECL_FOLLOW);
 
@@ -825,7 +828,7 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Expression {
         match self.advance().value {
             Token::Ident(x) => Expression::Identifier(x),
-            Token::Integer(x) => Expression::Integer(x.parse::<i128>().unwrap()),
+            Token::Integer(x, k) => Expression::Integer(x.parse::<i128>().unwrap(), k),
             Token::String(x) => Expression::String(x),
             Token::Char(x) => Expression::Char(x),
             Token::LParen => {

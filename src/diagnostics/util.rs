@@ -20,7 +20,8 @@ pub fn token_width(token: TokenMeta) -> usize {
 
         Token::Cast | 
         Token::Else | 
-        Token::Enum
+        Token::Enum |
+        Token::Spec
             => 4,
 
         Token::Asm | 
@@ -70,7 +71,7 @@ pub fn token_width(token: TokenMeta) -> usize {
             => 1,
 
         Token::Ident(x) | 
-        Token::Integer(x) | 
+        Token::Integer(x, _) | 
         Token::PrimType(x) | 
         Token::String(x)
             => x.len(),

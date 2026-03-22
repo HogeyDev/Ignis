@@ -47,3 +47,11 @@ pub fn oct_non_int<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, u
     eprintln!("{: >width$}\nexpected an octal integer to follow '\\'", '^', width = off);
     std::process::exit(1);
 }
+
+pub fn int_follower<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
+    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    let (line, off) = error_align_caret(&lines[pos.0], pos.1);
+    eprintln!("{}", line);
+    eprintln!("{: >width$}\nexpected a primative integer type to follow an integer '\\'", '^', width = off);
+    std::process::exit(1);
+}
