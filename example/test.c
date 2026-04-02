@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define IGNIS_PATH "../target/debug/ignis"
+#define IGNIS_PATH "../build/ignis"
 #define FILE_ENDING ".is"
 
 typedef struct {
@@ -48,6 +48,15 @@ void addTest(Tests *tests, const char *name, const char *output, int return_code
     tests->size++;
 }
 
+int file_exists(const char *fp) {
+    FILE *file = fopen(fp, "r");
+    if (file) {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
 void runTests(Tests *tests) {
     for (unsigned int i = 0; i < tests->size; i++) {
         Test test = tests->tests[i];
@@ -59,7 +68,7 @@ void runTests(Tests *tests) {
             sprintf(compile_command, "%s -o %s %s -stdlib ../std/ --debug-asm", IGNIS_PATH, test.binary_path, test.source_path);
             printf("COMPILING: %s\n", compile_command);
             unsigned int code = WEXITSTATUS(system(compile_command));
-            if (code != 0) {
+            if (code != 0 || !file_exists(test.binary_path)) {
                 printf("Test `%s` failed to compile\n", test.name);
                 exit(1);
             }
@@ -72,7 +81,7 @@ void runTests(Tests *tests) {
             unsigned int code = WEXITSTATUS(system(run_command));
             if (code != test.return_code) {
                 printf("Test `%s` failed at runtime\n\t`%s` expected exit code `%d`, but exited `%d` instead\n", test.name, test.name, test.return_code, code);
-                // exit(1);
+                exit(1);
             }
         }
 
@@ -83,7 +92,7 @@ void runTests(Tests *tests) {
             unsigned int code = WEXITSTATUS(system(clean_command));
             if (code != 0) {
                 printf("Test `%s` failed to clean\n", test.name);
-                // exit(1);
+                exit(1);
             }
         }
     }

@@ -1,16 +1,10 @@
+.PHONY: test compile install debug debug_asm run_asm compile_asm
 asmfile = new_print
 
 all: compile test
 
 compile:
-	cargo build
-
-# compile_asm_win:
-# 	nasm -f win64 example/hello_world.asm -o example/hello_world.o
-# 	gcc example/hello_world.o -o example/hello_world.exe
-
-build:
-	cargo build --release
+	zig build-exe -femit-bin=./build/ignis src/main.zig
 
 compile_asm:
 	nasm -f elf64 example/$(asmfile).bin.asm -o example/$(asmfile).o -g
@@ -25,9 +19,8 @@ debug_asm:
 	gdb ./example/$(asmfile).bin
 
 debug:
-	gdb --args ./target/debug/ignis -o ./example/$(asmfile).bin ./example/$(asmfile).is
+	gdb --args ./build/ignis -o ./example/$(asmfile).bin ./example/$(asmfile).is
 
-.PHONY: test
 test:
 	gcc -o example/_test example/test.c -g
 	cd example && ./_test
