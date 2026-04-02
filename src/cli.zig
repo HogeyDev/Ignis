@@ -45,4 +45,11 @@ pub const CliParser = struct {
 
         return cli_parser;
     }
+
+    pub fn flag_value(self: *CliParser, flag: []const u8) bool {
+        return self.flags.contains(flag);
+    }
+    pub fn option_value(self: *CliParser, option: []const u8, fallback: []const u8) []const u8 {
+        return self.options.get(option) orelse fallback;
+    }
 };
