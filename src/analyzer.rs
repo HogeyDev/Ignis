@@ -304,25 +304,26 @@ impl Analyzer {
                     self.warning(&format!("{name}: not all branches return"));
                 }
 
-                self.analyze_statement(body);
+                self.analyze_statement(body, (false, true));
                 self.pop_table();
             }
             Declaration::TypeDef { name, kind } => self.add_entry(name.into(), Symbol::Type { kind: kind.to_owned() }),
-            Declaration::Statement(stmt) => self.analyze_statement(stmt),
+            Declaration::Statement(stmt) => self.analyze_statement(stmt, (false, false)),
         }
     }
 
-    fn analyze_statement(&mut self, body: &Statement) {
+                                                      // (breakable, returnable)
+    fn analyze_statement(&mut self, body: &Statement, control_flow: (bool, bool)) {
         match body {
             Statement::ParseError => unreachable!(),
-            Statement::VarDecl { is_static, name, kind, value } => {
+            Statement::VarDecl { name, kind, value, .. } => {
                 if let None = kind && let None = value {
                     self.error("variable must have a type if no value is assigned");
                 }
                 let kind_final = match kind {
                     Some(k) => k.to_owned(),
                     None => {
-                        let Some(k) = self.kindof(&value.unwrap()) else {
+                        let Some(k) = self.kindof(value.as_ref().unwrap()) else {
                             self.error(&format!("could not infer the type of `{name}`")); return;
                         };
                         k
@@ -338,13 +339,39 @@ impl Analyzer {
                     }
                 };
             }
-            Statement::Return(expr) => if expr.is_some() { self.analyze_expression(&expr.unwrap()) }
+            Statement::Return(expr) => if expr.is_some() { self.analyze_expression(expr.as_ref().unwrap()) }
+            Statement::If { condition, body, alt } => {
+                if !["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"]
+                    .map(|x| Some(Type::Prim(x.into())))
+                    .contains(&self.kindof(condition)) {
+                        self.error("if condition must have integer type");
+                }
+                self.analyze_statement(body, control_flow);
+                if let Some(alt_body) = alt {
+                    self.analyze_statement(alt_body, control_flow);
+                }
+            }
+            Statement::While { condition, body } => {
+                if !["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"]
+                    .map(|x| Some(Type::Prim(x.into())))
+                    .contains(&self.kindof(condition)) {
+                        self.error("if condition must have integer type");
+                }
+                self.analyze_statement(body, (true, control_flow.1));
+            }
+            Statement::Break => {
+                if control_flow.0 {
+
+                }
+            }
         }
     }
 
     fn analyze_expression(&mut self, expr: &Expression) {
         match expr {
-
+            Expression::ParseError => unreachable!(),
+            Expression::Unary { child, .. } => self.analyze_expression(child),
+            _ => {}
         }
     }
 
