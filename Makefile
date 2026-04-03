@@ -1,10 +1,12 @@
-.PHONY: test compile install debug debug_asm run_asm compile_asm
+.PHONY: test compile long install debug debug_asm run_asm compile_asm
 asmfile = new_print
 
 all: compile test
 
 compile:
 	zig build-exe -femit-bin=./build/ignis src/main.zig
+long:
+	zig build-exe -femit-bin=./build/ignis src/main.zig -freference-trace=$(depth)
 
 compile_asm:
 	nasm -f elf64 example/$(asmfile).bin.asm -o example/$(asmfile).o -g

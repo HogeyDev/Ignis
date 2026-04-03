@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const CliParser = struct {
     allocator: std.mem.Allocator,
+    args: std.ArrayList([]const u8),
     flags: std.StringHashMap(void),
     options: std.StringHashMap([]const u8),
     arguments: std.ArrayList([]const u8),
@@ -9,12 +10,14 @@ pub const CliParser = struct {
     pub fn init(allocator: std.mem.Allocator) CliParser {
         return CliParser{
             .allocator = allocator,
+            .args = .empty,
             .flags = std.StringHashMap(void).init(allocator),
             .options = std.StringHashMap([]const u8).init(allocator),
             .arguments = .empty,
         };
     }
     pub fn deinit(self: *CliParser) void {
+        self.args.deinit(self.allocator);
         self.flags.deinit();
         self.options.deinit();
         self.arguments.deinit(self.allocator);
@@ -23,8 +26,9 @@ pub const CliParser = struct {
     pub fn from(allocator: std.mem.Allocator, args_iter: *std.process.ArgIterator) !CliParser {
         var cli_parser = CliParser.init(allocator);
 
-        _ = args_iter.next();
+        try cli_parser.args.append(cli_parser.allocator, args_iter.next().?);
         while (args_iter.next()) |arg| {
+            try cli_parser.args.append(cli_parser.allocator, arg);
             if (arg.len > 0 and arg[0] == '-') {
                 if (arg.len > 1 and arg[1] == '-') {
                     const flag = arg[2..];
@@ -32,6 +36,7 @@ pub const CliParser = struct {
                 } else {
                     const option = arg[1..];
                     if (args_iter.next()) |value| {
+                        try cli_parser.args.append(cli_parser.allocator, arg);
                         try cli_parser.options.put(option, value);
                     } else {
                         std.debug.print("expected argument after `{s}`\n", .{ option });
