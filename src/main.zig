@@ -1,4 +1,6 @@
 const std = @import("std");
+const config = @import("config.zig");
+const lexer = @import("lexer.zig");
 const cli = @import("cli.zig");
 const io = @import("io.zig");
 
@@ -37,4 +39,15 @@ pub fn main() !void {
     const input_file_path: []const u8 = cli_parser.arguments.items[0];
     var input_file = try io.SourceFile.read_file(allocator, input_file_path);
     defer input_file.deinit();
+
+    var program_config = try config.get_config(allocator, input_file_path, &cli_parser);
+    defer program_config.deinit();
+
+    var tokenizer = try lexer.Lexer.init(allocator, program_config.main_file, input_file.contents);
+    defer tokenizer.deinit();
+    const tokens = try tokenizer.run();
+
+    for (tokens.items) |token| {
+        std.debug.print("{}\n", .{ token });
+    }
 }

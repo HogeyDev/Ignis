@@ -3,7 +3,7 @@ const std = @import("std");
 pub const SourceFile = struct {
     allocator: std.mem.Allocator,
     path: []const u8,
-    contents: []const u8,
+    contents: []u8,
 
     pub fn deinit(self: *SourceFile) void {
         self.allocator.free(self.path);
