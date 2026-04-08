@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define IGNIS_PATH "../build/ignis"
+#define IGNIS_PATH "../build/main"
 #define FILE_ENDING ".is"
 
 typedef struct {

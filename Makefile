@@ -4,7 +4,7 @@ asmfile = new_print
 all: compile test
 
 compile:
-	zig build-exe -femit-bin=./build/ignis src/main.zig
+	sil
 long:
 	zig build-exe -femit-bin=./build/ignis src/main.zig -freference-trace=$(depth)
 

@@ -1,0 +1,3 @@
+source ./src/
+include ./src/include/
+build ./build/
