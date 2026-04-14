@@ -1,3 +1,5 @@
 source ./src/
 include ./src/include/
 build ./build/
+ccargs -g
+ldargs -g
