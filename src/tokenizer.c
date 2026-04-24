@@ -93,11 +93,7 @@ void _advance(char *contents, size_t len, size_t *index, size_t *col, char *curr
     _advance(file->contents, contents_len, &index, &col, &curr, &next)
 
 Tokens get_tokens(SourceFile *file) {
-    typedef struct {
-        char *items;
-        size_t count;
-        size_t capacity;
-    } Characters;
+    DECLARE_DYNAMIC_ARRAY(char, Characters);
 
     Tokens tokens = {0};
 

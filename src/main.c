@@ -7,6 +7,7 @@
 #include "config.h"
 #include "da.h"
 #include "io.h"
+#include "parser.h"
 #include "tokenizer.h"
 
 int main(int argc, char **argv) {
@@ -27,10 +28,12 @@ int main(int argc, char **argv) {
     ProgramConfig config = get_config(input_file_path, &clip);
 
     Tokens tokens = get_tokens(&input_file);
-    for (size_t i = 0; i < tokens.count; i++) {
-        Token token = tokens.items[i];
-        printf("%zu: %s\n", i, format_token(token));
-    }
+    // for (size_t i = 0; i < tokens.count; i++) {
+    //     Token token = tokens.items[i];
+    //     printf("%zu: %s\n", i, format_token(token));
+    // }
+
+    Ast *root = parse_tokens(&tokens);
 
     config_free(&config);
     free(input_file.contents);

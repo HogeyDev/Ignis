@@ -1,6 +1,15 @@
 #ifndef DA_H
 #define DA_H
 
+#include <stddef.h>
+
+#define DECLARE_DYNAMIC_ARRAY(T, Name) \
+    typedef struct {                   \
+        T *items;                      \
+        size_t count;                  \
+        size_t capacity;               \
+    } Name
+
 #define da_append(xs, x) \
     do { \
         if ((xs)->count >= (xs)->capacity) { \

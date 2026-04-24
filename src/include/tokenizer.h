@@ -1,6 +1,7 @@
 #ifndef TOKENIZER_H
 #define TOKENIZER_H
 
+#include "da.h"
 #include "io.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -69,11 +70,7 @@ typedef struct {
     } location;
 } Token;
 
-typedef struct {
-    Token *items;
-    size_t count;
-    size_t capacity;
-} Tokens;
+DECLARE_DYNAMIC_ARRAY(Token, Tokens);
 
 char *format_token(Token token);
 

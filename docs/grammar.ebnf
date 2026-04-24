@@ -4,12 +4,14 @@ declaration = struct_decl
             | enum_decl
             | func_decl
             | typedef_decl
+            | trait_decl
             | import_st
             | "static" var_decl ;
 
 param = ident ":" type ;
 params = param { "," params } ;
-func_decl = "func" ident "(" type [ "," params ] ")" block ;
+func_header = "func" ident "(" type [ "," params ] ")" ;
+func_decl = func_header block ;
 
 var_decl = "let" ident ":" type ["=" expr] ";" ;
 
@@ -22,6 +24,8 @@ enum_mods = enum_mod [ "," enum_mods ] ;
 variant = ident ;
 variants = variant { "," variants } [ "," ] ;
 enum_decl = "enum" ident [ "[" enum_mods "]" ] "{" variants "}" ;
+
+trait_decl = "trait" ident "{" { func_header ";" } "}" ;
 
 block = "{" { statement } "}" ;
 
