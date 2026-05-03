@@ -2,15 +2,18 @@ pub mod diagnostics;
 pub mod analyzer;
 pub mod parser;
 pub mod lexer;
+pub mod cli;
 
-use crate::{analyzer::Analyzer, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAST}};
+use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAST}};
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let filename: &str = match args.get(3) {
-        Some(x) => &x,
-        None => "example/preprocessing.is",
-    };
+    let cli_parser: CliParser = CliParser::from(std::env::args().collect());
+    if cli_parser.arguments.len() == 0 || cli_parser.arguments.len() > 1 {
+        let reason = if cli_parser.arguments.len() > 1 { "More than one" } else { "No" };
+        eprintln!("Error: {} main file found\n\tUsage: {} main.is -o output", reason, cli_parser.args.first().unwrap());
+        std::process::exit(1);
+    }
+    let filename: &str = &cli_parser.arguments[0];
     let contents: String = std::fs::read_to_string(filename).unwrap();
     let lines: Vec<String> = contents.lines().map(|x| x.to_owned()).collect();
 
