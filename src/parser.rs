@@ -250,6 +250,12 @@ pub enum Expression {
     Group(Box<Expression>),
 }
 
+impl Type {
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Type::Prim(p) if matches!(p.as_str(), "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize"))
+    }
+}
+
 pub struct Parser<'a> {
     filename: &'a str,
     source_lines: Vec<String>,

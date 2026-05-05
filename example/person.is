@@ -57,7 +57,7 @@ func main(int) {
     let memory_padding: int = 42; // I serve ZERO purpose other than padding memory
     print_person_ref(cool_ref);
 
-    let x: int = 0;
+    let x: i32 = 0;
     while (x < 10) {
         print_int(x);
         x = x + 1;

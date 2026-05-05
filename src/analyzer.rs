@@ -339,11 +339,13 @@ impl Analyzer {
                     }
                 };
             }
-            Statement::Return(expr) => if expr.is_some() { self.analyze_expression(expr.as_ref().unwrap()) }
+            Statement::Return(expr) => {
+                if expr.is_some() {
+                    _ = self.analyze_expression(expr.as_ref().unwrap())
+                }
+            }
             Statement::If { condition, body, alt } => {
-                if !["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"]
-                    .map(|x| Some(Type::Prim(x.into())))
-                    .contains(&self.kindof(condition)) {
+                if !self.kindof(condition).is_some_and(|t| t.is_integer()) {
                         self.error("if condition must have integer type");
                 }
                 self.analyze_statement(body, control_flow);
@@ -352,26 +354,90 @@ impl Analyzer {
                 }
             }
             Statement::While { condition, body } => {
-                if !["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"]
-                    .map(|x| Some(Type::Prim(x.into())))
-                    .contains(&self.kindof(condition)) {
-                        self.error("if condition must have integer type");
+                if !self.kindof(condition).is_some_and(|t| t.is_integer()) {
+                    self.error("while condition must have integer type");
                 }
                 self.analyze_statement(body, (true, control_flow.1));
             }
             Statement::Break => {
-                if control_flow.0 {
-
+                if !control_flow.0 {
+                    self.error("break statement cannot be used here");
                 }
             }
+            Statement::Continue => {
+                if !control_flow.0 {
+                    self.error("continue statement cannot be used here");
+                }
+            }
+            Statement::Asm(_) => {}
+            Statement::Block(stmts) => stmts.iter().for_each(|stmt| self.analyze_statement(stmt, control_flow)),
+            Statement::Expression(expr) => _ = self.analyze_expression(expr),
         }
     }
 
-    fn analyze_expression(&mut self, expr: &Expression) {
+    fn analyze_expression(&mut self, expr: &Expression) -> Option<Type> {
         match expr {
             Expression::ParseError => unreachable!(),
-            Expression::Unary { child, .. } => self.analyze_expression(child),
-            _ => {}
+            Expression::Unary { child, op } => {
+                self.analyze_expression(child);
+                match op {
+                    Token::At => match self.kindof(child) {
+                        ptr @ Some(Type::Pointer { .. }) => ptr,
+                        _ => {
+                            self.error("cannot deference non pointer type");
+                            None
+                        }
+                    }
+                    Token::Ampersand => match **child {
+                        ref ident @ Expression::Identifier(_) => Some(Type::Pointer { kind: Box::new(self.kindof(&ident)?) }),
+                        ref mem @ Expression::MemberAccess { .. } => Some(Type::Pointer { kind: Box::new(self.kindof(&mem)?) }),
+                        ref arr @ Expression::ArrayAccess { .. } => Some(Type::Pointer { kind: Box::new(self.kindof(&arr)?) }),
+                        _ => {
+                            self.error("invalid operand for reference operator");
+                            None
+                        }
+                    }
+                    _ => None
+                }
+            }
+            Expression::Binary { lhs, rhs, .. } => {
+                let lhs_type = self.analyze_expression(lhs);
+                let rhs_type = self.analyze_expression(rhs);
+
+                if matches!(lhs_type, Some(Type::Pointer { .. })) &&
+                    rhs_type.is_some_and(|t| t.is_integer()) { lhs_type }
+                else if lhs_type.is_some() { lhs_type }
+                else { None }
+            }
+            fcall @ Expression::FunctionCall { .. } => self.kindof(fcall),
+            Expression::ArrayAccess { lhs, index } => {
+                let lhs_type = self.kindof(lhs);
+                match lhs_type {
+                    Some(Type::Array { size, kind }) => {
+                        if let Some(size_unwrap) = size &&
+                            let Some(Expression::Integer(size_val, _)) = Self::comptime_eval(&size_unwrap) &&
+                            let Some(Expression::Integer(index_val, _)) = Self::comptime_eval(index) &&
+                            (index_val < 0 || index_val >= size_val)
+                        {
+                            self.error("array index out of bounds");
+                        }
+                        if !self.kindof(index).is_some_and(|t| t.is_integer()) {
+                            self.error("array index must be integer type");
+                        }
+                        Some(*kind)
+                    }
+                    _ => None,
+                }
+            }
+            // TODO: everything from here on down only does typechecking, this needs to be expanded
+            memacc @ Expression::MemberAccess { .. } => self.kindof(memacc),
+            Expression::StructInitializer { name, .. } => Some(Type::Ident(name.clone())),
+            Expression::TypeCast { to, .. } => Some(*to.clone()),
+            Expression::Integer(_, kind) => Some(Type::Prim(kind.clone())),
+            Expression::String(_) => Some(Type::Array { size: None, kind: Box::new(Type::Prim("char".to_owned())) }),
+            Expression::Char(_) => Some(Type::Prim("char".to_owned())),
+            ident @ Expression::Identifier(_) => self.kindof(ident),
+            Expression::Group(child) => self.kindof(child),
         }
     }
 
@@ -380,6 +446,6 @@ impl Analyzer {
             self.analyze_declaration(decl);
         }
 
-        eprintln!("{:#?}", self.env);
+        // eprintln!("{:#?}", self.env);
     }
 }
