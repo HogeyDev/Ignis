@@ -346,7 +346,7 @@ impl Analyzer {
             }
             Statement::If { condition, body, alt } => {
                 if !self.kindof(condition).is_some_and(|t| t.is_integer()) {
-                        self.error("if condition must have integer type");
+                    self.error("if condition must have integer type");
                 }
                 self.analyze_statement(body, control_flow);
                 if let Some(alt_body) = alt {
