@@ -1,10 +1,10 @@
 pub mod diagnostics;
-// pub mod analyzer;
+pub mod analyzer;
 pub mod parser;
 pub mod lexer;
 pub mod cli;
 
-use crate::{cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
+use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -28,6 +28,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    // let mut analyzer = Analyzer::new();
-    // analyzer.run(&root);
+    let mut analyzer = Analyzer::from(parser);
+    analyzer.run(&root);
 }

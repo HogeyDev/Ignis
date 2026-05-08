@@ -175,7 +175,7 @@ impl Ast for Type {
 }
 
 pub type DeclarationId = usize;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Declaration {
     ParseError,
     Struct {
@@ -211,7 +211,7 @@ impl Ast for Declaration {
 }
 
 pub type StatementId = usize;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     ParseError,
     Import(String), // path (relative?)
@@ -435,22 +435,22 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn add_decl(&mut self, decl: Declaration) -> DeclarationId {
+    pub fn add_decl(&mut self, decl: Declaration) -> DeclarationId {
         let id = self.declaration_arena.len();
         self.declaration_arena.push(decl);
         id
     }
-    fn add_stmt(&mut self, stmt: Statement) -> StatementId {
+    pub fn add_stmt(&mut self, stmt: Statement) -> StatementId {
         let id = self.statement_arena.len();
         self.statement_arena.push(stmt);
         id
     }
-    fn add_expr(&mut self, expr: Expression) -> ExpressionId {
+    pub fn add_expr(&mut self, expr: Expression) -> ExpressionId {
         let id = self.expression_arena.len();
         self.expression_arena.push(expr);
         id
     }
-    fn add_type(&mut self, kind: Type) -> TypeId {
+    pub fn add_type(&mut self, kind: Type) -> TypeId {
         let id = self.type_arena.len();
         self.type_arena.push(kind);
         id
