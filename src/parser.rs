@@ -137,32 +137,50 @@ impl Token {
     }
 }
 
-pub type RootAST = Vec<Declaration>;
+trait Ast: Sized {
+    type Id;
 
+    fn error_variant() -> Self;
+    fn add_to_arena(self, parser: &mut Parser) -> Self::Id;
+}
+pub type RootAst = Vec<DeclarationId>;
+
+pub type TypeId = usize;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     ParseError,
     Prim(String),
     Array {
-        size: Option<Expression>,
-        kind: Box<Type>,
+        size: Option<ExpressionId>,
+        kind: TypeId,
     },
     Pointer {
-        kind: Box<Type>
+        kind: TypeId,
     },
     Ident(String),
     Function {
-        ret: Box<Type>,
-        params: Vec<Type>,
+        ret: TypeId,
+        params: Vec<TypeId>,
     },
 }
+impl Ast for Type {
+    type Id = TypeId;
 
+    fn error_variant() -> Self {
+        Type::ParseError
+    }
+    fn add_to_arena(self, parser: &mut Parser) -> Self::Id {
+        parser.add_type(self)
+    }
+}
+
+pub type DeclarationId = usize;
 #[derive(Debug)]
 pub enum Declaration {
     ParseError,
     Struct {
         name: String,
-        fields: HashMap<String, Type>
+        fields: HashMap<String, TypeId>
     },
     Enum {
         name: String,
@@ -171,83 +189,115 @@ pub enum Declaration {
     },
     Function {
         name: String,
-        ret: Type,
-        params: Vec<(String, Type)>, // (name, type)
-        body: Statement,
+        ret: TypeId,
+        params: Vec<(String, TypeId)>, // (name, type)
+        body: StatementId,
     },
     TypeDef {
         name: String,
-        kind: Type,
+        kind: TypeId,
     },
-    Statement(Statement), // this is pretty much only for global variable declarations and imports
+    Statement(StatementId), // this is pretty much only for global variable declarations and imports
+}
+impl Ast for Declaration {
+    type Id = DeclarationId;
+
+    fn error_variant() -> Self {
+        Declaration::ParseError
+    }
+    fn add_to_arena(self, parser: &mut Parser) -> Self::Id {
+        parser.add_decl(self)
+    }
 }
 
+pub type StatementId = usize;
 #[derive(Debug)]
 pub enum Statement {
     ParseError,
     Import(String), // path (relative?)
-    Return(Option<Expression>),
+    Return(Option<ExpressionId>),
     VarDecl {
         is_static: bool,
         name: String,
-        kind: Option<Type>,
-        value: Option<Expression>,
+        kind: Option<TypeId>,
+        value: Option<ExpressionId>,
     },
     If {
-        condition: Expression,
-        body: Box<Statement>,
-        alt: Option<Box<Statement>>,
+        condition: ExpressionId,
+        body: StatementId,
+        alt: Option<StatementId>,
     },
     While {
-        condition: Expression,
-        body: Box<Statement>,
+        condition: ExpressionId,
+        body: StatementId,
     },
     Break,
     Continue,
     Asm(String),
-    Block(Vec<Statement>),
-    Expression(Expression),
+    Block(Vec<StatementId>),
+    Expression(ExpressionId),
+}
+impl Ast for Statement {
+    type Id = StatementId;
+
+    fn error_variant() -> Self {
+        Statement::ParseError
+    }
+    fn add_to_arena(self, parser: &mut Parser) -> Self::Id {
+        parser.add_stmt(self)
+    }
 }
 
+pub type ExpressionId = usize;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     ParseError,
     Unary {
-        child: Box<Expression>,
+        child: ExpressionId,
         op: Token,
     },
     Binary {
-        lhs: Box<Expression>,
-        rhs: Box<Expression>,
+        lhs: ExpressionId,
+        rhs: ExpressionId,
         op: Token,
     },
     FunctionCall {
-        name: Box<Expression>,
+        name: ExpressionId,
         args: Vec<Expression>,
     },
     ArrayAccess {
-        lhs: Box<Expression>,
-        index: Box<Expression>,
+        lhs: ExpressionId,
+        index: ExpressionId,
     },
     MemberAccess {
-        lhs: Box<Expression>,
+        lhs: ExpressionId,
         member: String,
     },
     StructInitializer {
         name: String,
-        values: HashMap<String, Expression>
+        values: HashMap<String, ExpressionId>
     },
 
     TypeCast {
-        to: Box<Type>,
-        value: Box<Expression>,
+        to: TypeId,
+        value: ExpressionId,
     },
 
     Integer(i128, String), // (value, type) : 69u32 -> (69, "u32")
     String(String),
     Char(char),
     Identifier(String),
-    Group(Box<Expression>),
+    Group(ExpressionId),
+}
+impl Ast for Expression {
+    type Id = ExpressionId;
+
+    fn error_variant() -> Self {
+        Expression::ParseError
+    }
+    fn add_to_arena(self, parser: &mut Parser) -> Self::Id {
+        parser.add_expr(self)
+    }
 }
 
 impl Type {
@@ -265,6 +315,11 @@ pub struct Parser<'a> {
 
     pub err_count: usize,
     // warn_count: usize,
+
+    pub declaration_arena: Vec<Declaration>,
+    pub statement_arena: Vec<Statement>,
+    pub expression_arena: Vec<Expression>,
+    pub type_arena: Vec<Type>,
 }
 
 fn concat_tokenlist(metalist: &[&[TokenKind]]) -> Vec<TokenKind> {
@@ -276,7 +331,7 @@ macro_rules! consume {
         {
             let Some(Token::Ident(value)) = $self.consume(TokenKind::Ident).map(|x| x.value) else {
                 $self.error($message, concat_tokenlist(&[$($follow),+]).as_slice());
-                return $error::ParseError;
+                return $self.add_error::<$error>();
             };
             value
         }
@@ -285,7 +340,7 @@ macro_rules! consume {
         {
             let Some(Token::String(value)) = $self.consume(TokenKind::String).map(|x| x.value) else {
                 $self.error($message, concat_tokenlist(&[$($follow),+]).as_slice());
-                return $error::ParseError;
+                return $self.add_error::<$error>();
             };
             value
         }
@@ -294,7 +349,7 @@ macro_rules! consume {
         {
             if $self.consume(TokenKind::$kind).is_none() {
                 $self.error($message, concat_tokenlist(&[$($follow),+]).as_slice());
-                return $error::ParseError;
+                return $self.add_error::<$error>();
             }
         }
     };
@@ -329,6 +384,11 @@ impl<'a> Parser<'a> {
             i: 0usize,
 
             err_count: 0,
+
+            declaration_arena: Vec::new(),
+            statement_arena: Vec::new(),
+            expression_arena: Vec::new(),
+            type_arena: Vec::new(),
         }
     }
 
@@ -375,7 +435,33 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn run(&mut self) -> Vec<Declaration> {
+    fn add_decl(&mut self, decl: Declaration) -> DeclarationId {
+        let id = self.declaration_arena.len();
+        self.declaration_arena.push(decl);
+        id
+    }
+    fn add_stmt(&mut self, stmt: Statement) -> StatementId {
+        let id = self.statement_arena.len();
+        self.statement_arena.push(stmt);
+        id
+    }
+    fn add_expr(&mut self, expr: Expression) -> ExpressionId {
+        let id = self.expression_arena.len();
+        self.expression_arena.push(expr);
+        id
+    }
+    fn add_type(&mut self, kind: Type) -> TypeId {
+        let id = self.type_arena.len();
+        self.type_arena.push(kind);
+        id
+    }
+
+    fn add_error<T: Ast>(&mut self) -> T::Id {
+        let err_node = T::error_variant();
+        err_node.add_to_arena(self)
+    }
+
+    pub fn run(&mut self) -> RootAst {
         std::iter::from_fn(|| if self.i < self.tokens.len() { Some(self.declaration()) } else { None }).collect()
         // let mut program: Vec<Declaration> = Vec::new();
 
@@ -386,24 +472,30 @@ impl<'a> Parser<'a> {
         // program
     }
 
-    fn declaration(&mut self) -> Declaration {
+    fn declaration(&mut self) -> DeclarationId {
         match &self.current().value {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
             Token::Function => self.function_decl(),
             Token::TypeDef => self.typedef_decl(),
-            Token::Import => Declaration::Statement(self.import_st()),
-            Token::Static => Declaration::Statement(self.var_decl()),
+            Token::Import => {
+                let imp = self.import_st();
+                self.add_decl(Declaration::Statement(imp))
+            }
+            Token::Static => {
+                let var = self.var_decl();
+                self.add_decl(Declaration::Statement(var))
+            }
             x => {
                 self.error(
                     format!("invalid declaration: '{}'", x.get_plaintext()),
                     DECL_FOLLOW
                 );
-                Declaration::ParseError
+                self.add_decl(Declaration::ParseError)
             }
         }
     }
-    fn struct_decl(&mut self) -> Declaration {
+    fn struct_decl(&mut self) -> DeclarationId {
         self.advance();
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
         let mut fields: HashMap<String, Type> = HashMap::new();
@@ -420,7 +512,7 @@ impl<'a> Parser<'a> {
 
         Declaration::Struct { name, fields }
     }
-    fn enum_decl(&mut self) -> Declaration {
+    fn enum_decl(&mut self) -> DeclarationId {
         self.advance();
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
         let mut variants: Vec<String> = Vec::new();
@@ -446,7 +538,7 @@ impl<'a> Parser<'a> {
 
         Declaration::Enum { name, modifiers, variants }
     }
-    fn function_decl(&mut self) -> Declaration {
+    fn function_decl(&mut self) -> DeclarationId {
         self.advance();
 
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
@@ -468,7 +560,7 @@ impl<'a> Parser<'a> {
 
         Declaration::Function { name, ret, params, body: self.block() }
     }
-    fn typedef_decl(&mut self) -> Declaration {
+    fn typedef_decl(&mut self) -> DeclarationId {
         self.advance();
 
         let curr = self.current().value.to_owned();
@@ -512,7 +604,7 @@ impl<'a> Parser<'a> {
             }
         }
     }
-    fn import_st(&mut self) -> Statement {
+    fn import_st(&mut self) -> StatementId {
         self.advance();
 
         let mut path = consume!(self, Ident, "expected an identifier".into(), Statement, STMT_FOLLOW);
@@ -539,7 +631,7 @@ impl<'a> Parser<'a> {
             Statement::Return(Some(value))
         }
     }
-    fn var_decl(&mut self) -> Statement {
+    fn var_decl(&mut self) -> StatementId {
         let is_static = match self.advance().value {
             Token::Let => false,
             Token::Static => true,

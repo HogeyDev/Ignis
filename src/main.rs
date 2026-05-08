@@ -4,7 +4,7 @@ pub mod parser;
 pub mod lexer;
 pub mod cli;
 
-use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAST}};
+use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -21,7 +21,7 @@ fn main() {
     let tokens: Vec<TokenMeta> = lexer.run();
 
     let mut parser: Parser = Parser::from(&filename, lines, tokens);
-    let root: RootAST = parser.run();
+    let root: RootAst = parser.run();
 
     if parser.err_count > 0 {
         eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", parser.err_count);
