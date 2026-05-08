@@ -263,7 +263,7 @@ pub enum Expression {
     },
     FunctionCall {
         name: ExpressionId,
-        args: Vec<Expression>,
+        args: Vec<ExpressionId>,
     },
     ArrayAccess {
         lhs: ExpressionId,
@@ -498,7 +498,7 @@ impl<'a> Parser<'a> {
     fn struct_decl(&mut self) -> DeclarationId {
         self.advance();
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
-        let mut fields: HashMap<String, Type> = HashMap::new();
+        let mut fields: HashMap<String, TypeId> = HashMap::new();
 
         consume!(self, LBrace, "expected '{'".into(), Declaration, DECL_FOLLOW);
         while let Token::Ident(field) = self.current().value.to_owned() {
@@ -510,7 +510,7 @@ impl<'a> Parser<'a> {
         }
         consume!(self, RBrace, "expected '}'".into(), Declaration, DECL_FOLLOW);
 
-        Declaration::Struct { name, fields }
+        self.add_decl(Declaration::Struct { name, fields })
     }
     fn enum_decl(&mut self) -> DeclarationId {
         self.advance();
@@ -536,7 +536,7 @@ impl<'a> Parser<'a> {
         }
         consume!(self, RBrace, "expected '}'".into(), Declaration, DECL_FOLLOW);
 
-        Declaration::Enum { name, modifiers, variants }
+        self.add_decl(Declaration::Enum { name, modifiers, variants })
     }
     fn function_decl(&mut self) -> DeclarationId {
         self.advance();
@@ -558,7 +558,8 @@ impl<'a> Parser<'a> {
         }
         consume!(self, RParen, "expected ')'".into(), Declaration, DECL_FOLLOW);
 
-        Declaration::Function { name, ret, params, body: self.block() }
+        let body = self.block();
+        self.add_decl(Declaration::Function { name, ret, params, body })
     }
     fn typedef_decl(&mut self) -> DeclarationId {
         self.advance();
@@ -569,9 +570,9 @@ impl<'a> Parser<'a> {
         let value = self.parse_type();
         consume!(self, Semi, "expected ';'".into(), Declaration, DECL_FOLLOW);
 
-        Declaration::TypeDef { name: new_type, kind: value }
+        self.add_decl(Declaration::TypeDef { name: new_type, kind: value })
     }
-    fn block(&mut self) -> Statement {
+    fn block(&mut self) -> StatementId {
         let mut statements = Vec::new();
 
         if self.current().get_kind() == TokenKind::LBrace {
@@ -584,10 +585,10 @@ impl<'a> Parser<'a> {
             statements.push(self.statement());
         }
 
-        Statement::Block(statements)
+        self.add_stmt(Statement::Block(statements))
     }
     
-    fn statement(&mut self) -> Statement {
+    fn statement(&mut self) -> StatementId {
         match self.current().value {
             Token::Import => self.import_st(),
             Token::Return => self.return_st(),
@@ -600,7 +601,7 @@ impl<'a> Parser<'a> {
             _ => {
                 let expr = self.expression();
                 consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-                Statement::Expression(expr)
+                self.add_stmt(Statement::Expression(expr))
             }
         }
     }
@@ -618,17 +619,17 @@ impl<'a> Parser<'a> {
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
 
-        Statement::Import(path)
+        self.add_stmt(Statement::Import(path))
     }
-    fn return_st(&mut self) -> Statement {
+    fn return_st(&mut self) -> StatementId {
         self.advance();
         if self.current().get_kind() == TokenKind::Semi {
             self.advance();
-            Statement::Return(None)
+            self.add_stmt(Statement::Return(None))
         } else {
             let value = self.expression();
             consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-            Statement::Return(Some(value))
+            self.add_stmt(Statement::Return(Some(value)))
         }
     }
     fn var_decl(&mut self) -> StatementId {
@@ -658,9 +659,9 @@ impl<'a> Parser<'a> {
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
 
-        Statement::VarDecl { is_static, name, kind, value }
+        self.add_stmt(Statement::VarDecl { is_static, name, kind, value })
     }
-    fn if_st(&mut self) -> Statement {
+    fn if_st(&mut self) -> StatementId {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW);
@@ -671,12 +672,12 @@ impl<'a> Parser<'a> {
 
         let alt = if self.current().get_kind() == TokenKind::Else {
             self.advance();
-            Some(Box::new(self.statement()))
+            Some(self.statement())
         } else { None };
 
-        Statement::If { condition, body: Box::new(body), alt }
+        self.add_stmt(Statement::If { condition, body: body, alt })
     }
-    fn while_st(&mut self) -> Statement {
+    fn while_st(&mut self) -> StatementId {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW);
@@ -684,18 +685,17 @@ impl<'a> Parser<'a> {
         consume!(self, RParen, "expected ')'".into(), Statement, STMT_FOLLOW);
 
         let body = self.block();
-
-        Statement::While { condition, body: Box::new(body) }
+        self.add_stmt(Statement::While { condition, body })
     }
-    fn asm_st(&mut self) -> Statement {
+    fn asm_st(&mut self) -> StatementId {
         self.advance();
         
         let value = consume!(self, String, "expected a string".into(), Statement, STMT_FOLLOW);
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-        Statement::Asm(value)
+        self.add_stmt(Statement::Asm(value))
     }
-    fn for_st(&mut self) -> Statement {
+    fn for_st(&mut self) -> StatementId {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW, &[TokenKind::Semi]);
@@ -709,20 +709,24 @@ impl<'a> Parser<'a> {
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
         consume!(self, RParen, "expected ')'".into(), Statement, STMT_FOLLOW);
 
-        let mut body = self.block();
-        match body {
-            Statement::Block(ref mut xs) => xs.push(Statement::Expression(updater)),
-            Statement::ParseError => return Statement::ParseError,
-            _ => unreachable!(),
+        let body_id = self.block();
+        if let Statement::ParseError = self.statement_arena[body_id] {
+            return self.add_stmt(Statement::ParseError);
         }
 
-        Statement::Block(vec![
-            Statement::Expression(init),
-            Statement::While { condition, body: Box::new(body) },
-        ])
+        let updater_stmt_id = self.add_stmt(Statement::Expression(updater));
+        if let Statement::Block(ref mut xs) = self.statement_arena[body_id] {
+            xs.push(updater_stmt_id);
+        } else {
+            unreachable!();
+        }
+
+        let init_stmt_id = self.add_stmt(Statement::Expression(init));
+        let while_stmt_id = self.add_stmt(Statement::While { condition, body: body_id });
+        self.add_stmt(Statement::Block(vec![ init_stmt_id, while_stmt_id ]))
     }
 
-    fn parse_type(&mut self) -> Type {
+    fn parse_type(&mut self) -> TypeId {
         match self.current().value.to_owned() {
             Token::LBracket => {
                 self.advance();
@@ -730,20 +734,20 @@ impl<'a> Parser<'a> {
                     Some(self.expression())
                 } else { None };
                 consume!(self, RBracket, "expected ']'".into(), Type, TYPE_FOLLOW);
-                let child = self.parse_type();
-                Type::Array { size, kind: Box::new(child) }
+                let kind = self.parse_type();
+                self.add_type(Type::Array { size, kind })
             }
             Token::At => {
                 self.advance();
-                let child = self.parse_type();
-                Type::Pointer { kind: Box::new(child) }
+                let kind = self.parse_type();
+                self.add_type(Type::Pointer { kind })
             }
             Token::FuncType => {
                 self.advance();
 
                 consume!(self, LessThan, "expected '<'".into(), Type, TYPE_FOLLOW);
                 self.consume(TokenKind::LessThan);
-                let ret_type = self.parse_type();
+                let ret = self.parse_type();
 
                 let mut params = Vec::new();
                 while self.current().get_kind() == TokenKind::Comma {
@@ -752,52 +756,52 @@ impl<'a> Parser<'a> {
                 }
 
                 consume!(self, MoreThan, "expected '>'".into(), Type, TYPE_FOLLOW);
-                Type::Function { ret: Box::new(ret_type), params }
+                self.add_type(Type::Function { ret, params })
             }
             Token::PrimType(kind) => {
                 self.advance();
-                Type::Prim(kind.to_owned())
+                self.add_type(Type::Prim(kind.to_owned()))
             }
             Token::Ident(kind) => {
                 self.advance();
-                Type::Ident(kind.to_owned())
+                self.add_type(Type::Ident(kind.to_owned()))
             }
             x => {
                 self.error(format!("invalid type: '{}'", x.get_plaintext()), TYPE_FOLLOW);
-                Type::ParseError
+                self.add_error::<Type>()
             }
         }
     }
 
-    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser<'a>) -> Expression) -> Expression {
+    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser<'a>) -> ExpressionId) -> ExpressionId {
         let mut lhs = child(self);
 
         while symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = child(self);
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value }
+            lhs = self.add_expr(Expression::Binary { lhs, rhs, op: op.value })
         }
 
         lhs
     }
     fn right_rec(&mut self,
         symbols: &[TokenKind],
-        parent: fn(&mut Parser<'a>) -> Expression,
-        child: fn(&mut Parser<'a>) -> Expression,
-    ) -> Expression {
+        parent: fn(&mut Parser<'a>) -> ExpressionId,
+        child: fn(&mut Parser<'a>) -> ExpressionId,
+    ) -> ExpressionId {
         let lhs = child(self);
 
         if symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = parent(self);
-            Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value }
+            self.add_expr(Expression::Binary { lhs, rhs, op: op.value })
         } else { lhs }
     }
-    fn expression(&mut self) -> Expression { self.assignment() }
-    fn assignment(&mut self) -> Expression { self.right_rec(&[TokenKind::Equals], Self::assignment, Self::logical_or) }
-    fn logical_or(&mut self) -> Expression { self.left_rec(&[TokenKind::LogOr], Self::logical_and) }
-    fn logical_and(&mut self) -> Expression { self.left_rec(&[TokenKind::LogAnd], Self::equality) }
-    fn equality(&mut self) -> Expression {
+    fn expression(&mut self) -> ExpressionId { self.assignment() }
+    fn assignment(&mut self) -> ExpressionId { self.right_rec(&[TokenKind::Equals], Self::assignment, Self::logical_or) }
+    fn logical_or(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::LogOr], Self::logical_and) }
+    fn logical_and(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::LogAnd], Self::equality) }
+    fn equality(&mut self) -> ExpressionId {
         let mut lhs = self.relation();
 
         if [TokenKind::EqualTo,
@@ -805,12 +809,12 @@ impl<'a> Parser<'a> {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.relation();
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value };
+            lhs = self.add_expr(Expression::Binary { lhs, rhs, op: op.value });
         }
 
         lhs
     }
-    fn relation(&mut self) -> Expression {
+    fn relation(&mut self) -> ExpressionId {
         let mut lhs = self.bitwise_or();
 
         if [TokenKind::LessThan,
@@ -820,33 +824,35 @@ impl<'a> Parser<'a> {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.bitwise_or();
-            lhs = Expression::Binary { lhs: Box::new(lhs), rhs: Box::new(rhs), op: op.value };
+            lhs = self.add_expr(Expression::Binary { lhs, rhs, op: op.value });
         }
 
         lhs
     }
-    fn bitwise_or(&mut self) -> Expression { self.left_rec(&[TokenKind::BitOr], Self::bitwise_xor) }
-    fn bitwise_xor(&mut self) -> Expression { self.left_rec(&[TokenKind::BitXor], Self::bitwise_and) }
-    fn bitwise_and(&mut self) -> Expression { self.left_rec(&[TokenKind::Ampersand], Self::shift) }
-    fn shift(&mut self) -> Expression { self.left_rec(&[TokenKind::LShift, TokenKind::RShift], Self::addition) }
-    fn addition(&mut self) -> Expression { self.left_rec(&[TokenKind::Plus, TokenKind::Minus], Self::multiplication) }
-    fn multiplication(&mut self) -> Expression { self.left_rec(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent], Self::unary)}
-    fn unary(&mut self) -> Expression {
+    fn bitwise_or(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::BitOr], Self::bitwise_xor) }
+    fn bitwise_xor(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::BitXor], Self::bitwise_and) }
+    fn bitwise_and(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::Ampersand], Self::shift) }
+    fn shift(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::LShift, TokenKind::RShift], Self::addition) }
+    fn addition(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::Plus, TokenKind::Minus], Self::multiplication) }
+    fn multiplication(&mut self) -> ExpressionId { self.left_rec(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent], Self::unary)}
+    fn unary(&mut self) -> ExpressionId {
         if [TokenKind::LogNot,
             TokenKind::Minus,
             TokenKind::BitNeg
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.unary()), op: op.value }
+            let child = self.unary();
+            self.add_expr(Expression::Unary { child, op: op.value })
         } else { self.reference() }
     }
-    fn reference(&mut self) -> Expression {
+    fn reference(&mut self) -> ExpressionId {
         if self.current().get_kind() == TokenKind::Ampersand {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.access()), op: op.value }
+            let child = self.access();
+            self.add_expr(Expression::Unary { child, op: op.value })
         } else { self.access() }
     }
-    fn access(&mut self) -> Expression {
+    fn access(&mut self) -> ExpressionId {
         if self.current().get_kind() == TokenKind::Cast {
             self.advance();
             consume!(self, LParen, "expected '('".into(), Expression, EXPR_FOLLOW);
@@ -857,10 +863,11 @@ impl<'a> Parser<'a> {
             let value = self.expression();
 
             consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);
-            Expression::TypeCast { to: Box::new(to), value: Box::new(value) }
+            self.add_expr(Expression::TypeCast { to, value })
         } else if self.current().get_kind() == TokenKind::At {
             let op = self.advance();
-            Expression::Unary { child: Box::new(self.primary()), op: op.value }
+            let child = self.primary();
+            self.add_expr(Expression::Unary { child, op: op.value })
         } else {
             let mut lhs = self.primary();
 
@@ -876,13 +883,13 @@ impl<'a> Parser<'a> {
                     }
                     consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);
 
-                    lhs = Expression::FunctionCall { name: Box::new(lhs), args };
+                    lhs = self.add_expr(Expression::FunctionCall { name: lhs, args });
                     true
                 }
                 Token::LBracket => {
                     let index = self.expression();
 
-                    lhs = Expression::ArrayAccess { lhs: Box::new(lhs), index: Box::new(index) };
+                    lhs = self.add_expr(Expression::ArrayAccess { lhs, index });
                     consume!(self, RBracket, "expected ']'".into(), Expression, EXPR_FOLLOW);
                     true
                 }
@@ -898,19 +905,19 @@ impl<'a> Parser<'a> {
                         else { break; }
                     }
                     consume!(self, RBrace, "expected '}'".into(), Expression, EXPR_FOLLOW);
-                    let Expression::Identifier(name) = lhs else { panic!("expected a struct name before initializer"); };
-                    lhs = Expression::StructInitializer { name, values };
+                    let Expression::Identifier(name) = self.expression_arena[lhs].to_owned() else { panic!("expected a struct name before initializer"); };
+                    lhs = self.add_expr(Expression::StructInitializer { name, values });
                     true
                 }
                 Token::Arrow => {
                     let member = consume!(self, Ident, "expected an identifer".into(), Expression, EXPR_FOLLOW);
-                    lhs = Expression::Unary { child: Box::new(lhs), op: Token::Star };
-                    lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
+                    lhs = self.add_expr(Expression::Unary { child: lhs, op: Token::Star });
+                    lhs = self.add_expr(Expression::MemberAccess { lhs, member });
                     true
                 }
                 Token::Dot => {
                     let member = consume!(self, Ident, "expected an identifer".into(), Expression, EXPR_FOLLOW);
-                    lhs = Expression::MemberAccess { lhs: Box::new(lhs), member };
+                    lhs = self.add_expr(Expression::MemberAccess { lhs, member });
                     true
                 }
                 _ => {
@@ -923,12 +930,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn primary(&mut self) -> Expression {
+    fn primary(&mut self) -> ExpressionId {
         match self.advance().value {
-            Token::Ident(x) => Expression::Identifier(x),
-            Token::Integer(x, k) => Expression::Integer(x.parse::<i128>().unwrap(), k),
-            Token::String(x) => Expression::String(x),
-            Token::Char(x) => Expression::Char(x),
+            Token::Ident(x) => self.add_expr(Expression::Identifier(x)),
+            Token::Integer(x, k) => self.add_expr(Expression::Integer(x.parse::<i128>().unwrap(), k)),
+            Token::String(x) => self.add_expr(Expression::String(x)),
+            Token::Char(x) => self.add_expr(Expression::Char(x)),
             Token::LParen => {
                 let child = self.expression();
                 consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);
@@ -937,7 +944,7 @@ impl<'a> Parser<'a> {
             x => {
                 self.i -= 1; // go back to fix alignment
                 self.error(format!("'{}' is not an expression", x.get_plaintext()), EXPR_FOLLOW);
-                Expression::ParseError
+                self.add_error::<Expression>()
             }
         }
     }
