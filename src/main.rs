@@ -1,6 +1,8 @@
 use crate::lexer::Lexer;
 
 mod lexer;
+mod token;
+mod span;
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();

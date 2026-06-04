@@ -1,3 +1,5 @@
+use crate::token::Token;
+
 pub struct Lexer {
     index: usize,
     content: String,
@@ -9,5 +11,9 @@ impl Lexer {
             index: 0,
             content,
         }
+    }
+
+    pub fn tokens(&mut self) -> Vec<Token> {
+        Vec::new()
     }
 }
