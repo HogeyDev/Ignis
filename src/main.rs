@@ -10,7 +10,7 @@ fn main() -> Result<(), std::io::Error> {
     let input_file = args[0].as_str();
     let source = std::fs::read_to_string(input_file)?;
     
-    let tokens = Lexer::new(source).tokens();
+    let tokens = Lexer::new(&source).tokens();
     
     Ok(())
 }

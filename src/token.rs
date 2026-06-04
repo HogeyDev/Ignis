@@ -1,9 +1,71 @@
 use crate::span::Span;
 
-pub enum TokenKind {
+pub enum TokenKind<'a> {
+    Continue,
+    Function,
+    TypeDef,
+    Import,
+    Return,
+    Static,
+    Struct,
+    Break,
+    While,
+    Cast,
+    Else,
+    Enum,
+    Spec,
+    Asm,
+    For,
+    Let,
+    If,
+
+    Ident(&'a str),
+    String(&'a str),
+    Integer(&'a str, &'a str),
+    Char(char),
+
+    PrimType(&'a str),
+    FuncType,
+
+    LBrace,
+    RBrace,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
+    
+    Colon,
+    Semi,
+    Comma,
+
+    Equals,
+    LogOr,
+    LogAnd,
+    LogNot,
+    DoubleEquals,
+    NotEquals,
+    LessThan,
+    MoreThan,
+    LessThanEq,
+    MoreThanEq,
+    BitOr,
+    BitXor,
+    BitNeg,
+    LShift,
+    RShift,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Ampersand,
+    At,
+
+    Dot,
+    Arrow,
 }
 
-pub struct Token {
-    value: TokenKind,
-    pos: Span,
+pub struct Token<'a> {
+    pub value: TokenKind<'a>,
+    pub pos: Span,
 }
