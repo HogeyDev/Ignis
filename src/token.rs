@@ -1,5 +1,6 @@
 use crate::span::Span;
 
+#[derive(Debug)]
 pub enum TokenKind<'a> {
     Continue,
     Function,
@@ -38,19 +39,19 @@ pub enum TokenKind<'a> {
     Semi,
     Comma,
 
-    Equals,
-    LogOr,
-    LogAnd,
-    LogNot,
-    DoubleEquals,
-    NotEquals,
-    LessThan,
-    MoreThan,
-    LessThanEq,
-    MoreThanEq,
-    BitOr,
-    BitXor,
-    BitNeg,
+    Eq,
+    PipePipe,
+    AmpAmp,
+    Bang,
+    EqEq,
+    BangEq,
+    LT,
+    GT,
+    LTE,
+    GTE,
+    Pipe,
+    Caret,
+    Tilde,
     LShift,
     RShift,
     Plus,
@@ -58,13 +59,14 @@ pub enum TokenKind<'a> {
     Star,
     Slash,
     Percent,
-    Ampersand,
+    Amp,
     At,
-
     Dot,
-    Arrow,
+
+    Eof,
 }
 
+#[derive(Debug)]
 pub struct Token<'a> {
     pub value: TokenKind<'a>,
     pub pos: Span,
