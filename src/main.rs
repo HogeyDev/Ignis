@@ -2,6 +2,7 @@ pub mod diagnostics;
 pub mod analyzer;
 pub mod parser;
 pub mod lexer;
+pub mod ssa;
 pub mod cli;
 
 use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
