@@ -3,8 +3,9 @@ pub mod analyzer;
 pub mod parser;
 pub mod lexer;
 pub mod cli;
+pub mod ir;
 
-use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
+use crate::{analyzer::Analyzer, cli::CliParser, ir::IrConstructor, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
