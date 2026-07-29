@@ -5,7 +5,7 @@ pub mod lexer;
 pub mod cli;
 pub mod ir;
 
-use crate::{analyzer::Analyzer, cli::CliParser, ir::IrConstructor, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
+use crate::{analyzer::Analyzer, cli::CliParser, ir::{Instruction, IrConstructor}, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -23,12 +23,18 @@ fn main() {
 
     let mut parser: Parser = Parser::from(&filename, lines, tokens);
     let root: RootAst = parser.run();
-
     if parser.err_count > 0 {
         eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", parser.err_count);
         std::process::exit(1);
     }
 
-    let mut analyzer = Analyzer::from(parser);
+    let mut analyzer = Analyzer::from(parser.clone());
     analyzer.run(&root);
+    if analyzer.err_count > 0 {
+        eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", analyzer.err_count);
+        std::process::exit(1);
+    }
+
+    let mut ir: Vec<Instruction> = IrConstructor::new(parser, &root);
+    eprintln!("{ir:#?}");
 }

@@ -306,6 +306,7 @@ impl Type {
     }
 }
 
+#[derive(Clone)]
 pub struct Parser<'a> {
     filename: &'a str,
     source_lines: Vec<String>,

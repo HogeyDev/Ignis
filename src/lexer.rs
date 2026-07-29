@@ -249,7 +249,10 @@ impl<'a> Lexer<'a> {
                                 _ => diagnostics::lexer::unknown_escape_sequence(self.filename, self.lines, self.pos),
                             }
                         }
-                        x => Token::Char(x),
+                        x => {
+                            self.advance();
+                            Token::Char(x)
+                        }
                     };
                     if self.curr() == Some('\'') {
                         self.advance();

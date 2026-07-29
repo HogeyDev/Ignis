@@ -1,4 +1,4 @@
-use crate::parser::ExpressionId;
+use crate::parser::{ExpressionId, Parser, RootAst};
 
 enum Value {
     Unary {
@@ -54,4 +54,20 @@ enum Operation {
     Mod,
 }
 
+#[derive(Debug)]
+pub enum Instruction {
+
+}
+
 pub struct IrConstructor {}
+
+impl IrConstructor {
+    pub fn new(parser: Parser, root: &RootAst) -> Vec<Instruction> {
+        for decl_id in root {
+            eprintln!("{:#?}", parser.declaration_arena[*decl_id]);
+        }
+        Vec::new()
+    }
+
+    // fn 
+}
