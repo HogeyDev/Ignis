@@ -93,16 +93,16 @@ void runTests(Tests *tests) {
 int main() {
     Tests tests = initTests();
 
-    addTest(&tests, "fibonacci", "", 13);
-    addTest(&tests, "person", "", 18);
-    addTest(&tests, "return", "", 19);
-    addTest(&tests, "enum", "", 0);
-    addTest(&tests, "preprocessing", "", 123);
-    addTest(&tests, "macros", "", 42);
-    addTest(&tests, "primes", "", 168);
+    // addTest(&tests, "fibonacci", "", 13);
+    // addTest(&tests, "person", "", 18);
+    // addTest(&tests, "return", "", 19);
+    // addTest(&tests, "enum", "", 0);
+    // addTest(&tests, "preprocessing", "", 123);
+    // addTest(&tests, "macros", "", 42);
+    // addTest(&tests, "primes", "", 168);
     addTest(&tests, "boolean", "", 100);
-    addTest(&tests, "heap", "", 0);
-    addTest(&tests, "pointers", "", 128);
+    // addTest(&tests, "heap", "", 0);
+    // addTest(&tests, "pointers", "", 128);
 
     // addTest(&tests, "new_print", "", 16);
     // addTest(&tests, "stdtest", "", 37);

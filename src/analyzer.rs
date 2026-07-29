@@ -22,9 +22,9 @@ pub enum Symbol {
 
 type Environment = Vec<HashMap<String, SymbolId>>;
 pub struct Analyzer<'a> {
-    parser: Parser<'a>,
+    pub parser: Parser<'a>,
     env: Environment,
-    symbol_arena: Vec<Symbol>,
+    pub symbol_arena: Vec<Symbol>,
 
     pub warn_count: usize,
     pub err_count: usize,

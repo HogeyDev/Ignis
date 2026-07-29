@@ -2,10 +2,10 @@ pub mod diagnostics;
 pub mod analyzer;
 pub mod parser;
 pub mod lexer;
-pub mod ssa;
 pub mod cli;
+pub mod ir;
 
-use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}};
+use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}, ir::{BasicBlockId, IrBuilder}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -34,4 +34,9 @@ fn main() {
         eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", analyzer.err_count);
         std::process::exit(1);
     }
+
+    let mut ir_builder: IrBuilder = IrBuilder::new(&analyzer);
+    let ir: BasicBlockId = ir_builder.run(&root);
+
+    eprintln!("{ir}");
 }
