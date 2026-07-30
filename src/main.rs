@@ -5,7 +5,7 @@ pub mod lexer;
 pub mod cli;
 pub mod ir;
 
-use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}, ir::{BasicBlockId, IrBuilder}};
+use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}, ir::{BlockId, IrBuilder}};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -36,7 +36,5 @@ fn main() {
     }
 
     let mut ir_builder: IrBuilder = IrBuilder::new(&analyzer);
-    let ir: BasicBlockId = ir_builder.run(&root);
-
-    eprintln!("{ir}");
+    ir_builder.run(&root);
 }
