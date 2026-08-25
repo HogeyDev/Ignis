@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{analyzer::Analyzer, parser::{Declaration, DeclarationId, RootAst}};
+use crate::{analyzer::Analyzer, parser::{Declaration, DeclarationId, RootAst, TypeId}};
 
 pub type BlockId = usize;
 pub struct BasicBlock {
@@ -56,12 +56,17 @@ pub enum Value {
         block_id: BlockId,
         operands: Vec<ValueId>,
     },
+    ConstInt(i128, TypeId),
+    ConstChar(char, TypeId),
+    ConstString(String, TypeId),
 }
 
 pub enum Instruction {
     BinExp {
-        dest: String,
         op: BinOp,
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
     },
 }
 
