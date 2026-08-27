@@ -2,14 +2,14 @@ import stdlib;
 import string;
 
 func print_char(void, c: char) {
-	asm "   movzx rax, byte [rbp+16]";
-    asm "push rax";
-	asm "mov rax, 1";
-	asm "mov rdi, 1";
-	asm "mov rdx, 1";
-	asm "mov rsi, rsp";
-	asm "syscall";
-	asm "add rsp, 8";
+    asm "	movzx rax, byte [rbp+16]";
+    asm "	push rax";
+    asm "	mov rax, 1";
+    asm "	mov rdi, 1";
+    asm "	mov rdx, 1";
+    asm "	mov rsi, rsp";
+    asm "	syscall";
+    asm "	add rsp, 8";
 }
 
 func print(void, str: []char) {
@@ -45,7 +45,7 @@ func print_int(void, num: int) {
 
 func print_int_pointer(void, ptr: @int) {
 	let as_int: int = 0;
-	asm "	mov rax, qword [rbp+16]"; // move `ptr` into rax
-	asm "	mov qword [rbp-8], rax"; // move rax into `as_int`
+    asm "	mov rax, qword [rbp+16]"; // move `ptr` into rax
+    asm "	mov qword [rbp-8], rax"; // move rax into `as_int`
 	print_int(as_int);
 }

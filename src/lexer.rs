@@ -2,6 +2,7 @@ use crate::{diagnostics, parser::TokenKind};
 
 #[derive(Debug, Clone)]
 pub struct TokenMeta {
+    pub file_id: usize,
     pub pos: (usize, usize), // line, index
     pub value: Token,
 }
@@ -152,6 +153,7 @@ impl Token {
 
 pub struct Lexer<'a> {
     filename: &'a str,
+    file_id: usize,
     source: Vec<char>,
     lines: &'a Vec<String>,
     i: usize,
@@ -159,9 +161,10 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn from(filename: &'a str, lines: &'a Vec<String>, source: &'a String) -> Self {
+    pub fn from(filename: &'a str, file_id: usize, lines: &'a Vec<String>, source: &'a String) -> Self {
         Self {
             filename,
+            file_id,
             source: source.chars().collect(),
             lines,
             i: 0,
@@ -191,7 +194,7 @@ impl<'a> Lexer<'a> {
         while self.i < self.source.len() {
             let Some((value, pos)) = self.next_token() else { break; };
 
-            tokens.push(TokenMeta { value, pos });
+            tokens.push(TokenMeta { file_id: self.file_id, value, pos });
         }
         tokens
     }

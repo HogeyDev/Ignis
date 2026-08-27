@@ -26,10 +26,11 @@ fn main() {
         config.import_path_priority.push(stdlib);
     }
 
-    let mut lexer: Lexer = Lexer::from(&filename, &lines, &contents);
+    let mut inc_files = Vec::new();
+    let mut lexer: Lexer = Lexer::from(&filename, 0, &lines, &contents);
     let tokens: Vec<TokenMeta> = lexer.run();
 
-    let mut parser: Parser = Parser::from(&config, &filename, lines, tokens);
+    let mut parser: Parser = Parser::from(&config, &filename, lines, tokens, &mut inc_files);
     let root: RootAst = parser.run();
     if parser.err_count > 0 {
         eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", parser.err_count);

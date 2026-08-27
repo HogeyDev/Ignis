@@ -307,7 +307,7 @@ impl Type {
 
     pub fn stringify(&self, type_arena: &Vec<Type>) -> String {
         match self {
-            Type::ParseError => todo!(),
+            Type::ParseError => "?".to_string(),
             Type::Prim(prim) => prim.to_string(),
             Type::Array { size, kind } => {
                 if let Some(s) = size {
@@ -330,12 +330,12 @@ impl Type {
     }
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Parser<'a> {
     config: &'a Configuration,
 
     filename: &'a str,
-    source_lines: Vec<String>,
+    source_lines: HashMap<usize, Vec<String>>, // file id -> lines
 
     tokens: Vec<TokenMeta>,
     i: usize,
@@ -348,7 +348,7 @@ pub struct Parser<'a> {
     pub expression_arena: Vec<Expression>,
     pub type_arena: Vec<Type>,
 
-    inc_files: HashSet<String>,
+    pub inc_files: &'a mut Vec<String>,
 }
 
 fn concat_tokenlist(metalist: &[&[TokenKind]]) -> Vec<TokenKind> {
@@ -404,11 +404,15 @@ const TYPE_FOLLOW: &[TokenKind] = tlist![Comma, RParen, Equals, Semi, MoreThan];
 const EXPR_FOLLOW: &[TokenKind] = tlist![Comma, RParen, RBracket, Semi, RBrace];
 
 impl<'a> Parser<'a> {
-    pub fn from(config: &'a Configuration, filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
+    pub fn from(config: &'a Configuration, filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>, inc_files: &'a mut Vec<String>) -> Self {
         Self {
             config,
             filename,
-            source_lines,
+            source_lines: {
+                let mut slh = HashMap::new();
+                slh.insert(0, source_lines);
+                slh
+            },
 
             tokens,
             i: 0usize,
@@ -420,7 +424,17 @@ impl<'a> Parser<'a> {
             expression_arena: Vec::new(),
             type_arena: Vec::new(),
 
-            inc_files: HashSet::new(),
+            inc_files,
+        }
+    }
+
+    fn include_file(&mut self, path: String) -> (bool, usize) {
+        match self.inc_files.iter().position(|p| p.clone() == path) {
+            Some(i) => (false, i),
+            None => {
+                self.inc_files.push(path);
+                (true, self.inc_files.len()-1)
+            }
         }
     }
 
@@ -451,11 +465,11 @@ impl<'a> Parser<'a> {
         self.err_count += 1;
 
         let curr = self.current();
-        let (line, off) = error_align_caret(&self.source_lines[curr.pos.0], curr.pos.1);
+        let (line, off) = error_align_caret(&self.source_lines.get(&curr.file_id).unwrap()[curr.pos.0], curr.pos.1);
         let tok_width = token_width(curr.to_owned());
 
-        print_error_header(self.filename, curr.pos, msg);
-        let line_num = format!("{} | ", curr.pos.1+1);
+        print_error_header(&self.inc_files[curr.file_id], curr.pos, msg);
+        let line_num = format!("{} | ", curr.pos.0+1);
         eprintln!("{line_num}{}", line);
         eprintln!("{: >width$}{}\n", '^', std::iter::repeat_n('~', tok_width-1).collect::<String>(), width=off+line_num.len()+1);
     }
@@ -516,24 +530,32 @@ impl<'a> Parser<'a> {
                 // let imp = self.import_st();
                 // self.add_decl(Declaration::Statement(imp))
 
-                let imp = self.import_st();
-                let Statement::Import(mut rel_path) = self.statement_arena[imp].clone() else { unreachable!() };
-                rel_path.push_str(".is");
+                // let imp = self.import_st();
+                // let Statement::Import(mut rel_path) = self.statement_arena[imp].clone() else { unreachable!() };
+                // rel_path.push_str(".is");
 
-                if self.inc_files.insert(rel_path.clone()) {
-                    if let Some(full_path) = resolve_path(self.config, rel_path) {
-                        let file_contents = std::fs::read_to_string(&full_path).expect("can not open file path");
-                        let lines: Vec<String> = file_contents.lines().map(|x| x.to_owned()).collect();
-                        let mut lexer = Lexer::from(&full_path, &lines, &file_contents);
-                        let tokens = lexer.run();
+                // if let Some(full_path) = resolve_path(self.config, rel_path) {
+                //     let key = std::fs::canonicalize(&full_path) // basically just to make sure `../` gets flattened
+                //         .map(|p| p.to_string_lossy().into_owned())
+                //         .unwrap_or(full_path.clone());
 
-                        self.tokens.splice(self.i..self.i, tokens);
-                    } else {
-                        self.i -= 2;
-                        self.error_no_sync("could not find file".to_owned());
-                        self.i += 2;
-                    }
-                }
+                //     if self.inc_files.insert(key) {
+                //         if let Ok(file_contents) = std::fs::read_to_string(&full_path) {
+                //             let lines: Vec<String> = file_contents.lines().map(|x| x.to_owned()).collect();
+                //             let mut lexer = Lexer::from(&full_path, &lines, &file_contents);
+                //             let tokens = lexer.run();
+
+                //             self.tokens.splice(self.i..self.i, tokens);
+                //         } else {
+                //             self.error_no_sync(format!("could not open imported file"));
+                //         }
+                //     }
+                // } else {
+                //     self.i -= 2;
+                //     self.error_no_sync("could not find file".to_owned());
+                //     self.i += 2;
+                // }
+                self.import_st();
                 self.declaration()
             }
             Token::Static => {
@@ -644,7 +666,10 @@ impl<'a> Parser<'a> {
     
     fn statement(&mut self) -> StatementId {
         match self.current().value {
-            Token::Import => self.import_st(),
+            Token::Import => {
+                self.import_st();
+                self.statement()
+            }
             Token::Return => self.return_st(),
             Token::Let => self.var_decl(),
             Token::If => self.if_st(),
@@ -660,20 +685,86 @@ impl<'a> Parser<'a> {
         }
     }
     fn import_st(&mut self) -> StatementId {
+        // self.advance();
+        // let mut len = 1; // "import"
+
+        // let Some(Token::Ident(mut path)) = self.consume(TokenKind::Ident).map(|x| x.value) else {
+        //     self.error("expected an identifier".into(), STMT_FOLLOW);
+        //     return (self.add_error::<Statement>(), len);
+        // };
+        // len += 1;
+        // while self.current().get_kind() == TokenKind::Dot {
+        //     if self.consume(TokenKind::Dot).map(|x| x.value).is_none() {
+        //         self.error("expected '.'".into(), STMT_FOLLOW);
+        //         return (self.add_error::<Statement>(), len);
+        //     };
+        //     len += 1;
+        //     let Some(Token::Ident(subdir)) = self.consume(TokenKind::Ident).map(|x| x.value) else {
+        //         self.error("expected an identifier".into(), STMT_FOLLOW);
+        //         return (self.add_error::<Statement>(), len);
+        //     };
+        //     len += 1;
+
+        //     path.push('/');
+        //     path.push_str(&subdir);
+        // }
+
+        // if self.consume(TokenKind::Semi).map(|x| x.value).is_none() {
+        //     self.error("expected ';'".into(), STMT_FOLLOW);
+        //     return (self.add_error::<Statement>(), len);
+        // };
+        // len += 1;
+
+        // (self.add_stmt(Statement::Import(path)), len)
+
         self.advance();
+        let mut len = 1;
 
         let mut path = consume!(self, Ident, "expected an identifier".into(), Statement, STMT_FOLLOW);
+        len += 1;
         while self.current().get_kind() == TokenKind::Dot {
             consume!(self, Dot, "expected '.'".into(), Statement, STMT_FOLLOW);
+            len += 1;
             let subdir = consume!(self, Ident, "expected an identifier".into(), Statement, STMT_FOLLOW);
+            len += 1;
 
             path.push('/');
             path.push_str(&subdir);
         }
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
+        len += 1;
 
-        self.add_stmt(Statement::Import(path))
+        self.tokens.drain((self.i-len)..self.i);
+        self.i -= len;
+
+        path.push_str(".is");
+        if let Some(full_path) = resolve_path(self.config, path) {
+            let key = std::fs::canonicalize(&full_path) // basically just to make sure `../` gets flattened
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or(full_path.clone());
+
+            let (unique, id) = self.include_file(key);
+            if unique {
+                if let Ok(file_contents) = std::fs::read_to_string(&full_path) {
+                    let lines: Vec<String> = file_contents.lines().map(|x| x.to_owned()).collect();
+                    let mut lexer = Lexer::from(&full_path, id, &lines, &file_contents);
+                    let tokens = lexer.run();
+                    self.source_lines.insert(id, lines);
+
+                    self.tokens.splice(self.i..self.i, tokens);
+                } else {
+                    self.error_no_sync(format!("could not open imported file"));
+                }
+            }
+        } else {
+            self.i -= 2;
+            self.error_no_sync("could not find file".to_owned());
+            self.i += 2;
+        }
+
+        // self.add_stmt(Statement::Import(path))
+        0
     }
     fn return_st(&mut self) -> StatementId {
         self.advance();
