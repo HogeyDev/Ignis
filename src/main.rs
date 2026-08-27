@@ -1,11 +1,13 @@
 pub mod diagnostics;
 pub mod analyzer;
+pub mod config;
+pub mod import;
 pub mod parser;
 pub mod lexer;
 pub mod cli;
 pub mod ir;
 
-use crate::{analyzer::Analyzer, cli::CliParser, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}, ir::{BlockId, IrBuilder}};
+use crate::{analyzer::Analyzer, cli::CliParser, config::Configuration, lexer::{Lexer, TokenMeta}, parser::{Parser, RootAst}, ir::IrBuilder};
 
 fn main() {
     let cli_parser: CliParser = CliParser::from(std::env::args().collect());
@@ -18,10 +20,16 @@ fn main() {
     let contents: String = std::fs::read_to_string(filename).unwrap();
     let lines: Vec<String> = contents.lines().map(|x| x.to_owned()).collect();
 
+    let mut config = Configuration::new();
+    config.import_path_priority.insert(0, "./std/".to_owned()); // this should be the default stdlib path
+    if let Some(stdlib) = cli_parser.option_value("stdlib") {
+        config.import_path_priority.push(stdlib);
+    }
+
     let mut lexer: Lexer = Lexer::from(&filename, &lines, &contents);
     let tokens: Vec<TokenMeta> = lexer.run();
 
-    let mut parser: Parser = Parser::from(&filename, lines, tokens);
+    let mut parser: Parser = Parser::from(&config, &filename, lines, tokens);
     let root: RootAst = parser.run();
     if parser.err_count > 0 {
         eprintln!("\x1b[0;31merror\x1b[0;0m: ignis compiler failed with {} errors", parser.err_count);

@@ -9,6 +9,7 @@ pub struct BasicBlock {
     succs: Vec<BlockId>,
 
     insts: Vec<Instruction>,
+    term: Terminator,
 
     defs: HashMap<String, ValueId>,
     inc_phis: HashMap<String, ValueId>,
@@ -21,6 +22,7 @@ impl BasicBlock {
             succs: Vec::new(),
 
             insts: Vec::new(),
+            term: Terminator::Return(None), // a sensible default placeholder
 
             defs: HashMap::new(),
             inc_phis: HashMap::new(),
@@ -47,7 +49,10 @@ pub enum BinOp {
     Eq,
     NotEq,
 }
-pub enum UnOp {}
+pub enum UnaryOp {
+    Not,
+    Inv,
+}
 
 pub type ValueId = usize;
 pub enum Value {
@@ -56,7 +61,7 @@ pub enum Value {
         block_id: BlockId,
         operands: Vec<ValueId>,
     },
-    ConstInt(i128, TypeId),
+    ConstInt(i128, TypeId), // TODO: eventually we will have floats, but not yet.
     ConstChar(char, TypeId),
     ConstString(String, TypeId),
 }
@@ -70,6 +75,16 @@ pub enum Instruction {
     },
 }
 
+pub enum Terminator {
+    Jump(BlockId),
+    Branch {
+        cond: ValueId,
+        then_block: BlockId,
+        else_block: BlockId,
+    },
+    Return(Option<ValueId>),
+}
+
 pub struct IrBuilder<'a> {
     analyzer: &'a Analyzer<'a>,
     pub block_arena: Vec<BasicBlock>,
@@ -77,6 +92,8 @@ pub struct IrBuilder<'a> {
     label_counter: usize,
     sealed_blocks: HashSet<BlockId>,
     value_arena: Vec<Value>,
+
+    functions: HashMap<String, (BlockId, Vec<(String, TypeId)>)>, // entry block, params
 }
 
 impl<'a> IrBuilder<'a> {
@@ -88,6 +105,8 @@ impl<'a> IrBuilder<'a> {
             label_counter: 0,
             sealed_blocks: HashSet::new(),
             value_arena: Vec::new(),
+
+            functions: HashMap::new(),
         }
     }
 
@@ -226,12 +245,17 @@ impl<'a> IrBuilder<'a> {
                     self.block_arena[0].succs.push(block_id);
                 }
 
-                for param in params {
-                    // self.block_arena[block_id].insts.push(Instruction::De);
-                }
+                self.functions.insert(name.clone(), (block_id, params.clone()));
             }
-            // Declaration::Statement(stmt_id) => eprintln!("{:#?}", self.analyzer.parser.statement_arena[*stmt_id]),
-            x => todo!("{x:#?}"),
+            Declaration::Statement(stmt_id) => eprintln!("dbg stmt: {:#?}", self.analyzer.parser.statement_arena[*stmt_id]),
+            Declaration::Struct { name, fields } => {
+                eprintln!("dbg struct:\n{name} {{");
+                for (field_name, type_id) in fields.iter() {
+                    eprintln!("\t{field_name}: {}", self.analyzer.parser.type_arena[*type_id].stringify(&self.analyzer.parser.type_arena));
+                }
+                eprintln!("}}");
+            }
+            x => eprintln!("{x:#?}"),
         }
     }
 }

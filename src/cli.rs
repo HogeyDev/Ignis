@@ -46,9 +46,12 @@ impl CliParser {
     }
 
     pub fn flag_value(&self, flag: &str) -> bool {
-        return self.flags.contains(&flag.to_string());
+        self.flags.contains(&flag.to_string())
     }
-    pub fn option_value(&self, flag: &str, default_value: &str) -> String {
-        return self.options.get(&flag.to_string()).unwrap_or(&default_value.to_string()).to_string();
+    pub fn option_value_default(&self, flag: &str, default_value: &str) -> String {
+        self.options.get(&flag.to_string()).unwrap_or(&default_value.to_string()).to_string()
+    }
+    pub fn option_value(&self, flag: &str) -> Option<String> {
+        self.options.get(&flag.to_string()).map(|val| val.to_string())
     }
 }

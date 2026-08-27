@@ -1,7 +1,7 @@
-use crate::diagnostics::util::error_align_caret;
+use crate::diagnostics::util::{error_align_caret, print_error_header};
 
 pub fn unknown_character<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nunknown character `{}`", '^', lines[pos.0].chars().nth(pos.1).unwrap(), width = off);
@@ -9,7 +9,7 @@ pub fn unknown_character<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (us
 }
 
 pub fn unterminated_string<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nstring is not terminated", '^', width = off);
@@ -17,7 +17,7 @@ pub fn unterminated_string<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (
 }
 
 pub fn unknown_escape_sequence<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nunknown escape sequence", '^', width = off);
@@ -25,7 +25,7 @@ pub fn unknown_escape_sequence<'a>(filename: &'a str, lines: &'a Vec<String>, po
 }
 
 pub fn char_length<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nchar type can only fit a single character", '^', width = off);
@@ -33,7 +33,7 @@ pub fn char_length<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, u
 }
 
 pub fn hex_non_int<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nexpected a hexadecimal integer to follow '\\x'", '^', width = off);
@@ -41,7 +41,7 @@ pub fn hex_non_int<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, u
 }
 
 pub fn oct_non_int<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nexpected an octal integer to follow '\\'", '^', width = off);
@@ -49,7 +49,7 @@ pub fn oct_non_int<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, u
 }
 
 pub fn int_follower<'a>(filename: &'a str, lines: &'a Vec<String>, pos: (usize, usize)) -> ! {
-    eprintln!("{filename}:{}:{}", pos.0+1, pos.1+1);
+    print_error_header(filename, pos, "".to_owned());
     let (line, off) = error_align_caret(&lines[pos.0], pos.1);
     eprintln!("{}", line);
     eprintln!("{: >width$}\nexpected a primative integer type to follow an integer '\\'", '^', width = off);

@@ -104,7 +104,7 @@ impl Token {
             Self::Integer(x, _) => x,
 
             Self::PrimType(x) => x,
-            Self::FuncType => "Fn",
+            Self::FuncType => "Func",
 
             Self::LBrace => "{",
             Self::RBrace => "}",

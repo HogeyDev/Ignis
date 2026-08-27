@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{diagnostics::{util::{error_align_caret, print_error_header, token_width}}, lexer::{Token, TokenMeta}};
+use crate::{config::Configuration, diagnostics::util::{error_align_caret, print_error_header, token_width}, import::resolve_path, lexer::{Lexer, Token, TokenMeta}};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenKind {
@@ -304,10 +304,36 @@ impl Type {
     pub fn is_integer(&self) -> bool {
         matches!(self, Type::Prim(p) if matches!(p.as_str(), "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize"))
     }
+
+    pub fn stringify(&self, type_arena: &Vec<Type>) -> String {
+        match self {
+            Type::ParseError => todo!(),
+            Type::Prim(prim) => prim.to_string(),
+            Type::Array { size, kind } => {
+                if let Some(s) = size {
+                    format!("[{s}]{}", type_arena[*kind].stringify(type_arena))
+                } else {
+                    format!("[]{}", type_arena[*kind].stringify(type_arena))
+                }
+            }
+            Type::Pointer { kind } => format!("@{}", type_arena[*kind].stringify(type_arena)),
+            Type::Ident(ident) => ident.to_string(),
+            Type::Function { ret, params } => {
+                let mut fmt = format!("Func<{}", type_arena[*ret].stringify(type_arena));
+                for param in params {
+                    fmt.push_str(&format!(", {}", type_arena[*param].stringify(type_arena)));
+                }
+                fmt.push('>');
+                fmt
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct Parser<'a> {
+    config: &'a Configuration,
+
     filename: &'a str,
     source_lines: Vec<String>,
 
@@ -321,6 +347,8 @@ pub struct Parser<'a> {
     pub statement_arena: Vec<Statement>,
     pub expression_arena: Vec<Expression>,
     pub type_arena: Vec<Type>,
+
+    inc_files: HashSet<String>,
 }
 
 fn concat_tokenlist(metalist: &[&[TokenKind]]) -> Vec<TokenKind> {
@@ -376,8 +404,9 @@ const TYPE_FOLLOW: &[TokenKind] = tlist![Comma, RParen, Equals, Semi, MoreThan];
 const EXPR_FOLLOW: &[TokenKind] = tlist![Comma, RParen, RBracket, Semi, RBrace];
 
 impl<'a> Parser<'a> {
-    pub fn from(filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
+    pub fn from(config: &'a Configuration, filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>) -> Self {
         Self {
+            config,
             filename,
             source_lines,
 
@@ -390,6 +419,8 @@ impl<'a> Parser<'a> {
             statement_arena: Vec::new(),
             expression_arena: Vec::new(),
             type_arena: Vec::new(),
+
+            inc_files: HashSet::new(),
         }
     }
 
@@ -416,7 +447,7 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn error(&mut self, msg: String, sync_tokens: &[TokenKind]) {
+    fn error_no_sync(&mut self, msg: String) {
         self.err_count += 1;
 
         let curr = self.current();
@@ -427,7 +458,9 @@ impl<'a> Parser<'a> {
         let line_num = format!("{} | ", curr.pos.1+1);
         eprintln!("{line_num}{}", line);
         eprintln!("{: >width$}{}\n", '^', std::iter::repeat_n('~', tok_width-1).collect::<String>(), width=off+line_num.len()+1);
-
+    }
+    fn error(&mut self, msg: String, sync_tokens: &[TokenKind]) {
+        self.error_no_sync(msg);
         self.synchronize(sync_tokens);
     }
     fn synchronize(&mut self, sync_tokens: &[TokenKind]) {
@@ -480,8 +513,28 @@ impl<'a> Parser<'a> {
             Token::Function => self.function_decl(),
             Token::TypeDef => self.typedef_decl(),
             Token::Import => {
+                // let imp = self.import_st();
+                // self.add_decl(Declaration::Statement(imp))
+
                 let imp = self.import_st();
-                self.add_decl(Declaration::Statement(imp))
+                let Statement::Import(mut rel_path) = self.statement_arena[imp].clone() else { unreachable!() };
+                rel_path.push_str(".is");
+
+                if self.inc_files.insert(rel_path.clone()) {
+                    if let Some(full_path) = resolve_path(self.config, rel_path) {
+                        let file_contents = std::fs::read_to_string(&full_path).expect("can not open file path");
+                        let lines: Vec<String> = file_contents.lines().map(|x| x.to_owned()).collect();
+                        let mut lexer = Lexer::from(&full_path, &lines, &file_contents);
+                        let tokens = lexer.run();
+
+                        self.tokens.splice(self.i..self.i, tokens);
+                    } else {
+                        self.i -= 2;
+                        self.error_no_sync("could not find file".to_owned());
+                        self.i += 2;
+                    }
+                }
+                self.declaration()
             }
             Token::Static => {
                 let var = self.var_decl();

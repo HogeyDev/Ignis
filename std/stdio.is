@@ -2,14 +2,14 @@ import stdlib;
 import string;
 
 func print_char(void, c: char) {
-	asm "   movzx rax, byte [rbp+16]
-    push rax
-	mov rax, 1
-	mov rdi, 1
-	mov rdx, 1
-	mov rsi, rsp
-	syscall
-	add rsp, 8";
+	asm "   movzx rax, byte [rbp+16]";
+    asm "push rax";
+	asm "mov rax, 1";
+	asm "mov rdi, 1";
+	asm "mov rdx, 1";
+	asm "mov rsi, rsp";
+	asm "syscall";
+	asm "add rsp, 8";
 }
 
 func print(void, str: []char) {
