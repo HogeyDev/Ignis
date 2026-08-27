@@ -405,6 +405,7 @@ const EXPR_FOLLOW: &[TokenKind] = tlist![Comma, RParen, RBracket, Semi, RBrace];
 
 impl<'a> Parser<'a> {
     pub fn from(config: &'a Configuration, filename: &'a str, source_lines: Vec<String>, tokens: Vec<TokenMeta>, inc_files: &'a mut Vec<String>) -> Self {
+        inc_files.push(filename.to_owned());
         Self {
             config,
             filename,

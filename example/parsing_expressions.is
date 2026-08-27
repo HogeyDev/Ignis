@@ -1,1 +1,1 @@
-let a: int = -14;
+static a: int = -14;
