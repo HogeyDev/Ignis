@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{analyzer::Analyzer, parser::{Declaration, DeclarationId, RootAst, TypeId}};
+use crate::{analyzer::Analyzer, parser::{Declaration, DeclarationId, RootAst, Type, TypeId}};
 
 pub type BlockId = usize;
 pub struct BasicBlock {
@@ -93,7 +93,7 @@ pub struct IrBuilder<'a> {
     sealed_blocks: HashSet<BlockId>,
     value_arena: Vec<Value>,
 
-    functions: HashMap<String, (BlockId, Vec<(String, TypeId)>)>, // entry block, params
+    functions: HashMap<String, (BlockId, TypeId, Vec<(String, TypeId)>)>, // entry block, return value, params
 }
 
 impl<'a> IrBuilder<'a> {
@@ -241,11 +241,11 @@ impl<'a> IrBuilder<'a> {
             Declaration::ParseError => unreachable!(),
             Declaration::Function { name, ret, params, body } => {
                 let block_id = self.new_block(name.clone());
-                if name == "main" {
-                    self.block_arena[0].succs.push(block_id);
-                }
+                // if name == "main" {
+                //     self.block_arena[0].succs.push(block_id);
+                // }
 
-                self.functions.insert(name.clone(), (block_id, params.clone()));
+                self.functions.insert(name.clone(), (block_id, *ret, params.clone()));
             }
             Declaration::Statement(stmt_id) => eprintln!("dbg stmt: {:#?}", self.analyzer.parser.statement_arena[*stmt_id]),
             Declaration::Struct { name, fields } => {
