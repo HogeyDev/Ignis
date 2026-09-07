@@ -15,6 +15,7 @@ pub fn token_width(token: TokenMeta) -> usize {
             => 6,
 
         Token::Break |
+        Token::Defer |
         Token::While
             => 5,
 

@@ -241,9 +241,9 @@ impl<'a> IrBuilder<'a> {
             Declaration::ParseError => unreachable!(),
             Declaration::Function { name, ret, params, body } => {
                 let block_id = self.new_block(name.clone());
-                if name == "main" {
-                    self.block_arena[0].succs.push(block_id);
-                }
+                // if name == "main" {
+                //     self.block_arena[0].succs.push(block_id);
+                // }
 
                 self.functions.insert(name.clone(), (block_id, params.clone()));
             }

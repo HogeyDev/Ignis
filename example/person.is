@@ -1,5 +1,5 @@
 import stdio;
-// import stdlib;
+import stdlib;
 
 struct Car {
     color: []char;
