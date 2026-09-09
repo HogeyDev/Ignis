@@ -1,30 +1,29 @@
-use std::collections::{HashMap, HashSet};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
-use crate::{lexer::Token, parser::{Declaration, DeclarationId, Expression, ExpressionId, Parser, RootAst, Statement, StatementId, Type, TypeId}};
+use crate::{lexer::Token, parser::{Declaration, Expression, Parser, Statement, Type}};
 
 type SymbolId = usize;
 #[derive(Debug)]
 pub enum Symbol {
     Variable {
-        kind: TypeId,
+        kind: Rc<RefCell<Type>>,
     },
     Enum {
         mods: HashSet<String>,
         variants: Vec<String>,
     },
     Struct {
-        fields: HashMap<String, TypeId>,
+        fields: HashMap<String, Rc<RefCell<Type>>>,
     },
     Type {
-        kind: TypeId,
+        kind: Rc<RefCell<Type>>,
     }
 }
 
-type Environment = Vec<HashMap<String, SymbolId>>;
+type Environment = Vec<HashMap<String, Rc<RefCell<Symbol>>>>;
 pub struct Analyzer<'a> {
     pub parser: Parser<'a>,
     env: Environment,
-    pub symbol_arena: Vec<Symbol>,
 
     pub warn_count: usize,
     pub err_count: usize,
@@ -35,7 +34,6 @@ impl<'a> Analyzer<'a> {
         Self {
             env: Environment::new(),
             parser,
-            symbol_arena: Vec::new(),
 
             warn_count: 0,
             err_count: 0,
@@ -57,84 +55,87 @@ impl<'a> Analyzer<'a> {
     fn pop_table(&mut self) {
         self.env.pop();
     }
-    fn add_entry(&mut self, name: String, symbol: Symbol) {
+    fn add_entry(&mut self, name: String, symbol: Rc<RefCell<Symbol>>) {
         if self.env.is_empty() {
             self.add_table();
         }
-        let id = self.symbol_arena.len();
-        self.symbol_arena.push(symbol);
-
-        if self.env.last_mut().unwrap().insert(name.clone(), id).is_some() {
+        // let id = self.symbol_arena.len();
+        // self.symbol_arena.push(symbol);
+    
+        if self.env.last_mut().unwrap().insert(name.clone(), symbol).is_some() {
             eprintln!("\x1b[0;31merror\x1b[0;0m: redefinition of {}", name);
         }
     }
-    fn get_entry(&self, name: &String) -> Option<SymbolId> {
-        self.env.iter().rev().find_map(|table| table.get(name)).map(|x| *x)
+    fn get_entry(&self, name: &String) -> Option<Rc<RefCell<Symbol>>> {
+        self.env.iter().rev().find_map(|table| table.get(name)).map(|x| x.clone())
     }
 
-    fn comptime_eval(&self, expr_id: ExpressionId) -> Option<Expression> {
-        let expr = &self.parser.expression_arena[expr_id];
-        match expr {
-            Expression::Binary { lhs: lhs_id, rhs: rhs_id, op } => {
-                let eval_logic = |lhs: ExpressionId, rhs: ExpressionId, op: fn(bool, bool) -> bool| -> Option<Expression> {
+    fn comptime_eval(&self, expr: Rc<RefCell<Expression>>) -> Option<Rc<RefCell<Expression>>> {
+        // let expr = &self.parser.expression_arena[expr_id];
+        match &*expr.borrow() {
+            Expression::Binary { lhs, rhs, op } => {
+                let eval_logic = |lhs: Rc<RefCell<Expression>>, rhs: Rc<RefCell<Expression>>, op: fn(bool, bool) -> bool| -> Option<Rc<RefCell<Expression>>> {
                     let lhs_eval = {
-                        let Expression::Integer(val, _) = self.comptime_eval(lhs)? else { unreachable!(); };
+                        let Expression::Integer(val, _) = *self.comptime_eval(lhs)?.borrow() else { unreachable!(); };
                         val != 0
                     };
                     let rhs_eval = {
-                        let Expression::Integer(val, _) = self.comptime_eval(rhs)? else { unreachable!(); };
+                        let Expression::Integer(val, _) = *self.comptime_eval(rhs)?.borrow() else { unreachable!(); };
                         val != 0
                     };
 
-                    Some(Expression::Integer(op(lhs_eval, rhs_eval) as i128, "i32".into()))
+                    Some(Rc::new(RefCell::new(Expression::Integer(op(lhs_eval, rhs_eval) as i128, "i32".into()))))
                 };
-                let eval_math = |lhs: ExpressionId, rhs: ExpressionId, op: fn(i128, i128) -> i128| -> Option<Expression> {
-                    let Expression::Integer(lhs_eval, _) = self.comptime_eval(lhs)? else { unreachable!(); };
-                    let Expression::Integer(rhs_eval, _) = self.comptime_eval(rhs)? else { unreachable!(); };
+                let eval_math = |lhs: Rc<RefCell<Expression>>, rhs: Rc<RefCell<Expression>>, op: fn(i128, i128) -> i128| -> Option<Rc<RefCell<Expression>>> {
+                    let Expression::Integer(lhs_eval, _) = *self.comptime_eval(lhs)?.borrow() else { unreachable!(); };
+                    let Expression::Integer(rhs_eval, _) = *self.comptime_eval(rhs)?.borrow() else { unreachable!(); };
 
-                    Some(Expression::Integer(op(lhs_eval, rhs_eval), "i32".into()))
+                    Some(Rc::new(RefCell::new(Expression::Integer(op(lhs_eval, rhs_eval), "i32".into()))))
                 };
                 match op {
-                    Token::Equals => self.comptime_eval(*rhs_id),
-                    Token::LogOr => eval_logic(*lhs_id, *rhs_id, |l, r| l || r),
-                    Token::LogAnd => eval_logic(*lhs_id, *rhs_id, |l, r| l && r),
-                    Token::DoubleEquals => eval_logic(*lhs_id, *rhs_id, |l, r| l == r),
-                    Token::NotEquals => eval_logic(*lhs_id, *rhs_id, |l, r| l != r),
-                    Token::LessThan => eval_logic(*lhs_id, *rhs_id, |l, r| l < r),
-                    Token::MoreThan => eval_logic(*lhs_id, *rhs_id, |l, r| l > r),
-                    Token::LessThanEq => eval_logic(*lhs_id, *rhs_id, |l, r| l <= r),
-                    Token::MoreThanEq => eval_logic(*lhs_id, *rhs_id, |l, r| l >= r),
+                    Token::Equals => self.comptime_eval(rhs.clone()),
+                    Token::LogOr => eval_logic(lhs.clone(), rhs.clone(), |l, r| l || r),
+                    Token::LogAnd => eval_logic(lhs.clone(), rhs.clone(), |l, r| l && r),
+                    Token::DoubleEquals => eval_logic(lhs.clone(), rhs.clone(), |l, r| l == r),
+                    Token::NotEquals => eval_logic(lhs.clone(), rhs.clone(), |l, r| l != r),
+                    Token::LessThan => eval_logic(lhs.clone(), rhs.clone(), |l, r| l < r),
+                    Token::MoreThan => eval_logic(lhs.clone(), rhs.clone(), |l, r| l > r),
+                    Token::LessThanEq => eval_logic(lhs.clone(), rhs.clone(), |l, r| l <= r),
+                    Token::MoreThanEq => eval_logic(lhs.clone(), rhs.clone(), |l, r| l >= r),
 
-                    Token::BitOr => eval_math(*lhs_id, *rhs_id, |l, r| l | r),
-                    Token::BitXor => eval_math(*lhs_id, *rhs_id, |l, r| l ^ r),
-                    Token::Ampersand => eval_math(*lhs_id, *rhs_id, |l, r| l & r),
-                    Token::LShift => eval_math(*lhs_id, *rhs_id, |l, r| l << r),
-                    Token::RShift => eval_math(*lhs_id, *rhs_id, |l, r| l >> r),
-                    Token::Plus => eval_math(*lhs_id, *rhs_id, |l, r| l + r),
-                    Token::Minus => eval_math(*lhs_id, *rhs_id, |l, r| l - r),
-                    Token::Star => eval_math(*lhs_id, *rhs_id, |l, r| l * r),
-                    Token::Slash => eval_math(*lhs_id, *rhs_id, |l, r| l / r),
-                    Token::Percent => eval_math(*lhs_id, *rhs_id, |l, r| l % r),
+                    Token::BitOr => eval_math(lhs.clone(), rhs.clone(), |l, r| l | r),
+                    Token::BitXor => eval_math(lhs.clone(), rhs.clone(), |l, r| l ^ r),
+                    Token::Ampersand => eval_math(lhs.clone(), rhs.clone(), |l, r| l & r),
+                    Token::LShift => eval_math(lhs.clone(), rhs.clone(), |l, r| l << r),
+                    Token::RShift => eval_math(lhs.clone(), rhs.clone(), |l, r| l >> r),
+                    Token::Plus => eval_math(lhs.clone(), rhs.clone(), |l, r| l + r),
+                    Token::Minus => eval_math(lhs.clone(), rhs.clone(), |l, r| l - r),
+                    Token::Star => eval_math(lhs.clone(), rhs.clone(), |l, r| l * r),
+                    Token::Slash => eval_math(lhs.clone(), rhs.clone(), |l, r| l / r),
+                    Token::Percent => eval_math(lhs.clone(), rhs.clone(), |l, r| l % r),
 
                     _ => unreachable!("parser should have dealt with an unknown binary operator way before here i think"),
                 }
             }
-            Expression::Unary { child: child_id, op } => {
+            Expression::Unary { child, op } => {
                 match op {
                     Token::LogNot => {
                         let (eval, kind) = {
-                            let Expression::Integer(v, k) = self.comptime_eval(*child_id)? else { unreachable!(); };
-                            (v != 0, k)
+                            let borrowed = self.comptime_eval(child.clone())?;
+                            let Expression::Integer(value, ref kind) = *borrowed.borrow() else { unreachable!(); };
+                            (value != 0, kind.clone())
                         };
-                        Some(Expression::Integer((!eval) as i128, kind))
+                        Some(Rc::new(RefCell::new(Expression::Integer((!eval) as i128, kind))))
                     }
                     Token::Minus => {
-                        let Expression::Integer(eval, kind) = self.comptime_eval(*child_id)? else { unreachable!(); };
-                        Some(Expression::Integer((-eval) as i128, kind))
+                        let borrowed = self.comptime_eval(child.clone())?;
+                        let Expression::Integer(eval, ref kind) = *borrowed.borrow() else { unreachable!(); };
+                        Some(Rc::new(RefCell::new(Expression::Integer((-eval) as i128, kind.clone()))))
                     }
                     Token::BitNeg => {
-                        let Expression::Integer(eval, kind) = self.comptime_eval(*child_id)? else { unreachable!(); };
-                        Some(Expression::Integer(!eval, kind))
+                        let borrowed = self.comptime_eval(child.clone())?;
+                        let Expression::Integer(eval, ref kind) = *borrowed.borrow() else { unreachable!(); };
+                        Some(Rc::new(RefCell::new(Expression::Integer(!eval, kind.clone()))))
                     }
                     Token::Ampersand => None,
                     Token::At => None,
@@ -143,7 +144,7 @@ impl<'a> Analyzer<'a> {
                 }
             }
             Expression::TypeCast { .. } => None,
-            Expression::Group(sub) => self.comptime_eval(*sub),
+            Expression::Group(sub) => self.comptime_eval(sub.clone()),
 
             Expression::ParseError => None,
             Expression::FunctionCall { .. } => None,
@@ -153,14 +154,13 @@ impl<'a> Analyzer<'a> {
 
             Expression::Identifier(_) => None,
 
-            expr @ (Expression::String(_) | Expression::Integer(_, _) | Expression::Char(_)) => Some(expr.to_owned()),
+            expr @ (Expression::String(_) | Expression::Integer(_, _) | Expression::Char(_)) => Some(Rc::new(RefCell::new(expr.to_owned()))),
         }
     }
-    fn comptime_true(&self, expr_id: ExpressionId) -> bool {
-        let expr = &self.parser.expression_arena[expr_id];
-        match expr {
-            Expression::Binary { .. } | Expression::Unary { .. } => match self.comptime_eval(expr_id) {
-                Some(Expression::Integer(x, _)) if x != 0 => true,
+    fn comptime_true(&self, expr: Rc<RefCell<Expression>>) -> bool {
+        match &*expr.borrow() {
+            Expression::Binary { .. } | Expression::Unary { .. } => match self.comptime_eval(expr.clone()).map(|x| &*x.borrow()) {
+                Some(Expression::Integer(x, _)) if *x != 0 => true,
                 _ => false,
             },
             Expression::TypeCast { .. } => false,
@@ -179,9 +179,8 @@ impl<'a> Analyzer<'a> {
             Expression::Char(c) => c != &'\0',
         }
     }
-    fn uniform_branch_return(&self, block_id: StatementId) -> bool {
-        let block = &self.parser.statement_arena[block_id];
-        match block {
+    fn uniform_branch_return(&self, block: Rc<RefCell<Statement>>) -> bool {
+        match &*block.borrow() {
             Statement::Return(_) => true,
 
             Statement::ParseError
@@ -192,32 +191,31 @@ impl<'a> Analyzer<'a> {
                 | Statement::Asm(_)
                 | Statement::Expression(_) => false,
 
-            Statement::Block(stmts) => stmts.iter().any(|stmt| self.uniform_branch_return(*stmt)),
+            Statement::Block(stmts) => stmts.iter().any(|stmt| self.uniform_branch_return(stmt.clone())),
             Statement::If { condition, body, alt } => {
-                self.uniform_branch_return(*body) && match alt {
-                    None => self.comptime_true(*condition),
-                    Some(other) => self.uniform_branch_return(*other),
+                self.uniform_branch_return(body.clone()) && match alt {
+                    None => self.comptime_true(condition.clone()),
+                    Some(other) => self.uniform_branch_return(other.clone()),
                 }
             }
-            Statement::While { condition, body } => self.comptime_true(*condition) && self.uniform_branch_return(*body),
+            Statement::While { condition, body } => self.comptime_true(condition.clone()) && self.uniform_branch_return(body.clone()),
         }
     }
 
-    fn kindof(&mut self, expr_id: ExpressionId) -> Option<TypeId> {
-        let expr = &self.parser.expression_arena[expr_id];
-        match expr {
+    fn kindof(&mut self, expr: Rc<RefCell<Expression>>) -> Option<Rc<RefCell<Type>>> {
+        match &*expr.borrow() {
             Expression::ParseError => None,
 
             Expression::Unary { child, .. } => self.kindof(*child),
             Expression::Binary { lhs, .. } => self.kindof(*lhs), // lhs must match rhs, so we can infer this i think
-            Expression::FunctionCall { name: name_id, .. } => {
-                match &self.parser.expression_arena[*name_id] {
+            Expression::FunctionCall { name, .. } => {
+                match &*name.borrow() {
                     Expression::Identifier(n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find function named `{n}`"));
                             return None;
                         };
-                        let Symbol::Variable { kind } = &self.symbol_arena[var] else {
+                        let Symbol::Variable { kind } = &*var.borrow() else {
                             self.error(&format!("`{n}` is not callable"));
                             return None;
                         };
@@ -227,9 +225,8 @@ impl<'a> Analyzer<'a> {
                     _ => todo!(),
                 }
             }
-            Expression::ArrayAccess { lhs: lhs_id, .. } => {
-                let lhs = &self.parser.expression_arena[*lhs_id];
-                match lhs {
+            Expression::ArrayAccess { lhs, .. } => {
+                match &*lhs.borrow() {
                     Expression::Identifier(n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find variable named `{n}`"));
