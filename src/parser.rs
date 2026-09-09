@@ -279,30 +279,7 @@ impl Type {
         matches!(self, Type::Prim(p) if matches!(p.as_str(), "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize"))
     }
 
-    // pub fn stringify(&self, type_arena: &Vec<Type>) -> String {
-    //     match self {
-    //         Type::ParseError => "?".to_string(),
-    //         Type::Prim(prim) => prim.to_string(),
-    //         Type::Array { size, kind } => {
-    //             if let Some(s) = size {
-    //                 format!("[{s}]{}", type_arena[*kind].stringify(type_arena))
-    //             } else {
-    //                 format!("[]{}", type_arena[*kind].stringify(type_arena))
-    //             }
-    //         }
-    //         Type::Pointer { kind } => format!("@{}", type_arena[*kind].stringify(type_arena)),
-    //         Type::Ident(ident) => ident.to_string(),
-    //         Type::Function { ret, params } => {
-    //             let mut fmt = format!("Func<{}", type_arena[*ret].stringify(type_arena));
-    //             for param in params {
-    //                 fmt.push_str(&format!(", {}", type_arena[*param].stringify(type_arena)));
-    //             }
-    //             fmt.push('>');
-    //             fmt
-    //         }
-    //     }
-    // }
-}
+    }
 
 // #[derive(Clone)]
 pub struct Parser<'a> {
@@ -315,12 +292,6 @@ pub struct Parser<'a> {
     i: usize,
 
     pub err_count: usize,
-    // warn_count: usize,
-
-    // pub declaration_arena: Vec<Declaration>,
-    // pub statement_arena: Vec<Statement>,
-    // pub expression_arena: Vec<Expression>,
-    // pub type_arena: Vec<Type>,
 
     pub inc_files: &'a mut Vec<String>,
 }
@@ -394,11 +365,6 @@ impl<'a> Parser<'a> {
 
             err_count: 0,
 
-            // declaration_arena: Vec::new(),
-            // statement_arena: Vec::new(),
-            // expression_arena: Vec::new(),
-            // type_arena: Vec::new(),
-
             inc_files,
         }
     }
@@ -458,28 +424,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // pub fn add_decl(&mut self, decl: Declaration) -> DeclarationId {
-    //     let id = self.declaration_arena.len();
-    //     self.declaration_arena.push(decl);
-    //     id
-    // }
-    // pub fn add_stmt(&mut self, stmt: Statement) -> StatementId {
-    //     let id = self.statement_arena.len();
-    //     self.statement_arena.push(stmt);
-    //     id
-    // }
-    // pub fn add_expr(&mut self, expr: Expression) -> ExpressionId {
-    //     let id = self.expression_arena.len();
-    //     self.expression_arena.push(expr);
-    //     id
-    // }
-    // pub fn add_type(&mut self, kind: Type) -> TypeId {
-    //     let id = self.type_arena.len();
-    //     self.type_arena.push(kind);
-    //     id
-    // }
-    
-    fn add_error<T: Ast>() -> Rc<RefCell<T>> {
+    pub fn add_error<T: Ast>() -> Rc<RefCell<T>> {
         Rc::new(RefCell::new(T::error_variant()))
     }
 

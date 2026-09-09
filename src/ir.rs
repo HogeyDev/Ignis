@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
-use crate::{analyzer::Analyzer, parser::{Declaration, DeclarationId, RootAst, Type, TypeId}};
+use crate::{analyzer::Analyzer, parser::{Declaration, Type}};
 
 pub type BlockId = usize;
 pub struct BasicBlock {
@@ -61,9 +61,9 @@ pub enum Value {
         block_id: BlockId,
         operands: Vec<ValueId>,
     },
-    ConstInt(i128, TypeId), // TODO: eventually we will have floats, but not yet.
-    ConstChar(char, TypeId),
-    ConstString(String, TypeId),
+    ConstInt(i128, Rc<RefCell<Type>>), // TODO: eventually we will have floats, but not yet.
+    ConstChar(char, Rc<RefCell<Type>>),
+    ConstString(String, Rc<RefCell<Type>>),
 }
 
 pub enum Instruction {
@@ -86,6 +86,7 @@ pub enum Terminator {
 }
 
 pub struct IrBuilder<'a> {
+    #[allow(dead_code)]
     analyzer: &'a Analyzer<'a>,
     pub block_arena: Vec<BasicBlock>,
 
@@ -93,7 +94,7 @@ pub struct IrBuilder<'a> {
     sealed_blocks: HashSet<BlockId>,
     value_arena: Vec<Value>,
 
-    functions: HashMap<String, (BlockId, TypeId, Vec<(String, TypeId)>)>, // entry block, return value, params
+    functions: HashMap<String, (BlockId, Rc<RefCell<Type>>, Vec<(String, Rc<RefCell<Type>>)>)>, // entry block, return value, params
 }
 
 impl<'a> IrBuilder<'a> {
@@ -119,11 +120,11 @@ impl<'a> IrBuilder<'a> {
         self.block_arena.len() - 1
     }
 
-    pub fn run(&mut self, ast: &RootAst) {
+    pub fn run(&mut self, ast: &[Rc<RefCell<Declaration>>]) {
         self.new_block(String::from("entrypoint"));
 
-        for decl_id in ast {
-            self.declaration(*decl_id);
+        for decl in ast {
+            self.declaration(decl.clone());
         }
     }
 
@@ -235,23 +236,22 @@ impl<'a> IrBuilder<'a> {
         self.sealed_blocks.insert(block_id);
     }
 
-    fn declaration(&mut self, decl_id: DeclarationId) {
-        let decl = &self.analyzer.parser.declaration_arena[decl_id];
-        match decl {
+    fn declaration(&mut self, decl: Rc<RefCell<Declaration>>) {
+        match &*decl.borrow() {
             Declaration::ParseError => unreachable!(),
-            Declaration::Function { name, ret, params, body } => {
+            Declaration::Function { name, ret, params, body: _ } => {
                 let block_id = self.new_block(name.clone());
                 // if name == "main" {
                 //     self.block_arena[0].succs.push(block_id);
                 // }
 
-                self.functions.insert(name.clone(), (block_id, *ret, params.clone()));
+                self.functions.insert(name.clone(), (block_id, ret.clone(), params.clone()));
             }
-            Declaration::Statement(stmt_id) => eprintln!("dbg stmt: {:#?}", self.analyzer.parser.statement_arena[*stmt_id]),
+            Declaration::Statement(stmt) => eprintln!("dbg stmt: {:#?}", stmt.borrow()),
             Declaration::Struct { name, fields } => {
                 eprintln!("dbg struct:\n{name} {{");
-                for (field_name, type_id) in fields.iter() {
-                    eprintln!("\t{field_name}: {}", self.analyzer.parser.type_arena[*type_id].stringify(&self.analyzer.parser.type_arena));
+                for (field_name, type_ref) in fields.iter() {
+                    eprintln!("\t{field_name}: {:#?}", type_ref.borrow());
                 }
                 eprintln!("}}");
             }

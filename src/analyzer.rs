@@ -2,7 +2,6 @@ use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use crate::{lexer::Token, parser::{Declaration, Expression, Parser, Statement, Type}};
 
-type SymbolId = usize;
 #[derive(Debug)]
 pub enum Symbol {
     Variable {
@@ -59,9 +58,6 @@ impl<'a> Analyzer<'a> {
         if self.env.is_empty() {
             self.add_table();
         }
-        // let id = self.symbol_arena.len();
-        // self.symbol_arena.push(symbol);
-    
         if self.env.last_mut().unwrap().insert(name.clone(), symbol).is_some() {
             eprintln!("\x1b[0;31merror\x1b[0;0m: redefinition of {}", name);
         }
@@ -71,7 +67,6 @@ impl<'a> Analyzer<'a> {
     }
 
     fn comptime_eval(&self, expr: Rc<RefCell<Expression>>) -> Option<Rc<RefCell<Expression>>> {
-        // let expr = &self.parser.expression_arena[expr_id];
         match &*expr.borrow() {
             Expression::Binary { lhs, rhs, op } => {
                 let eval_logic = |lhs: Rc<RefCell<Expression>>, rhs: Rc<RefCell<Expression>>, op: fn(bool, bool) -> bool| -> Option<Rc<RefCell<Expression>>> {
@@ -159,10 +154,8 @@ impl<'a> Analyzer<'a> {
     }
     fn comptime_true(&self, expr: Rc<RefCell<Expression>>) -> bool {
         match &*expr.borrow() {
-            Expression::Binary { .. } | Expression::Unary { .. } => match self.comptime_eval(expr.clone()).map(|x| &*x.borrow()) {
-                Some(Expression::Integer(x, _)) if *x != 0 => true,
-                _ => false,
-            },
+            Expression::Binary { .. } | Expression::Unary { .. } => self.comptime_eval(expr.clone())
+                .is_some_and(|eval| matches!(&*eval.borrow(), Expression::Integer(x, _) if *x != 0)),
             Expression::TypeCast { .. } => false,
             Expression::Group(sub) => self.comptime_true(sub.clone()),
 
@@ -206,8 +199,8 @@ impl<'a> Analyzer<'a> {
         match &*expr.borrow() {
             Expression::ParseError => None,
 
-            Expression::Unary { child, .. } => self.kindof(*child),
-            Expression::Binary { lhs, .. } => self.kindof(*lhs), // lhs must match rhs, so we can infer this i think
+            Expression::Unary { child, .. } => self.kindof(child.clone()),
+            Expression::Binary { lhs, .. } => self.kindof(lhs.clone()), // lhs must match rhs, so we can infer this i think
             Expression::FunctionCall { name, .. } => {
                 match &*name.borrow() {
                     Expression::Identifier(n) => {
@@ -220,7 +213,7 @@ impl<'a> Analyzer<'a> {
                             return None;
                         };
                         
-                        Some(*kind)
+                        Some(kind.clone())
                     }
                     _ => todo!(),
                 }
@@ -232,34 +225,32 @@ impl<'a> Analyzer<'a> {
                             self.error(&format!("cannot find variable named `{n}`"));
                             return None;
                         };
-                        let Symbol::Variable { kind: kind_id } = &self.symbol_arena[var] else {
+                        let Symbol::Variable { kind: var_kind } = &*var.borrow() else {
                             self.error(&format!("`{n}` is not a variable"));
                             return None;
                         };
-                        let Type::Array { kind, .. } = self.parser.type_arena[*kind_id] else {
+                        let Type::Array { kind, .. } = &*var_kind.borrow() else {
                             self.error(&format!("`{n} is not an array"));
                             return None;
                         };
 
-                        Some(kind)
+                        Some(kind.clone())
                     }
                     _ => todo!(),
                 }
             }
-            Expression::MemberAccess { lhs: lhs_id, member } => {
-                let lhs = &self.parser.expression_arena[*lhs_id];
-                match lhs {
+            Expression::MemberAccess { lhs, member } => {
+                match &*lhs.borrow() {
                     Expression::Identifier(n) => {
                         let Some(var) = self.get_entry(n) else {
                             self.error(&format!("cannot find variable named `{n}`"));
                             return None;
                         };
-                        let Symbol::Variable { kind: kind_id } = &self.symbol_arena[var] else {
+                        let Symbol::Variable { kind: var_kind } = &*var.borrow() else {
                             self.error(&format!("`{n}` is not a variable"));
                             return None;
                         };
-                        let kind = &self.parser.type_arena[*kind_id];
-                        let struct_name = match kind {
+                        let struct_name = match &*var_kind.borrow() {
                             Type::Ident(name) => name.clone(),
                             _ => {
                                 self.error(&format!("`{n}` is not a struct"));
@@ -267,7 +258,7 @@ impl<'a> Analyzer<'a> {
                             }
                         };
                         let entry = self.get_entry(&struct_name);
-                        if let Some(entry_id) = entry && let Symbol::Struct { fields } = &self.symbol_arena[entry_id] {
+                        if let Some(symbol) = entry && let Symbol::Struct { fields } = &*symbol.borrow() {
                             fields.get(member).map(|x| x.to_owned())
                         } else {
                             self.error(&format!("could not find struct type `{struct_name}`"));
@@ -277,69 +268,65 @@ impl<'a> Analyzer<'a> {
                     _ => todo!(),
                 }
             }
-            Expression::StructInitializer { name, .. } => Some(self.parser.add_type(Type::Ident(name.to_owned()))),
-            Expression::TypeCast { to, .. } => Some(*to),
-            Expression::Integer(_, k) => Some(self.parser.add_type(Type::Prim(k.to_owned()))),
+            Expression::StructInitializer { name, .. } => Some(Rc::new(RefCell::new(Type::Ident(name.to_owned())))),
+            Expression::TypeCast { to, .. } => Some(to.clone()),
+            Expression::Integer(_, k) => Some(Rc::new(RefCell::new(Type::Prim(k.to_owned())))),
             Expression::String(_) => {
-                let char_id = self.parser.add_type(Type::Prim("char".into()));
-                Some(self.parser.add_type(Type::Pointer { kind: char_id }))
+                let char_id = Rc::new(RefCell::new(Type::Prim("char".into())));
+                Some(Rc::new(RefCell::new(Type::Pointer { kind: char_id })))
             }
-            Expression::Char(_) => Some(self.parser.add_type(Type::Prim("char".into()))),
+            Expression::Char(_) => Some(Rc::new(RefCell::new(Type::Prim("char".into())))),
             Expression::Identifier(x) => {
                 let entry = self.get_entry(x);
-                if let Some(entry_id) = entry && let Symbol::Variable { kind } = &self.symbol_arena[entry_id] {
+                if let Some(symbol) = entry && let Symbol::Variable { kind } = &*symbol.borrow() {
                     Some(kind.to_owned())
                 } else {
                     self.error(&format!("cannot find variable named `{x}`"));
                     None
                 }
             }
-            Expression::Group(child) => self.kindof(*child),
+            Expression::Group(child) => self.kindof(child.clone()),
         }
     }
 
-    fn analyze_declaration(&mut self, decl_id: DeclarationId) {
-        let decl = self.parser.declaration_arena[decl_id].clone();
-        match decl {
+    fn analyze_declaration(&mut self, decl: Rc<RefCell<Declaration>>) {
+        match &*decl.borrow() {
             Declaration::ParseError => unreachable!(),
             Declaration::Enum { name, modifiers, variants } => {
-                self.add_entry(name.into(), Symbol::Enum { mods: modifiers.clone(), variants: variants.clone() });
+                self.add_entry(name.clone(), Rc::new(RefCell::new(Symbol::Enum { mods: modifiers.clone(), variants: variants.clone() })));
             }
             Declaration::Struct { name, fields } => {
-                self.add_entry(name.into(), Symbol::Struct { fields: fields.clone() });
+                self.add_entry(name.clone(), Rc::new(RefCell::new(Symbol::Struct { fields: fields.clone() })));
             }
             Declaration::Function { name, ret, params, body } => {
-                let params_tmp = params.iter().map(|x| x.1).collect();
-                let kind = self.parser.add_type(Type::Function {
-                    ret,
-                    params: params_tmp,
-                });
+                let kind = Rc::new(RefCell::new(Type::Function {
+                    ret: ret.clone(),
+                    params: params.iter().map(|x| x.1.clone()).collect(),
+                }));
                 self.add_entry(name.clone(),
-                    Symbol::Variable { kind });
+                    Rc::new(RefCell::new(Symbol::Variable { kind })));
 
                 self.add_table();
                 for param in params {
                     let name = param.0.clone();
-                    self.add_entry(name, Symbol::Variable { kind: param.1 });
+                    self.add_entry(name, Rc::new(RefCell::new(Symbol::Variable { kind: param.1.clone() })));
                 }
 
-                let ret_kind = &self.parser.type_arena[ret];
-                if ret_kind != &Type::Prim(String::from("void")) && !self.uniform_branch_return(body) {
+                if *ret.borrow() != Type::Prim(String::from("void")) && !self.uniform_branch_return(body.clone()) {
                     self.warning(&format!("{name}: not all branches return"));
                 }
 
-                self.analyze_statement(body, (false, true));
+                self.analyze_statement(body.clone(), (false, true));
                 self.pop_table();
             }
-            Declaration::TypeDef { name, kind } => self.add_entry(name.into(), Symbol::Type { kind: kind.to_owned() }),
-            Declaration::Statement(stmt) => self.analyze_statement(stmt, (false, false)),
+            Declaration::TypeDef { name, kind } => self.add_entry(name.clone(), Rc::new(RefCell::new(Symbol::Type { kind: kind.clone() }))),
+            Declaration::Statement(stmt) => self.analyze_statement(stmt.clone(), (false, false)),
         }
     }
 
                                                        // (breakable, returnable)
-    fn analyze_statement(&mut self, body_id: StatementId, control_flow: (bool, bool)) {
-        let body = self.parser.statement_arena[body_id].clone();
-        match body {
+    fn analyze_statement(&mut self, body: Rc<RefCell<Statement>>, control_flow: (bool, bool)) {
+        match &*body.borrow() {
             Statement::ParseError => unreachable!(),
             Statement::VarDecl { name, kind, value, .. } => {
                 if let None = kind && let None = value {
@@ -348,15 +335,15 @@ impl<'a> Analyzer<'a> {
                 let kind_final = match kind {
                     Some(k) => k.to_owned(),
                     None => {
-                        let Some(k) = self.kindof(value.unwrap()) else {
+                        let Some(k) = self.kindof(value.as_ref().unwrap().clone()) else {
                             self.error(&format!("could not infer the type of `{name}`")); return;
                         };
                         k
                     }
                 };
-                self.add_entry(name.clone(), Symbol::Variable { kind: kind_final });
+                self.add_entry(name.clone(), Rc::new(RefCell::new(Symbol::Variable { kind: kind_final })));
             }
-            Statement::Import(ref path) => {
+            Statement::Import(path) => {
                 if let Err(e) = std::fs::exists(path) {
                     match e.kind() {
                         std::io::ErrorKind::NotFound => self.error(&format!("could not find file `{path}`")),
@@ -366,22 +353,22 @@ impl<'a> Analyzer<'a> {
             }
             Statement::Return(expr) => {
                 if expr.is_some() {
-                    _ = self.analyze_expression(expr.unwrap())
+                    _ = self.analyze_expression(expr.as_ref().unwrap().clone())
                 }
             }
             Statement::If { condition, body, alt } => {
-                if let Some(kind_id) = self.kindof(condition) && self.parser.type_arena[kind_id].is_integer() {
-                    self.analyze_statement(body, control_flow);
+                if let Some(kind) = self.kindof(condition.clone()) && kind.borrow().is_integer() {
+                    self.analyze_statement(body.clone(), control_flow);
                     if let Some(alt_body) = alt {
-                        self.analyze_statement(alt_body, control_flow);
+                        self.analyze_statement(alt_body.clone(), control_flow);
                     }
                 } else {
                     self.error("if condition must have integer type");
                 }
             }
             Statement::While { condition, body } => {
-                if let Some(kind_id) = self.kindof(condition) && self.parser.type_arena[kind_id].is_integer() {
-                    self.analyze_statement(body, (true, control_flow.1));
+                if let Some(kind) = self.kindof(condition.clone()) && kind.borrow().is_integer() {
+                    self.analyze_statement(body.clone(), (true, control_flow.1));
                 } else {
                     self.error("while condition must have integer type");
                 }
@@ -397,37 +384,28 @@ impl<'a> Analyzer<'a> {
                 }
             }
             Statement::Asm(_) => {}
-            Statement::Block(stmts) => stmts.iter().for_each(|stmt| self.analyze_statement(*stmt, control_flow)),
-            Statement::Expression(expr) => _ = self.analyze_expression(expr),
+            Statement::Block(stmts) => stmts.iter().for_each(|stmt| self.analyze_statement(stmt.clone(), control_flow)),
+            Statement::Expression(expr) => _ = self.analyze_expression(expr.clone()),
         }
     }
 
-    fn analyze_expression(&mut self, expr_id: ExpressionId) -> Option<TypeId> {
-        let expr = self.parser.expression_arena[expr_id].clone();
-        match expr {
+    fn analyze_expression(&mut self, expr: Rc<RefCell<Expression>>) -> Option<Rc<RefCell<Type>>> {
+        match &*expr.borrow() {
             Expression::ParseError => unreachable!(),
             Expression::Unary { child, op } => {
-                self.analyze_expression(child);
+                self.analyze_expression(child.clone());
                 match op {
-                    Token::At => match self.kindof(child) {
-                        ptr @ Some(ptr_id) if matches!(self.parser.type_arena[ptr_id], Type::Pointer { .. }) => ptr,
+                    Token::At => match self.kindof(child.clone()) {
+                        Some(ptr) if matches!(&*ptr.borrow(), Type::Pointer { .. }) => Some(ptr),
                         _ => {
                             self.error("cannot deference non pointer type");
                             None
                         }
                     }
-                    Token::Ampersand => match &self.parser.expression_arena[child] {
-                        Expression::Identifier(_) => {
-                            let ptr_kind = self.kindof(child)?;
-                            Some(self.parser.add_type(Type::Pointer { kind: ptr_kind }))
-                        }
-                        Expression::MemberAccess { .. } => {
-                            let ptr_kind = self.kindof(child)?;
-                            Some(self.parser.add_type(Type::Pointer { kind: ptr_kind }))
-                        }
-                        Expression::ArrayAccess { .. } => {
-                            let ptr_kind = self.kindof(child)?;
-                            Some(self.parser.add_type(Type::Pointer { kind: ptr_kind }))
+                    Token::Ampersand => match &*child.borrow() {
+                        Expression::Identifier(_) | Expression::MemberAccess { .. } | Expression::ArrayAccess { .. } => {
+                            let ptr_kind = self.kindof(child.clone())?;
+                            Some(Rc::new(RefCell::new(Type::Pointer { kind: ptr_kind })))
                         }
                         _ => {
                             self.error("invalid operand for reference operator");
@@ -438,29 +416,29 @@ impl<'a> Analyzer<'a> {
                 }
             }
             Expression::Binary { lhs, rhs, .. } => {
-                let lhs_type = self.analyze_expression(lhs);
-                let rhs_type = self.analyze_expression(rhs);
+                let lhs_type = self.analyze_expression(lhs.clone());
+                let rhs_type = self.analyze_expression(rhs.clone());
 
-                if matches!(lhs_type, Some(ptr_id) if matches!(self.parser.type_arena[ptr_id], Type::Pointer { .. })) &&
-                    let Some(rhs_type_unwrap) = rhs_type && self.parser.type_arena[rhs_type_unwrap].is_integer() { lhs_type }
+                if matches!(lhs_type, Some(ref ptr) if matches!(&*ptr.borrow(), Type::Pointer { .. })) &&
+                    let Some(rhs_type_unwrap) = rhs_type && rhs_type_unwrap.borrow().is_integer() { lhs_type }
                 else if lhs_type.is_some() { lhs_type }
                 else { None }
             }
-            Expression::FunctionCall { .. } => self.kindof(expr_id),
+            Expression::FunctionCall { .. } => self.kindof(expr.clone()),
             Expression::ArrayAccess { lhs, index } => {
-                let lhs_type = self.kindof(lhs);
+                let lhs_type = self.kindof(lhs.clone());
                 match lhs_type {
-                    Some(arr_id) => {
-                        if let Type::Array { size: size_id, kind: kind_id } = self.parser.type_arena[arr_id] {
-                            if let Some(size_id_value) = size_id &&
-                                let Some(Expression::Integer(size_val, _)) = self.comptime_eval(size_id_value) &&
-                                let Some(Expression::Integer(index_val, _)) = self.comptime_eval(index) &&
+                    Some(arr_type) => {
+                        if let Type::Array { size, kind } = &*arr_type.borrow() {
+                            if let Some(size_expr) = size &&
+                                let Some(Expression::Integer(size_val, _)) = self.comptime_eval(size_expr.clone()).map(|x| x.borrow().clone()) &&
+                                let Some(Expression::Integer(index_val, _)) = self.comptime_eval(index.clone()).map(|x| x.borrow().clone()) &&
                                 (index_val < 0 || index_val >= size_val)
                             {
                                 self.error("array index out of bounds");
                             }
-                            if let Some(index_unwrap) = self.kindof(index) && self.parser.type_arena[index_unwrap].is_integer() {
-                                Some(kind_id)
+                            if let Some(index_type) = self.kindof(index.clone()) && index_type.borrow().is_integer() {
+                                Some(kind.clone())
                             } else {
                                 self.error("array index must be integer type");
                                 None
@@ -473,23 +451,23 @@ impl<'a> Analyzer<'a> {
                 }
             }
             // TODO: everything from here on down only does typechecking, this needs to be expanded
-            Expression::MemberAccess { .. } => self.kindof(expr_id),
-            Expression::StructInitializer { name, .. } => Some(self.parser.add_type(Type::Ident(name.clone()))),
-            Expression::TypeCast { to, .. } => Some(to),
-            Expression::Integer(_, kind) => Some(self.parser.add_type(Type::Prim(kind.to_owned()))),
+            Expression::MemberAccess { .. } => self.kindof(expr.clone()),
+            Expression::StructInitializer { name, .. } => Some(Rc::new(RefCell::new(Type::Ident(name.clone())))),
+            Expression::TypeCast { to, .. } => Some(to.clone()),
+            Expression::Integer(_, kind) => Some(Rc::new(RefCell::new(Type::Prim(kind.to_owned())))),
             Expression::String(_) => {
-                let char_id = self.parser.add_type(Type::Prim("char".to_owned()));
-                Some(self.parser.add_type(Type::Array { size: None, kind: char_id }))
+                let char_id = Rc::new(RefCell::new(Type::Prim("char".to_owned())));
+                Some(Rc::new(RefCell::new(Type::Array { size: None, kind: char_id })))
             }
-            Expression::Char(_) => Some(self.parser.add_type(Type::Prim("char".to_owned()))),
-            Expression::Identifier(_) => self.kindof(expr_id),
-            Expression::Group(child) => self.kindof(child),
+            Expression::Char(_) => Some(Rc::new(RefCell::new(Type::Prim("char".to_owned())))),
+            Expression::Identifier(_) => self.kindof(expr.clone()),
+            Expression::Group(child) => self.kindof(child.clone()),
         }
     }
 
-    pub fn run(&mut self, root: &RootAst) {
+    pub fn run(&mut self, root: &[Rc<RefCell<Declaration>>]) {
         for decl in root {
-            self.analyze_declaration(*decl);
+            self.analyze_declaration(decl.clone());
         }
 
         // eprintln!("{:#?}", self.env);
