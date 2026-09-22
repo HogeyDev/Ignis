@@ -148,16 +148,16 @@ pub enum Type {
     ParseError,
     Prim(String),
     Array {
-        size: Option<Rc<RefCell<Expression>>>,
-        kind: Rc<RefCell<Type>>,
+        size: Option<Rc<Expression>>,
+        kind: Rc<Type>,
     },
     Pointer {
-        kind: Rc<RefCell<Type>>,
+        kind: Rc<Type>,
     },
     Ident(String),
     Function {
-        ret: Rc<RefCell<Type>>,
-        params: Vec<Rc<RefCell<Type>>>,
+        ret: Rc<Type>,
+        params: Vec<Rc<Type>>,
     },
 }
 impl Ast for Type {
@@ -171,7 +171,7 @@ pub enum Declaration {
     ParseError,
     Struct {
         name: String,
-        fields: HashMap<String, Rc<RefCell<Type>>>
+        fields: HashMap<String, Rc<Type>>
     },
     Enum {
         name: String,
@@ -180,15 +180,15 @@ pub enum Declaration {
     },
     Function {
         name: String,
-        ret: Rc<RefCell<Type>>,
-        params: Vec<(String, Rc<RefCell<Type>>)>, // (name, type)
-        body: Rc<RefCell<Statement>>,
+        ret: Rc<Type>,
+        params: Vec<(String, Rc<Type>)>, // (name, type)
+        body: Rc<Statement>,
     },
     TypeDef {
         name: String,
-        kind: Rc<RefCell<Type>>,
+        kind: Rc<Type>,
     },
-    Statement(Rc<RefCell<Statement>>), // this is pretty much only for global variable declarations and imports
+    Statement(Rc<Statement>), // this is pretty much only for global variable declarations and imports
 }
 impl Ast for Declaration {
     fn error_variant() -> Self {
@@ -200,27 +200,27 @@ impl Ast for Declaration {
 pub enum Statement {
     ParseError,
     Import(String), // path (relative?)
-    Return(Option<Rc<RefCell<Expression>>>),
+    Return(Option<Rc<Expression>>),
     VarDecl {
         is_static: bool,
         name: String,
-        kind: Option<Rc<RefCell<Type>>>,
-        value: Option<Rc<RefCell<Expression>>>,
+        kind: Option<Rc<Type>>,
+        value: Option<Rc<Expression>>,
     },
     If {
-        condition: Rc<RefCell<Expression>>,
-        body: Rc<RefCell<Statement>>,
-        alt: Option<Rc<RefCell<Statement>>>,
+        condition: Rc<Expression>,
+        body: Rc<Statement>,
+        alt: Option<Rc<Statement>>,
     },
     While {
-        condition: Rc<RefCell<Expression>>,
-        body: Rc<RefCell<Statement>>,
+        condition: Rc<Expression>,
+        body: Rc<Statement>,
     },
     Break,
     Continue,
     Asm(String),
-    Block(Vec<Rc<RefCell<Statement>>>),
-    Expression(Rc<RefCell<Expression>>),
+    Block(Vec<Rc<Statement>>),
+    Expression(Rc<Expression>),
 }
 impl Ast for Statement {
     fn error_variant() -> Self {
@@ -232,41 +232,41 @@ impl Ast for Statement {
 pub enum Expression {
     ParseError,
     Unary {
-        child: Rc<RefCell<Expression>>,
+        child: Rc<Expression>,
         op: Token,
     },
     Binary {
-        lhs: Rc<RefCell<Expression>>,
-        rhs: Rc<RefCell<Expression>>,
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
         op: Token,
     },
     FunctionCall {
-        name: Rc<RefCell<Expression>>,
-        args: Vec<Rc<RefCell<Expression>>>,
+        name: Rc<Expression>,
+        args: Vec<Rc<Expression>>,
     },
     ArrayAccess {
-        lhs: Rc<RefCell<Expression>>,
-        index: Rc<RefCell<Expression>>,
+        lhs: Rc<Expression>,
+        index: Rc<Expression>,
     },
     MemberAccess {
-        lhs: Rc<RefCell<Expression>>,
+        lhs: Rc<Expression>,
         member: String,
     },
     StructInitializer {
         name: String,
-        values: HashMap<String, Rc<RefCell<Expression>>>
+        values: HashMap<String, Rc<Expression>>
     },
 
     TypeCast {
-        to: Rc<RefCell<Type>>,
-        value: Rc<RefCell<Expression>>,
+        to: Rc<Type>,
+        value: Rc<Expression>,
     },
 
     Integer(i128, String), // (value, type) : 69u32 -> (69, "u32")
     String(String),
     Char(char),
     Identifier(String),
-    Group(Rc<RefCell<Expression>>),
+    Group(Rc<Expression>),
 }
 impl Ast for Expression {
     fn error_variant() -> Self {
@@ -424,11 +424,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn add_error<T: Ast>() -> Rc<RefCell<T>> {
-        Rc::new(RefCell::new(T::error_variant()))
+    pub fn add_error<T: Ast>() -> Rc<T> {
+        Rc::new(T::error_variant())
     }
 
-    pub fn run(&mut self) -> Vec<Rc<RefCell<Declaration>>> {
+    pub fn run(&mut self) -> Vec<Rc<Declaration>> {
         std::iter::from_fn(|| if self.i < self.tokens.len() { Some(self.declaration()) } else { None }).collect()
         // let mut program: Vec<Declaration> = Vec::new();
 
@@ -439,61 +439,33 @@ impl<'a> Parser<'a> {
         // program
     }
 
-    fn declaration(&mut self) -> Rc<RefCell<Declaration>> {
+    fn declaration(&mut self) -> Rc<Declaration> {
         match &self.current().value {
             Token::Struct => self.struct_decl(),
             Token::Enum => self.enum_decl(),
             Token::Function => self.function_decl(),
             Token::TypeDef => self.typedef_decl(),
             Token::Import => {
-                // let imp = self.import_st();
-                // self.add_decl(Declaration::Statement(imp))
-
-                // let imp = self.import_st();
-                // let Statement::Import(mut rel_path) = self.statement_arena[imp].clone() else { unreachable!() };
-                // rel_path.push_str(".is");
-
-                // if let Some(full_path) = resolve_path(self.config, rel_path) {
-                //     let key = std::fs::canonicalize(&full_path) // basically just to make sure `../` gets flattened
-                //         .map(|p| p.to_string_lossy().into_owned())
-                //         .unwrap_or(full_path.clone());
-
-                //     if self.inc_files.insert(key) {
-                //         if let Ok(file_contents) = std::fs::read_to_string(&full_path) {
-                //             let lines: Vec<String> = file_contents.lines().map(|x| x.to_owned()).collect();
-                //             let mut lexer = Lexer::from(&full_path, &lines, &file_contents);
-                //             let tokens = lexer.run();
-
-                //             self.tokens.splice(self.i..self.i, tokens);
-                //         } else {
-                //             self.error_no_sync(format!("could not open imported file"));
-                //         }
-                //     }
-                // } else {
-                //     self.i -= 2;
-                //     self.error_no_sync("could not find file".to_owned());
-                //     self.i += 2;
-                // }
                 self.import_st();
                 self.declaration()
             }
             Token::Static => {
                 let var = self.var_decl();
-                Rc::new(RefCell::new(Declaration::Statement(var)))
+                Rc::new(Declaration::Statement(var))
             }
             x => {
                 self.error(
                     format!("invalid declaration: '{}'", x.get_plaintext()),
                     DECL_FOLLOW
                 );
-                Rc::new(RefCell::new(Declaration::ParseError))
+                Rc::new(Declaration::ParseError)
             }
         }
     }
-    fn struct_decl(&mut self) -> Rc<RefCell<Declaration>> {
+    fn struct_decl(&mut self) -> Rc<Declaration> {
         self.advance();
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
-        let mut fields: HashMap<String, Rc<RefCell<Type>>> = HashMap::new();
+        let mut fields: HashMap<String, Rc<Type>> = HashMap::new();
 
         consume!(self, LBrace, "expected '{'".into(), Declaration, DECL_FOLLOW);
         while let Token::Ident(field) = self.current().value.to_owned() {
@@ -505,9 +477,9 @@ impl<'a> Parser<'a> {
         }
         consume!(self, RBrace, "expected '}'".into(), Declaration, DECL_FOLLOW);
 
-        Rc::new(RefCell::new(Declaration::Struct { name, fields }))
+        Rc::new(Declaration::Struct { name, fields })
     }
-    fn enum_decl(&mut self) -> Rc<RefCell<Declaration>> {
+    fn enum_decl(&mut self) -> Rc<Declaration> {
         self.advance();
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
         let mut variants: Vec<String> = Vec::new();
@@ -531,9 +503,9 @@ impl<'a> Parser<'a> {
         }
         consume!(self, RBrace, "expected '}'".into(), Declaration, DECL_FOLLOW);
 
-        Rc::new(RefCell::new(Declaration::Enum { name, modifiers, variants }))
+        Rc::new(Declaration::Enum { name, modifiers, variants })
     }
-    fn function_decl(&mut self) -> Rc<RefCell<Declaration>> {
+    fn function_decl(&mut self) -> Rc<Declaration> {
         self.advance();
 
         let name = consume!(self, Ident, "expected an identifier".into(), Declaration, DECL_FOLLOW);
@@ -554,9 +526,9 @@ impl<'a> Parser<'a> {
         consume!(self, RParen, "expected ')'".into(), Declaration, DECL_FOLLOW);
 
         let body = self.block();
-        Rc::new(RefCell::new(Declaration::Function { name, ret, params, body }))
+        Rc::new(Declaration::Function { name, ret, params, body })
     }
-    fn typedef_decl(&mut self) -> Rc<RefCell<Declaration>> {
+    fn typedef_decl(&mut self) -> Rc<Declaration> {
         self.advance();
 
         let curr = self.current().value.to_owned();
@@ -565,25 +537,39 @@ impl<'a> Parser<'a> {
         let value = self.parse_type();
         consume!(self, Semi, "expected ';'".into(), Declaration, DECL_FOLLOW);
 
-       Rc::new(RefCell::new(Declaration::TypeDef { name: new_type, kind: value }))
+       Rc::new(Declaration::TypeDef { name: new_type, kind: value })
     }
-    fn block(&mut self) -> Rc<RefCell<Statement>> {
+    fn block_stmts(&mut self) -> Option<Vec<Rc<Statement>>> {
         let mut statements = Vec::new();
 
         if self.current().get_kind() == TokenKind::LBrace {
-            consume!(self, LBrace, "expected '{'".into(), Statement, STMT_FOLLOW);
+            if self.consume(TokenKind::LBrace).is_none() {
+                self.error("expected '{'".into(), concat_tokenlist(&[STMT_FOLLOW]).as_slice());
+                return None;
+            }
             while self.current().get_kind() != TokenKind::RBrace {
                 statements.push(self.statement());
             }
-            consume!(self, RBrace, "expected '}'".into(), Statement, STMT_FOLLOW);
+            if self.consume(TokenKind::RBrace).is_none() {
+                self.error("expected '}'".into(), concat_tokenlist(&[STMT_FOLLOW]).as_slice());
+                return None;
+            }
         } else {
             statements.push(self.statement());
         }
 
-        Rc::new(RefCell::new(Statement::Block(statements)))
+        Some(statements)
+    }
+    fn block(&mut self) -> Rc<Statement> {
+        let statements = self.block_stmts();
+        match statements {
+            None => Rc::new(Statement::ParseError),
+            Some(stmts) => Rc::new(Statement::Block(stmts)),
+
+        }
     }
     
-    fn statement(&mut self) -> Rc<RefCell<Statement>> {
+    fn statement(&mut self) -> Rc<Statement> {
         match self.current().value {
             Token::Import => {
                 self.import_st();
@@ -599,11 +585,11 @@ impl<'a> Parser<'a> {
             _ => {
                 let expr = self.expression();
                 consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-                Rc::new(RefCell::new(Statement::Expression(expr)))
+                Rc::new(Statement::Expression(expr))
             }
         }
     }
-    fn import_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn import_st(&mut self) -> Rc<Statement> {
         // self.advance();
         // let mut len = 1; // "import"
 
@@ -682,20 +668,20 @@ impl<'a> Parser<'a> {
             self.i += 2;
         }
 
-        Rc::new(RefCell::new(Statement::Import(path)))
+        Rc::new(Statement::Import(path))
     }
-    fn return_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn return_st(&mut self) -> Rc<Statement> {
         self.advance();
         if self.current().get_kind() == TokenKind::Semi {
             self.advance();
-            Rc::new(RefCell::new(Statement::Return(None)))
+            Rc::new(Statement::Return(None))
         } else {
             let value = self.expression();
             consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-            Rc::new(RefCell::new(Statement::Return(Some(value))))
+            Rc::new(Statement::Return(Some(value)))
         }
     }
-    fn var_decl(&mut self) -> Rc<RefCell<Statement>> {
+    fn var_decl(&mut self) -> Rc<Statement> {
         let is_static = match self.advance().value {
             Token::Let => false,
             Token::Static => true,
@@ -722,9 +708,9 @@ impl<'a> Parser<'a> {
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
 
-        Rc::new(RefCell::new(Statement::VarDecl { is_static, name, kind, value }))
+        Rc::new(Statement::VarDecl { is_static, name, kind, value })
     }
-    fn if_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn if_st(&mut self) -> Rc<Statement> {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW);
@@ -738,9 +724,9 @@ impl<'a> Parser<'a> {
             Some(self.statement())
         } else { None };
 
-        Rc::new(RefCell::new(Statement::If { condition, body: body, alt }))
+        Rc::new(Statement::If { condition, body: body, alt })
     }
-    fn while_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn while_st(&mut self) -> Rc<Statement> {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW);
@@ -748,17 +734,17 @@ impl<'a> Parser<'a> {
         consume!(self, RParen, "expected ')'".into(), Statement, STMT_FOLLOW);
 
         let body = self.block();
-        Rc::new(RefCell::new(Statement::While { condition, body }))
+        Rc::new(Statement::While { condition, body })
     }
-    fn asm_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn asm_st(&mut self) -> Rc<Statement> {
         self.advance();
         
         let value = consume!(self, String, "expected a string".into(), Statement, STMT_FOLLOW);
 
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
-        Rc::new(RefCell::new(Statement::Asm(value)))
+        Rc::new(Statement::Asm(value))
     }
-    fn for_st(&mut self) -> Rc<RefCell<Statement>> {
+    fn for_st(&mut self) -> Rc<Statement> {
         self.advance();
 
         consume!(self, LParen, "expected '('".into(), Statement, STMT_FOLLOW, &[TokenKind::Semi]);
@@ -772,22 +758,22 @@ impl<'a> Parser<'a> {
         consume!(self, Semi, "expected ';'".into(), Statement, STMT_FOLLOW);
         consume!(self, RParen, "expected ')'".into(), Statement, STMT_FOLLOW);
 
-        let body = self.block();
-        if matches!(*body.borrow(), Statement::ParseError) {
-            return Rc::new(RefCell::new(Statement::ParseError));
+        let body_stmts = self.block_stmts();
+        if body_stmts.is_none() {
+            return Rc::new(Statement::ParseError);
         }
+        let mut body_stmts = body_stmts.unwrap();
 
-        let updater_stmt = Rc::new(RefCell::new(Statement::Expression(updater)));
-        if let Statement::Block(ref mut xs) = *body.borrow_mut() {
-            xs.push(updater_stmt);
-        } else { unreachable!() };
+        let updater_stmt = Rc::new(Statement::Expression(updater));
+        body_stmts.push(updater_stmt);
+        let body = Rc::new(Statement::Block(body_stmts));
 
-        let init_stmt = Rc::new(RefCell::new(Statement::Expression(init)));
-        let while_stmt = Rc::new(RefCell::new(Statement::While { condition, body }));
-        Rc::new(RefCell::new(Statement::Block(vec![ init_stmt, while_stmt ])))
+        let init_stmt = Rc::new(Statement::Expression(init));
+        let while_stmt = Rc::new(Statement::While { condition, body });
+        Rc::new(Statement::Block(vec![ init_stmt, while_stmt ]))
     }
 
-    fn parse_type(&mut self) -> Rc<RefCell<Type>> {
+    fn parse_type(&mut self) -> Rc<Type> {
         match self.current().value.to_owned() {
             Token::LBracket => {
                 self.advance();
@@ -796,12 +782,12 @@ impl<'a> Parser<'a> {
                 } else { None };
                 consume!(self, RBracket, "expected ']'".into(), Type, TYPE_FOLLOW);
                 let kind = self.parse_type();
-                Rc::new(RefCell::new(Type::Array { size, kind }))
+                Rc::new(Type::Array { size, kind })
             }
             Token::At => {
                 self.advance();
                 let kind = self.parse_type();
-                Rc::new(RefCell::new(Type::Pointer { kind }))
+                Rc::new(Type::Pointer { kind })
             }
             Token::FuncType => {
                 self.advance();
@@ -817,15 +803,15 @@ impl<'a> Parser<'a> {
                 }
 
                 consume!(self, MoreThan, "expected '>'".into(), Type, TYPE_FOLLOW);
-                Rc::new(RefCell::new(Type::Function { ret, params }))
+                Rc::new(Type::Function { ret, params })
             }
             Token::PrimType(kind) => {
                 self.advance();
-                Rc::new(RefCell::new(Type::Prim(kind.to_owned())))
+                Rc::new(Type::Prim(kind.to_owned()))
             }
             Token::Ident(kind) => {
                 self.advance();
-                Rc::new(RefCell::new(Type::Ident(kind.to_owned())))
+                Rc::new(Type::Ident(kind.to_owned()))
             }
             x => {
                 self.error(format!("invalid type: '{}'", x.get_plaintext()), TYPE_FOLLOW);
@@ -834,35 +820,35 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser<'a>) -> Rc<RefCell<Expression>>) -> Rc<RefCell<Expression>> {
+    fn left_rec(&mut self, symbols: &[TokenKind], child: fn(&mut Parser<'a>) -> Rc<Expression>) -> Rc<Expression> {
         let mut lhs = child(self);
 
         while symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = child(self);
-            lhs = Rc::new(RefCell::new(Expression::Binary { lhs, rhs, op: op.value }))
+            lhs = Rc::new(Expression::Binary { lhs, rhs, op: op.value })
         }
 
         lhs
     }
     fn right_rec(&mut self,
         symbols: &[TokenKind],
-        parent: fn(&mut Parser<'a>) -> Rc<RefCell<Expression>>,
-        child: fn(&mut Parser<'a>) -> Rc<RefCell<Expression>>,
-    ) -> Rc<RefCell<Expression>> {
+        parent: fn(&mut Parser<'a>) -> Rc<Expression>,
+        child: fn(&mut Parser<'a>) -> Rc<Expression>,
+    ) -> Rc<Expression> {
         let lhs = child(self);
 
         if symbols.contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = parent(self);
-            Rc::new(RefCell::new(Expression::Binary { lhs, rhs, op: op.value }))
+            Rc::new(Expression::Binary { lhs, rhs, op: op.value })
         } else { lhs }
     }
-    fn expression(&mut self) -> Rc<RefCell<Expression>> { self.assignment() }
-    fn assignment(&mut self) -> Rc<RefCell<Expression>> { self.right_rec(&[TokenKind::Equals], Self::assignment, Self::logical_or) }
-    fn logical_or(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::LogOr], Self::logical_and) }
-    fn logical_and(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::LogAnd], Self::equality) }
-    fn equality(&mut self) -> Rc<RefCell<Expression>> {
+    fn expression(&mut self) -> Rc<Expression> { self.assignment() }
+    fn assignment(&mut self) -> Rc<Expression> { self.right_rec(&[TokenKind::Equals], Self::assignment, Self::logical_or) }
+    fn logical_or(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::LogOr], Self::logical_and) }
+    fn logical_and(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::LogAnd], Self::equality) }
+    fn equality(&mut self) -> Rc<Expression> {
         let mut lhs = self.relation();
 
         if [TokenKind::EqualTo,
@@ -870,12 +856,12 @@ impl<'a> Parser<'a> {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.relation();
-            lhs = Rc::new(RefCell::new(Expression::Binary { lhs, rhs, op: op.value }));
+            lhs = Rc::new(Expression::Binary { lhs, rhs, op: op.value });
         }
 
         lhs
     }
-    fn relation(&mut self) -> Rc<RefCell<Expression>> {
+    fn relation(&mut self) -> Rc<Expression> {
         let mut lhs = self.bitwise_or();
 
         if [TokenKind::LessThan,
@@ -885,35 +871,35 @@ impl<'a> Parser<'a> {
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let rhs = self.bitwise_or();
-            lhs = Rc::new(RefCell::new(Expression::Binary { lhs, rhs, op: op.value }));
+            lhs = Rc::new(Expression::Binary { lhs, rhs, op: op.value });
         }
 
         lhs
     }
-    fn bitwise_or(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::BitOr], Self::bitwise_xor) }
-    fn bitwise_xor(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::BitXor], Self::bitwise_and) }
-    fn bitwise_and(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::Ampersand], Self::shift) }
-    fn shift(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::LShift, TokenKind::RShift], Self::addition) }
-    fn addition(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::Plus, TokenKind::Minus], Self::multiplication) }
-    fn multiplication(&mut self) -> Rc<RefCell<Expression>> { self.left_rec(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent], Self::unary)}
-    fn unary(&mut self) -> Rc<RefCell<Expression>> {
+    fn bitwise_or(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::BitOr], Self::bitwise_xor) }
+    fn bitwise_xor(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::BitXor], Self::bitwise_and) }
+    fn bitwise_and(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::Ampersand], Self::shift) }
+    fn shift(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::LShift, TokenKind::RShift], Self::addition) }
+    fn addition(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::Plus, TokenKind::Minus], Self::multiplication) }
+    fn multiplication(&mut self) -> Rc<Expression> { self.left_rec(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent], Self::unary)}
+    fn unary(&mut self) -> Rc<Expression> {
         if [TokenKind::LogNot,
             TokenKind::Minus,
             TokenKind::BitNeg
         ].contains(&self.current().get_kind()) {
             let op = self.advance();
             let child = self.unary();
-            Rc::new(RefCell::new(Expression::Unary { child, op: op.value }))
+            Rc::new(Expression::Unary { child, op: op.value })
         } else { self.reference() }
     }
-    fn reference(&mut self) -> Rc<RefCell<Expression>> {
+    fn reference(&mut self) -> Rc<Expression> {
         if self.current().get_kind() == TokenKind::Ampersand {
             let op = self.advance();
             let child = self.access();
-            Rc::new(RefCell::new(Expression::Unary { child, op: op.value }))
+            Rc::new(Expression::Unary { child, op: op.value })
         } else { self.access() }
     }
-    fn access(&mut self) -> Rc<RefCell<Expression>> {
+    fn access(&mut self) -> Rc<Expression> {
         if self.current().get_kind() == TokenKind::Cast {
             self.advance();
             consume!(self, LParen, "expected '('".into(), Expression, EXPR_FOLLOW);
@@ -924,11 +910,11 @@ impl<'a> Parser<'a> {
             let value = self.expression();
 
             consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);
-            Rc::new(RefCell::new(Expression::TypeCast { to, value }))
+            Rc::new(Expression::TypeCast { to, value })
         } else if self.current().get_kind() == TokenKind::At {
             let op = self.advance();
             let child = self.primary();
-            Rc::new(RefCell::new(Expression::Unary { child, op: op.value }))
+            Rc::new(Expression::Unary { child, op: op.value })
         } else {
             let mut lhs = self.primary();
 
@@ -944,13 +930,13 @@ impl<'a> Parser<'a> {
                     }
                     consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);
 
-                    lhs = Rc::new(RefCell::new(Expression::FunctionCall { name: lhs, args }));
+                    lhs = Rc::new(Expression::FunctionCall { name: lhs, args });
                     true
                 }
                 Token::LBracket => {
                     let index = self.expression();
 
-                    lhs = Rc::new(RefCell::new(Expression::ArrayAccess { lhs, index }));
+                    lhs = Rc::new(Expression::ArrayAccess { lhs, index });
                     consume!(self, RBracket, "expected ']'".into(), Expression, EXPR_FOLLOW);
                     true
                 }
@@ -966,22 +952,22 @@ impl<'a> Parser<'a> {
                         else { break; }
                     }
                     consume!(self, RBrace, "expected '}'".into(), Expression, EXPR_FOLLOW);
-                    let name = match &*lhs.borrow() {
+                    let name = match &*lhs {
                         Expression::Identifier(name) => name.clone(),
                         _ => panic!("expected a struct name before initializer"),
                     };
-                    lhs = Rc::new(RefCell::new(Expression::StructInitializer { name, values }));
+                    lhs = Rc::new(Expression::StructInitializer { name, values });
                     true
                 }
                 Token::Arrow => {
                     let member = consume!(self, Ident, "expected an identifer".into(), Expression, EXPR_FOLLOW);
-                    lhs = Rc::new(RefCell::new(Expression::Unary { child: lhs, op: Token::Star }));
-                    lhs = Rc::new(RefCell::new(Expression::MemberAccess { lhs, member }));
+                    lhs = Rc::new(Expression::Unary { child: lhs, op: Token::Star });
+                    lhs = Rc::new(Expression::MemberAccess { lhs, member });
                     true
                 }
                 Token::Dot => {
                     let member = consume!(self, Ident, "expected an identifer".into(), Expression, EXPR_FOLLOW);
-                    lhs = Rc::new(RefCell::new(Expression::MemberAccess { lhs, member }));
+                    lhs = Rc::new(Expression::MemberAccess { lhs, member });
                     true
                 }
                 _ => {
@@ -994,12 +980,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn primary(&mut self) -> Rc<RefCell<Expression>> {
+    fn primary(&mut self) -> Rc<Expression> {
         match self.advance().value {
-            Token::Ident(x) => Rc::new(RefCell::new(Expression::Identifier(x))),
-            Token::Integer(x, k) => Rc::new(RefCell::new(Expression::Integer(x.parse::<i128>().unwrap(), k))),
-            Token::String(x) => Rc::new(RefCell::new(Expression::String(x))),
-            Token::Char(x) => Rc::new(RefCell::new(Expression::Char(x))),
+            Token::Ident(x) => Rc::new(Expression::Identifier(x)),
+            Token::Integer(x, k) => Rc::new(Expression::Integer(x.parse::<i128>().unwrap(), k)),
+            Token::String(x) => Rc::new(Expression::String(x)),
+            Token::Char(x) => Rc::new(Expression::Char(x)),
             Token::LParen => {
                 let child = self.expression();
                 consume!(self, RParen, "expected ')'".into(), Expression, EXPR_FOLLOW);

@@ -61,9 +61,9 @@ pub enum Value {
         block_id: BlockId,
         operands: Vec<ValueId>,
     },
-    ConstInt(i128, Rc<RefCell<Type>>), // TODO: eventually we will have floats, but not yet.
-    ConstChar(char, Rc<RefCell<Type>>),
-    ConstString(String, Rc<RefCell<Type>>),
+    ConstInt(i128, Rc<Type>), // TODO: eventually we will have floats, but not yet.
+    ConstChar(char, Rc<Type>),
+    ConstString(String, Rc<Type>),
 }
 
 pub enum Instruction {
@@ -94,7 +94,7 @@ pub struct IrBuilder<'a> {
     sealed_blocks: HashSet<BlockId>,
     value_arena: Vec<Value>,
 
-    functions: HashMap<String, (BlockId, Rc<RefCell<Type>>, Vec<(String, Rc<RefCell<Type>>)>)>, // entry block, return value, params
+    functions: HashMap<String, (BlockId, Rc<Type>, Vec<(String, Rc<Type>)>)>, // entry block, return value, params
 }
 
 impl<'a> IrBuilder<'a> {
@@ -120,7 +120,7 @@ impl<'a> IrBuilder<'a> {
         self.block_arena.len() - 1
     }
 
-    pub fn run(&mut self, ast: &[Rc<RefCell<Declaration>>]) {
+    pub fn run(&mut self, ast: &[Rc<Declaration>]) {
         self.new_block(String::from("entrypoint"));
 
         for decl in ast {
@@ -236,8 +236,8 @@ impl<'a> IrBuilder<'a> {
         self.sealed_blocks.insert(block_id);
     }
 
-    fn declaration(&mut self, decl: Rc<RefCell<Declaration>>) {
-        match &*decl.borrow() {
+    fn declaration(&mut self, decl: Rc<Declaration>) {
+        match &*decl {
             Declaration::ParseError => unreachable!(),
             Declaration::Function { name, ret, params, body: _ } => {
                 let block_id = self.new_block(name.clone());
@@ -247,11 +247,11 @@ impl<'a> IrBuilder<'a> {
 
                 self.functions.insert(name.clone(), (block_id, ret.clone(), params.clone()));
             }
-            Declaration::Statement(stmt) => eprintln!("dbg stmt: {:#?}", stmt.borrow()),
+            Declaration::Statement(stmt) => eprintln!("dbg stmt: {:#?}", stmt),
             Declaration::Struct { name, fields } => {
                 eprintln!("dbg struct:\n{name} {{");
                 for (field_name, type_ref) in fields.iter() {
-                    eprintln!("\t{field_name}: {:#?}", type_ref.borrow());
+                    eprintln!("\t{field_name}: {:#?}", type_ref);
                 }
                 eprintln!("}}");
             }
