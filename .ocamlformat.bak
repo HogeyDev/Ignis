@@ -1,0 +1,15 @@
+version = 0.29.0
+profile = default
+
+# Maximum allowed indentation for blocks
+max-indent=4
+
+# Global indentations for typical blocks and constructs
+let-binding-indent=4
+cases-exp-indent=4
+function-indent=4
+match-indent=4
+
+# Secondary indentation configurations
+type-decl-indent=4
+stritem-extension-indent=4

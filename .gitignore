@@ -1,16 +1,12 @@
-/target
+# /target
+/_build
 
 /gf
 /.vscode
 /.idea
+
 /example/*.bin
 /example/*.asm
-
 /example/_test
 
-
-# Added by cargo
-#
-# already existing elements were commented out
-
-#/target
+/pdf
