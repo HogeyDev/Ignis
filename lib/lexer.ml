@@ -66,36 +66,13 @@ let identifier t =
     | "for" ->      Token.For
     | "let" ->      Token.Let
     | "if" ->       Token.If
+
     | "void" | "char" | "usize" | "isize"
     | "u64" | "u32" | "u16" | "u8"
     | "i64" | "i32" | "i16" | "i8" -> Token.PrimType s
     | "Func" ->     Token.FuncType
+
     | _ -> Ident s
-
-(* exception Error of string
-
-let error_align_caret line pos =
-  let buf = Buffer.create (String.length line) in
-  let off = ref 0 in
-  String.iteri (fun i c ->
-    if c = '\t' then begin
-      Buffer.add_string buf "    ";
-      if i < pos then off := !off + 4
-    end else begin
-      Buffer.add_char buf c;
-      if i < pos then off := !off + 1
-    end) line;
-  (Buffer.contents buf, !off)
-
-let report ~filename ~lines ~pos msg =
-  let line, col = pos in
-  Fmt.epr "%a: %s:%d:%d: %s@."
-    Fmt.(styled `Red string) "error" filename (line + 1) (col + 1) msg;
-  let src = lines.(line) in
-  let fixed, off = error_align_caret src col in
-  Fmt.epr "%s@." fixed;
-  Fmt.epr "%s^ %s@." (String.make off ' ') msg;
-  raise (Error msg) *)
 
 let number t =
     let b = Buffer.create 16 in
@@ -114,3 +91,44 @@ let number t =
               | _ -> Diagnostics.report ~filename:t.filename ~lines:t.lines ~pos:(t.line, t.col) "expected a primitive integer type")
          | _ -> "i32")
     in Token.Integer (value, suffix)
+
+let punctuation t =
+    let tok =
+        match Option.get (curr t) with
+        | '=' when rel t 1 = Some '=' -> advance t; Token.EqEq
+        | '|' when rel t 1 = Some '|' -> advance t; Token.PipePipe
+        | '&' when rel t 1 = Some '&' -> advance t; Token.AmpAmp
+        | '<' when rel t 1 = Some '=' -> advance t; Token.LessThanEq
+        | '<' when rel t 1 = Some '<' -> advance t; Token.LShift
+        | '>' when rel t 1 = Some '=' -> advance t; Token.MoreThanEq
+        | '>' when rel t 1 = Some '>' -> advance t; Token.RShift
+        | '-' when rel t 1 = Some '>' -> advance t; Token.Arrow
+        | '!' when rel t 1 = Some '=' -> advance t; Token.BangEq
+
+        | '{' -> Token.LBrace
+        | '}' -> Token.RBrace
+        | '(' -> Token.LParen
+        | ')' -> Token.RParen
+        | '[' -> Token.LBracket
+        | ']' -> Token.RBracket
+        | ':' -> Token.Colon
+        | ';' -> Token.Semi
+        | ',' -> Token.Comma
+        | '=' -> Token.Eq
+        | '|' -> Token.Pipe
+        | '&' -> Token.Ampersand
+        | '!' -> Token.Bang
+        | '<' -> Token.LessThan
+        | '>' -> Token.MoreThan
+        | '^' -> Token.Caret
+        | '~' -> Token.Tilde
+        | '+' -> Token.Plus
+        | '-' -> Token.Minus
+        | '*' -> Token.Star
+        | '/' -> Token.Slash
+        | '%' -> Token.Percent
+        | '@' -> Token.At
+        | '.' -> Token.Dot
+        | c -> Diagnostics.report ~filename:t.filename ~lines:t.lines ~pos:(t.line, t.col) (Printf.sprintf "unexpected character: `%c`" c) in
+    advance t;
+    tok

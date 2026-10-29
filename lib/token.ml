@@ -1,61 +1,61 @@
 type kind =
-    | Continue
-    | Function
-    | TypeDef
-    | Import
-    | Return
-    | Static
-    | Struct
-    | Break
-    | Defer
-    | While
-    | Cast
-    | Else
-    | Enum
-    | Spec
-    | Asm
-    | For
-    | Let
-    | If
+    | Continue   (* continue *)
+    | Function   (* function *)
+    | TypeDef    (* type *)
+    | Import     (* import *)
+    | Return     (* return *)
+    | Static     (* static *)
+    | Struct     (* struct *)
+    | Break      (* break *)
+    | Defer      (* defer *)
+    | While      (* while *)
+    | Cast       (* cast *)
+    | Else       (* else *)
+    | Enum       (* enum *)
+    | Spec       (* spec *)
+    | Asm        (* asm *)
+    | For        (* for *)
+    | Let        (* let *)
+    | If         (* if *)
     | Ident of string
     | StringLit of string
     | Integer of string * string (* (value, suffix_type) *)
     | CharLit of char
     | PrimType of string
-    | FuncType
-    | LBrace
-    | RBrace
-    | LParen
-    | RParen
-    | LBracket
-    | RBracket
-    | Colon
-    | Semi
-    | Comma
-    | Equals
-    | LogOr
-    | LogAnd
-    | LogNot
-    | DoubleEquals
-    | NotEquals
-    | LessThan
-    | MoreThan
-    | LessThanEq
-    | MoreThanEq
-    | BitOr
-    | BitXor
-    | BitNeg
-    | LShift
-    | RShift
-    | Plus
-    | Minus
-    | Star
-    | Slash
-    | Percent
-    | Ampersand
-    | At
-    | Dot
-    | Arrow
+    | FuncType   (* Func *)
+    | LBrace     (* { *)
+    | RBrace     (* } *)
+    | LParen     (* ( *)
+    | RParen     (* ) *)
+    | LBracket   (* [ *)
+    | RBracket   (* ] *)
+    | Colon      (* : *)
+    | Semi       (* ; *)
+    | Comma      (* , *)
+    | Eq         (* = *)
+    | PipePipe   (* || *)
+    | AmpAmp     (* && *)
+    | Bang       (* ! *)
+    | EqEq       (* == *)
+    | BangEq     (* != *)
+    | LessThan   (* < *)
+    | MoreThan   (* > *)
+    | LessThanEq (* <= *)
+    | MoreThanEq (* >= *)
+    | Pipe       (* | *)
+    | Caret      (* ^ *)
+    | Tilde      (* ~ *)
+    | LShift     (* << *)
+    | RShift     (* >> *)
+    | Plus       (* + *)
+    | Minus      (* - *)
+    | Star       (* * *)
+    | Slash      (* / *)
+    | Percent    (* % *)
+    | Ampersand  (* & *)
+    | At         (* @ *)
+    | Dot        (* . *)
+    | Arrow      (* -> *)
 
 (*                             (line, col)                *)
 type meta = { file_id : int; pos : int * int; value : kind }
